@@ -8,7 +8,13 @@ proc parse*(T: type DirPath, p: TaintedString): T =
   result = DirPath(p)
 
 template parse*(T: type string, s: TaintedString): string =
-  string(s)
+  string s
+
+proc parse*(T: type SomeSignedInt, s: TaintedString): T =
+  T parseInt(string s)
+
+proc parse*(T: type SomeUnsignedInt, s: TaintedString): T =
+  T parseUInt(string s)
 
 proc load*(Configuration: type,
            cmdLine = commandLineParams(),
