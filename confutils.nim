@@ -1,20 +1,45 @@
 import
-  os, parseopt, strutils, macros, typetraits, confutils/defs
+  os, parseopt, strutils, std_shims/macros_shim, typetraits, confutils/defs
 
 export
   defs
 
-proc parse*(T: type DirPath, p: TaintedString): T =
+proc parseCmdArg*(T: type DirPath, p: TaintedString): T =
   result = DirPath(p)
 
-template parse*(T: type string, s: TaintedString): string =
+proc parseCmdArg*(T: type OutFilePath, p: TaintedString): T =
+  result = OutFilePath(p)
+
+template parseCmdArg*(T: type string, s: TaintedString): string =
   string s
 
-proc parse*(T: type SomeSignedInt, s: TaintedString): T =
+proc parseCmdArg*(T: type SomeSignedInt, s: TaintedString): T =
   T parseInt(string s)
 
-proc parse*(T: type SomeUnsignedInt, s: TaintedString): T =
+proc parseCmdArg*(T: type SomeUnsignedInt, s: TaintedString): T =
   T parseUInt(string s)
+
+proc parseCmdArg*(T: type enum, s: TaintedString): T =
+  parseEnum[T](string(s))
+
+template setField[T](loc: var T, val: TaintedString, defaultVal: untyped): bool =
+  mixin parseCmdArg
+  type FieldType = type(loc)
+
+  loc = if len(val) > 0: parseCmdArg(FieldType, val)
+        else: FieldType(defaultVal)
+  true
+
+template setField[T](loc: var seq[T], val: TaintedString, defaultVal: untyped): bool =
+  mixin parseCmdArg
+  loc.add parseCmdArg(type(loc[0]), val)
+  false
+
+template simpleSet(loc: var auto) =
+  discard
+
+proc makeDefaultValue*(T: type): T =
+  discard
 
 proc load*(Configuration: type,
            cmdLine = commandLineParams(),
@@ -32,54 +57,109 @@ proc load*(Configuration: type,
   # This is an initial naive implementation that will be improved
   # over time.
 
-  mixin parse
+  mixin parseCmdArg
 
   type
-    FieldSetter = proc (val: TaintedString)
+    FieldSetter = proc (cfg: var Configuration, val: TaintedString): bool {.nimcall.}
 
-    ParamDesc = object
-      name, shorthand: string
-      typename: string # this is a human-readable type
+    CommandDesc = object
+      name: string
+      options: seq[OptionDesc]
+      subCommands: seq[CommandDesc]
+      fieldIdx: int
+      argumentsFieldIdx: int
 
+    OptionDesc = object
+      name, typename, shortform: string
       required: bool
-      occurances: int
-      isSeq: bool
+      rejectNext: bool
+      fieldIdx: int
 
-      setter: FieldSetter
+  template readPragma(field, name): NimNode =
+    let p = field.pragmas.findPragma bindSym(name)
+    if p != nil and p.len == 2: p[1] else: p
 
-  var
-    params = newSeq[ParamDesc]()
-    requiredFields = 0
+  macro generateFieldSetters(RecordType: type): untyped =
+    var recordDef = RecordType.getType[1].getImpl
+    let makeDefaultValue = bindSym"makeDefaultValue"
 
-  for fieldName, field in fieldPairs(result):
-    var param: ParamDesc
-    param.name = fieldName
+    result = newTree(nnkStmtListExpr)
+    var settersArray = newTree(nnkBracket)
 
-    type FieldType = type(field)
+    for field in recordFields(recordDef):
+      var
+        setterName = ident($field.name & "Setter")
+        fieldName = field.name
+        recordVar = ident "record"
+        recordField = newTree(nnkDotExpr, recordVar, fieldName)
+        defaultValue = field.readPragma"defaultValue"
 
-    when field.hasCustomPragma(defaultValue):
-      field = FieldType field.getCustomPragmaVal(defaultValue)
-    else:
-      param.required = true
+      if defaultValue == nil:
+        defaultValue = newCall(makeDefaultValue, newTree(nnkTypeOfExpr, recordField))
 
-    when FieldType is seq:
-      param.isSeq = true
-      param.required = false
+      settersArray.add newCall(bindSym"FieldSetter", setterName)
 
-    param.typename = FieldType.name
+      result.add quote do:
+        proc `setterName`(`recordVar`: var `RecordType`, val: TaintedString): bool {.nimcall.} =
+          when `recordField` is enum:
+            # TODO: For some reason, the normal `setField` rejects enum fields
+            # when they are used as case discriminators. File this as a bug.
+            `recordField` = parseEnum[type(`recordField`)](string(val))
+            return true
+          else:
+            return setField(`recordField`, val, `defaultValue`)
 
-    var fieldAddr = addr(field)
-    param.setter = proc (stringValue: TaintedString) =
-      when FieldType is seq:
-        type ElemType = type(field[0])
-        fieldAddr[].add parse(ElemType, stringValue)
+    result.add settersArray
+
+  macro buildCommandTree(RecordType: type): untyped =
+    var recordDef = RecordType.getType[1].getImpl
+    var res: CommandDesc
+    res.argumentsFieldIdx = -1
+
+    var fieldIdx = 0
+    for field in recordFields(recordDef):
+      let
+        isCommand = field.readPragma"command" != nil
+        hasDefault = field.readPragma"defaultValue" != nil
+        shortform = field.readPragma"shortform"
+        longform = field.readPragma"longform"
+        desc = field.readPragma"desc"
+
+      if isCommand:
+        let cmdType = field.typ.getImpl[^1]
+        if cmdType.kind != nnkEnumTy:
+          error "The command pragma should be specified only on enum fields", field.name
+        for i in 2 ..< cmdType.len:
+          res.subCommands.add CommandDesc(name: $cmdType[i],
+                                          fieldIdx: fieldIdx,
+                                          argumentsFieldIdx: -1)
       else:
-        fieldAddr[] = FieldType.parse(stringValue)
+        var option: OptionDesc
+        option.fieldIdx = fieldIdx
+        option.name = $field.name
+        option.required = not hasDefault
+        option.typename = field.typ.repr
+        if longform != nil: option.name = longform.strVal
+        if shortform != nil: option.shortform = shortform.strVal
 
-    when field.hasCustomPragma(shorthand):
-      param.shorthand = field.getCustomPragmaVal(shorthand)
+        var isSubcommandOption = false
+        if field.caseBranch != nil:
+          let branchCmd = $field.caseBranch[0]
+          for cmd in mitems(res.subCommands):
+            if cmd.name == branchCmd:
+              cmd.options.add option
+              isSubcommandOption = true
+              break
 
-    params.add param
+        if not isSubcommandOption:
+          res.options.add option
+
+      inc fieldIdx
+
+    result = newLitFixed(res)
+
+  let fieldSetters = generateFieldSetters(Configuration)
+  var rootCmd = buildCommandTree(Configuration)
 
   proc fail(msg: string) =
     if quitOnFailure:
@@ -88,26 +168,55 @@ proc load*(Configuration: type,
     else:
       raise newException(ConfigurationError, msg)
 
-  proc findParam(name: TaintedString): ptr ParamDesc =
-    for p in params.mitems:
-      if cmpIgnoreStyle(p.name, string(name)) == 0 or
-         cmpIgnoreStyle(p.shorthand, string(name)) == 0:
-        return addr(p)
+  proc findOption(cmd: ptr CommandDesc, name: TaintedString): ptr OptionDesc =
+    for o in cmd.options.mitems:
+      if cmpIgnoreStyle(o.name, string(name)) == 0 or
+         cmpIgnoreStyle(o.shortform, string(name)) == 0:
+        return addr(o)
 
     return nil
 
+  proc findSubcommand(cmd: ptr CommandDesc, name: TaintedString): ptr CommandDesc =
+    for subCmd in cmd.subCommands.mitems:
+      if cmpIgnoreStyle(subCmd.name, string(name)) == 0:
+        return addr(subCmd)
+
+    return nil
+
+  proc checkForMissingOptions(cmd: ptr CommandDesc) =
+    for o in cmd.options:
+      if o.required and o.rejectNext == false:
+        fail "The required option '$1' was not specified" % [o.name]
+
+  var currentCmd = addr rootCmd
+  var rejectNextArgument = currentCmd.argumentsFieldIdx == -1
+
   for kind, key, val in getopt(cmdLine):
-    if kind in {cmdLongOption, cmdShortOption}:
-      let param = findParam(key)
-      if param != nil:
-        inc param.occurances
-        if param.occurances > 1 and not param.isSeq:
+    case kind
+    of cmdLongOption, cmdShortOption:
+      let option = currentCmd.findOption(key)
+      if option != nil:
+        if option.rejectNext:
           fail "The options '$1' should not be specified more than once" % [string(key)]
-        param.setter(val)
+        option.rejectNext = fieldSetters[option.fieldIdx](result, val)
       else:
         fail "Unrecognized option '$1'" % [string(key)]
 
-  for p in params:
-    if p.required and p.occurances == 0:
-      fail "The required option '$1' was not specified" % [p.name]
+    of cmdArgument:
+      let subCmd = currentCmd.findSubcommand(key)
+      if subCmd != nil:
+        discard fieldSetters[subCmd.fieldIdx](result, key)
+        currentCmd = subCmd
+        rejectNextArgument = currentCmd.argumentsFieldIdx == -1
+      else:
+        if rejectNextArgument:
+          fail "The command '$1' does not accept additional arguments" % [currentCmd.name]
+        let argumentIdx = currentCmd.argumentsFieldIdx
+        doAssert argumentIdx != -1
+        rejectNextArgument = fieldSetters[argumentIdx](result, key)
+
+    else:
+      discard
+
+  currentCmd.checkForMissingOptions()
 
