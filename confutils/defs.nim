@@ -1,5 +1,6 @@
 type
   DirPath* = distinct string
+  FilePath* = distinct string
   OutFilePath* = distinct string
   ConfigurationError* = object of CatchableError
 

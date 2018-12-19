@@ -1,14 +1,24 @@
 import
-  os, parseopt, strutils, std_shims/macros_shim, typetraits, confutils/defs
+  os, parseopt, strutils, options, std_shims/macros_shim, typetraits,
+  confutils/defs
 
 export
   defs
 
 proc parseCmdArg*(T: type DirPath, p: TaintedString): T =
+  # TODO: check existence
   result = DirPath(p)
 
 proc parseCmdArg*(T: type OutFilePath, p: TaintedString): T =
+  # TODO: warn the user on rewrites
   result = OutFilePath(p)
+
+proc parseCmdArg*(T: type FilePath, p: TaintedString): T =
+  # TODO: check existence
+  result = FilePath(p)
+
+proc parseCmdArg*[T](_: type Option[T], s: TaintedString): Option[T] =
+  return some(parseCmdArg(T, s))
 
 template parseCmdArg*(T: type string, s: TaintedString): string =
   string s
@@ -41,6 +51,9 @@ template simpleSet(loc: var auto) =
 proc makeDefaultValue*(T: type): T =
   discard
 
+proc requiresInput*(T: type): bool =
+  result = not ((T is seq) or (T is Option))
+
 proc load*(Configuration: type,
            cmdLine = commandLineParams(),
            printUsage = true,
@@ -71,7 +84,7 @@ proc load*(Configuration: type,
 
     OptionDesc = object
       name, typename, shortform: string
-      required: bool
+      hasDefault: bool
       rejectNext: bool
       fieldIdx: int
 
@@ -97,7 +110,9 @@ proc load*(Configuration: type,
       if defaultValue == nil:
         defaultValue = newCall(makeDefaultValue, newTree(nnkTypeOfExpr, recordField))
 
-      settersArray.add newCall(bindSym"FieldSetter", setterName)
+      settersArray.add newTree(nnkTupleConstr,
+                               newCall(bindSym"FieldSetter", setterName),
+                               newCall(bindSym"requiresInput", newTree(nnkTypeOfExpr, field.typ)))
 
       result.add quote do:
         proc `setterName`(`recordVar`: var `RecordType`, val: TaintedString): bool {.nimcall.} =
@@ -137,7 +152,7 @@ proc load*(Configuration: type,
         var option: OptionDesc
         option.fieldIdx = fieldIdx
         option.name = $field.name
-        option.required = not hasDefault
+        option.hasDefault = hasDefault
         option.typename = field.typ.repr
         if longform != nil: option.name = longform.strVal
         if shortform != nil: option.shortform = shortform.strVal
@@ -183,6 +198,9 @@ proc load*(Configuration: type,
 
     return nil
 
+  template required(opt: OptionDesc): bool =
+    fieldSetters[opt.fieldIdx][1] and not opt.hasDefault
+
   proc checkForMissingOptions(cmd: ptr CommandDesc) =
     for o in cmd.options:
       if o.required and o.rejectNext == false:
@@ -198,14 +216,14 @@ proc load*(Configuration: type,
       if option != nil:
         if option.rejectNext:
           fail "The options '$1' should not be specified more than once" % [string(key)]
-        option.rejectNext = fieldSetters[option.fieldIdx](result, val)
+        option.rejectNext = fieldSetters[option.fieldIdx][0](result, val)
       else:
         fail "Unrecognized option '$1'" % [string(key)]
 
     of cmdArgument:
       let subCmd = currentCmd.findSubcommand(key)
       if subCmd != nil:
-        discard fieldSetters[subCmd.fieldIdx](result, key)
+        discard fieldSetters[subCmd.fieldIdx][0](result, key)
         currentCmd = subCmd
         rejectNextArgument = currentCmd.argumentsFieldIdx == -1
       else:
@@ -213,7 +231,7 @@ proc load*(Configuration: type,
           fail "The command '$1' does not accept additional arguments" % [currentCmd.name]
         let argumentIdx = currentCmd.argumentsFieldIdx
         doAssert argumentIdx != -1
-        rejectNextArgument = fieldSetters[argumentIdx](result, key)
+        rejectNextArgument = fieldSetters[argumentIdx][0](result, key)
 
     else:
       discard
