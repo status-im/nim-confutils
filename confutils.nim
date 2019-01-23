@@ -183,7 +183,10 @@ proc load*(Configuration: type,
           when `recordField` is enum:
             # TODO: For some reason, the normal `setField` rejects enum fields
             # when they are used as case discriminators. File this as a bug.
-            `recordField` = parseEnum[type(`recordField`)](string(val))
+            if len(val) > 0:
+              `recordField` = parseEnum[type(`recordField`)](string(val))
+            else:
+              `recordField` = `defaultValue`
             return true
           else:
             return setField(`recordField`, val, `defaultValue`)
@@ -246,7 +249,7 @@ proc load*(Configuration: type,
   proc fail(msg: string) =
     if quitOnFailure:
       stderr.writeLine(msg)
-      stderr.writeLine("Try '{1} --help' for more information" % appName)
+      stderr.writeLine("Try '$1 --help' for more information" % appName)
       quit 1
     else:
       raise newException(ConfigurationError, msg)
