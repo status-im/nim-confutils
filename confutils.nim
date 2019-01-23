@@ -86,6 +86,12 @@ proc parseCmdArg*(T: type SomeSignedInt, s: TaintedString): T =
 proc parseCmdArg*(T: type SomeUnsignedInt, s: TaintedString): T =
   T parseUInt(string s)
 
+proc parseCmdArg*(T: type SomeFloat, p: TaintedString): T =
+  result = parseFloat(p)
+
+proc parseCmdArg*(T: type bool, p: TaintedString): T =
+  result = parseBool(p)
+
 proc parseCmdArg*(T: type enum, s: TaintedString): T =
   parseEnum[T](string(s))
 
@@ -331,9 +337,8 @@ proc dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
     # Turn any default parameters into the confutils's `defaultValue` pragma
     if arg[2].kind != nnkEmpty:
       if arg[0].kind != nnkPragmaExpr:
-        arg[0] = newTree(nnkPragmaExpr, arg[0])
-      arg[0].add newTree(nnkPragma,
-                         newColonExpr(bindSym"defaultValue", arg[2]))
+        arg[0] = newTree(nnkPragmaExpr, arg[0], newTree(nnkPragma))
+      arg[0][1].add newColonExpr(bindSym"defaultValue", arg[2])
       arg[2] = newEmptyNode()
 
     configFields.add arg
@@ -383,5 +388,11 @@ macro cli*(args: varargs[untyped]): untyped =
 
   # Generate the final code
   result = newStmtList(cliProc, dispatchImpl(cliProcName, cliProc.params, args))
+
+  # TODO: remove this once Nim supports custom pragmas on proc params
+  for p in cliProc.params:
+    if p.kind == nnkEmpty: continue
+    p[0] = skipPragma p[0]
+
   debugMacroResult "CLI Code"
 
