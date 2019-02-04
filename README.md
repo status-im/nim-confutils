@@ -18,13 +18,11 @@ Windows registry.
 The library focuses on providing a lot of compile-time configurability
 and extensibility with a strong adherence to the DRY principle.
 
-Let's illustrate the API with a highly annotated example.
-
-Our configuration might be described in a separate module looking like this:
+Let's illustrate the API with a highly annotated example. Our configuration
+might be described in a separate module looking like this:
 
 ```nim
 # config.nim
-
 import
   confutils/defs
 
@@ -129,11 +127,12 @@ when isMainModule:
 ```
 
 And that's it - calling `load` with default parameters will first process any
-[command-line options](#handling-of-command-line-options) and then it will try
-to load any missing options from the most appropriate #[configuration location]
-(#handling-of-config-files) for the platform. Diagnostic messages will be
-provided for many simple configuration errors and the following help message
-will be produced automatically when calling the program with `program --help`:
+[command-line options](#handling-of-command-line-options) and then it will
+try to load any missing options from the most appropriate
+[configuration location](#handling-of-config-files)
+for the platform. Diagnostic messages will be provided for many simple
+configuration errors and the following help message will be produced
+automatically when calling the program with `program --help`:
 
 ```
 Usage: beacon_node [OPTIONS] <command>
@@ -159,7 +158,7 @@ Available sub-commands:
 
 For simpler CLI utilities, Confutils also provides the following convenience APIs:
 
-```
+```nim
 import
   confutils
 
@@ -179,7 +178,7 @@ cli do (validators {.
     quit(1)
 ```
 
-```
+```nim
 import
   confutils
 
@@ -203,7 +202,7 @@ will describe the various ways the default behavior can be tweaked or extended.
 A number of pragmas defined in `confutils/defs` can be attached to the
 configuration fields to control the behavior of the library.
 
-```
+```nim
 template desc*(v: string) {.pragma.}
 ```
 
@@ -212,30 +211,30 @@ help messages.
 
 -----------------
 
-```
+```nim
 template longform*(v: string) {.pragma.}
 ```
 
 A long name of the option.
 Typically, it will have to be be specified as `--longOptionName value`.
-See [Handling of command-line options](#handling-of-command-line-options]
+See [Handling of command-line options](#handling-of-command-line-options)
 for more details.
 
 -----------------
 
-```
+```nim
 template shortform*(v: string) {.pragma.}
 
 ```
 
 A short name of the option.
 Typically, it will be required to be specified as `-x value`.
-See [Handling of command-line options](#handling-of-command-line-options]
+See [Handling of command-line options](#handling-of-command-line-options)
 for more details.
 
 -----------------
 
-```
+```nim
 template defaultValue*(v: untyped) {.pragma.}
 ```
 
@@ -243,7 +242,7 @@ The default value of the option if no value was supplied by the user.
 
 -----------------
 
-```
+```nim
 template required* {.pragma.}
 ```
 
@@ -253,7 +252,7 @@ which the "empty" value can be considered a reasonable default. You can
 also extend this behavior to other user-defined types by providing the
 following overloads:
 
-```
+```nim
 template hasDefault*(T: type Foo): bool = true
 template default*(T: type Foo): Foo = Foo(...)
 ```
@@ -263,7 +262,7 @@ types to make them required.
 
 -----------------
 
-```
+```nim
 template command* {.pragma.}
 ```
 
@@ -272,7 +271,7 @@ See the section on [sub-commands](#Using-sub-commands) for more details.
 
 -----------------
 
-```
+```nim
 template argument* {.pragma.}
 ```
 
@@ -305,7 +304,7 @@ A valid path must be given.
 Furthermore, you can extend the behavior of the library by providing
 overloads such as:
 
-```
+```nim
 proc parseCmdArg*(T: type Foo, p: TaintedString): T =
   ## This provides parsing and validation for fields having the `Foo` type.
   ## You should raise `ConfigurationError` in case of detected problems.
