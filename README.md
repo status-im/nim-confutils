@@ -129,7 +129,7 @@ when isMainModule:
 And that's it - calling `load` with default parameters will first process any
 [command-line options](#handling-of-command-line-options) and then it will
 try to load any missing options from the most appropriate
-[configuration location](#handling-of-config-files)
+[configuration location](#handling-of-environment-variables-and-config-files)
 for the platform. Diagnostic messages will be provided for many simple
 configuration errors and the following help message will be produced
 automatically when calling the program with `program --help`:
@@ -333,8 +333,8 @@ The default parser of Confutils is called `MixedCmdParser`. It tries to follow
 the [robustness principle](https://en.wikipedia.org/wiki/Robustness_principle)
 by recognizing as many styles of passing command-line switches as possible.
 A prefix of `--` is used to indicate a long option name, while the `-` prefix
-uses the short option name. Multiple short options such as `a`, 'b' and
-'c' can be combined into a single `-abc` string. Both the long and the short
+uses the short option name. Multiple short options such as `-a`, `-b` and
+`-c` can be combined into a single `-abc` string. Both the long and the short
 forms can also be prefixed with `/` in the style of Windows utilities. The
 option names are matched in case-insensitive fashion and certain characters
 such as `_` and `-` will be ignored. The values can be separated from the
@@ -374,8 +374,8 @@ provide a `help` command and the following additional switches:
 
 After parsing the command line options, the default behavior of Confutils is
 to try to fill any missing options by examining the contents of the environment
-variables plus a single system-wide configuration location derived from the
-program name. If you want to use Confutils only as a command-line processor
+variables plus two per-user and system-wide configuration locations derived from
+the program name. If you want to use Confutils only as a command-line processor
 or a config file parser for example, you can supply an empty/nil value to the
 `cmdLine`, `envTable` or `configFileEnumerator` parameters of the `load` call.
 
@@ -403,7 +403,7 @@ The specified value is used to determine the default config file location.
 
 #### `vendorName`
 
-This is equal to `appName` unless [[overridden.]]
+This is equal to `appName` unless overridden.
 The specified value is used to determine the default config file location.
 
 #### `configFileEnumerator`
@@ -422,8 +422,8 @@ On Posix systems, the default behavior is attempt to load the configuration
 from the following files:
 
 ```
-/etc/{appName}.{ConfigFileForamt.extension}
 /$HOME/.config/{appName}.{ConfigFileFormat.extension}
+/etc/{appName}.{ConfigFileForamt.extension}
 ```
 
 #### `ConfigFileFormat`
