@@ -40,8 +40,8 @@ proc describeCmdOptions(cmd: CommandDesc) =
       write repeat(" ", max(0, 40 - opt.name.len - opt.typename.len)), ": ", opt.desc
     write "\n"
 
-proc showHelp(cmd: CommandDesc) =
-  let app = appName
+proc showHelp(version: string, cmd: CommandDesc) =
+  let app = appName & " " & version
 
   write "Usage: ", styleBright, app
   if cmd.name.len > 0: write " ", cmd.name
@@ -62,17 +62,46 @@ proc showHelp(cmd: CommandDesc) =
   write "\n"
   quit(0)
 
-proc parseCmdArg*(T: type DirPath, p: TaintedString): T =
-  # TODO: check existence
-  result = DirPath(p)
+# TODO remove the overloads here to get better "missing overload" error message
+proc parseCmdArg*(T: type InputDir, p: TaintedString): T =
+  if not dirExists(p.string):
+    raise newException(ValueError, "Directory doesn't exist")
 
-proc parseCmdArg*(T: type OutFilePath, p: TaintedString): T =
-  # TODO: warn the user on rewrites
-  result = OutFilePath(p)
+  result = T(p)
 
-proc parseCmdArg*(T: type FilePath, p: TaintedString): T =
-  # TODO: check existence
-  result = FilePath(p)
+proc parseCmdArg*(T: type InputFile, p: TaintedString): T =
+  # TODO this is needed only because InputFile cannot be made
+  # an alias of TypedInputFile at the moment, because of a generics
+  # caching issue
+  if not fileExists(p.string):
+    raise newException(ValueError, "File doesn't exist")
+
+  try:
+    let f = open(p.string, fmRead)
+    close f
+  except IOError:
+    raise newException(ValueError, "File not accessible")
+
+  result = T(p.string)
+
+proc parseCmdArg*(T: type TypedInputFile, p: TaintedString): T =
+  var path = p.string
+  when T.defaultExt.len > 0:
+    path = path.addFileExt(T.defaultExt)
+
+  if not fileExists(path):
+    raise newException(ValueError, "File doesn't exist")
+
+  try:
+    let f = open(path, fmRead)
+    close f
+  except IOError:
+    raise newException(ValueError, "File not accessible")
+
+  result = T(path)
+
+proc parseCmdArg*(T: type[OutDir|OutFile|OutPath], p: TaintedString): T =
+  result = T(p)
 
 proc parseCmdArg*[T](_: type Option[T], s: TaintedString): Option[T] =
   return some(parseCmdArg(T, s))
@@ -95,17 +124,21 @@ proc parseCmdArg*(T: type bool, p: TaintedString): T =
 proc parseCmdArg*(T: type enum, s: TaintedString): T =
   parseEnum[T](string(s))
 
-template setField[T](loc: var T, val: TaintedString, defaultVal: untyped): bool =
+proc parseCmdArgAux(T: type, s: TaintedString): T = # {.raises: [ValueError].} =
+  # The parseCmdArg procs are allowed to raise only `ValueError`.
+  # If you have provided your own specializations, please handle
+  # all other exception types.
   mixin parseCmdArg
-  type FieldType = type(loc)
+  parseCmdArg(T, s)
 
-  loc = if len(val) > 0: parseCmdArg(FieldType, val)
+template setField[T](loc: var T, val: TaintedString, defaultVal: untyped): bool =
+  type FieldType = type(loc)
+  loc = if len(val) > 0: parseCmdArgAux(FieldType, val)
         else: FieldType(defaultVal)
   true
 
 template setField[T](loc: var seq[T], val: TaintedString, defaultVal: untyped): bool =
-  mixin parseCmdArg
-  loc.add parseCmdArg(type(loc[0]), val)
+  loc.add parseCmdArgAux(type(loc[0]), val)
   false
 
 template simpleSet(loc: var auto) =
@@ -129,6 +162,7 @@ template debugMacroResult(macroName: string) {.dirty.} =
 
 proc load*(Configuration: type,
            cmdLine = commandLineParams(),
+           version = "",
            printUsage = true,
            quitOnFailure = true): Configuration =
   ## Loads a program configuration by parsing command-line arguments
@@ -142,8 +176,6 @@ proc load*(Configuration: type,
 
   # This is an initial naive implementation that will be improved
   # over time.
-
-  mixin parseCmdArg
 
   type
     FieldSetter = proc (cfg: var Configuration, val: TaintedString): bool {.nimcall.}
@@ -163,33 +195,34 @@ proc load*(Configuration: type,
       var
         setterName = ident($field.name & "Setter")
         fieldName = field.name
-        recordVar = ident "record"
-        recordField = newTree(nnkDotExpr, recordVar, fieldName)
+        configVar = ident "config"
+        configField = newTree(nnkDotExpr, configVar, fieldName)
         defaultValue = field.readPragma"defaultValue"
 
       if defaultValue == nil:
-        defaultValue = newCall(makeDefaultValue, newTree(nnkTypeOfExpr, recordField))
+        defaultValue = newCall(makeDefaultValue, newTree(nnkTypeOfExpr, configField))
 
       # TODO: This shouldn't be necessary. The type symbol returned from Nim should
       # be typed as a tyTypeDesc[tyString] instead of just `tyString`. To be filed.
       var fixedFieldType = newTree(nnkTypeOfExpr, field.typ)
 
       settersArray.add newTree(nnkTupleConstr,
+                               newLit($fieldName),
                                newCall(bindSym"FieldSetter", setterName),
                                newCall(bindSym"requiresInput", fixedFieldType))
 
       result.add quote do:
-        proc `setterName`(`recordVar`: var `RecordType`, val: TaintedString): bool {.nimcall.} =
-          when `recordField` is enum:
+        proc `setterName`(`configVar`: var `RecordType`, val: TaintedString): bool {.nimcall.} =
+          when `configField` is enum:
             # TODO: For some reason, the normal `setField` rejects enum fields
             # when they are used as case discriminators. File this as a bug.
             if len(val) > 0:
-              `recordField` = parseEnum[type(`recordField`)](string(val))
+              `configField` = parseEnum[type(`configField`)](string(val))
             else:
-              `recordField` = `defaultValue`
+              `configField` = `defaultValue`
             return true
           else:
-            return setField(`recordField`, val, `defaultValue`)
+            return setField(`configField`, val, `defaultValue`)
 
     result.add settersArray
     debugMacroResult "Field Setters"
@@ -245,6 +278,7 @@ proc load*(Configuration: type,
 
   let fieldSetters = generateFieldSetters(Configuration)
   var rootCmd = buildCommandTree(Configuration)
+  let confAddr = addr result
 
   proc fail(msg: string) =
     if quitOnFailure:
@@ -269,8 +303,17 @@ proc load*(Configuration: type,
 
     return nil
 
+  template applySetter(setterIdx: int, cmdLineVal: TaintedString): bool =
+    var r: bool
+    try:
+      r = fieldSetters[setterIdx][1](confAddr[], cmdLineVal)
+    except:
+      fail("Invalid value for " & fieldSetters[setterIdx][0] & ": " &
+           getCurrentExceptionMsg())
+    r
+
   template required(opt: OptionDesc): bool =
-    fieldSetters[opt.fieldIdx][1] and not opt.hasDefault
+    fieldSetters[opt.fieldIdx][2] and not opt.hasDefault
 
   proc processMissingOptions(conf: var Configuration, cmd: ptr CommandDesc) =
     for o in cmd.options:
@@ -278,7 +321,7 @@ proc load*(Configuration: type,
         if o.required:
           fail "The required option '$1' was not specified" % [o.name]
         elif o.hasDefault:
-          discard fieldSetters[o.fieldIdx][0](conf, TaintedString(""))
+          discard fieldSetters[o.fieldIdx][1](conf, TaintedString(""))
 
   var currentCmd = addr rootCmd
   var rejectNextArgument = currentCmd.argumentsFieldIdx == -1
@@ -287,23 +330,23 @@ proc load*(Configuration: type,
     case kind
     of cmdLongOption, cmdShortOption:
       if string(key) == "help":
-        showHelp currentCmd[]
+        showHelp version, currentCmd[]
 
       let option = currentCmd.findOption(key)
       if option != nil:
         if option.rejectNext:
           fail "The options '$1' should not be specified more than once" % [string(key)]
-        option.rejectNext = fieldSetters[option.fieldIdx][0](result, val)
+        option.rejectNext = applySetter(option.fieldIdx, val)
       else:
         fail "Unrecognized option '$1'" % [string(key)]
 
     of cmdArgument:
       if string(key) == "help" and currentCmd.subCommands.len > 0:
-        showHelp currentCmd[]
+        showHelp version, currentCmd[]
 
       let subCmd = currentCmd.findSubcommand(key)
       if subCmd != nil:
-        discard fieldSetters[subCmd.fieldIdx][0](result, key)
+        discard applySetter(subCmd.fieldIdx, key)
         currentCmd = subCmd
         rejectNextArgument = currentCmd.argumentsFieldIdx == -1
       else:
@@ -311,7 +354,7 @@ proc load*(Configuration: type,
           fail "The command '$1' does not accept additional arguments" % [currentCmd.name]
         let argumentIdx = currentCmd.argumentsFieldIdx
         doAssert argumentIdx != -1
-        rejectNextArgument = fieldSetters[argumentIdx][0](result, key)
+        rejectNextArgument = applySetter(argumentIdx, key)
 
     else:
       discard
@@ -398,4 +441,16 @@ macro cli*(args: varargs[untyped]): untyped =
     p[0] = skipPragma p[0]
 
   debugMacroResult "CLI Code"
+
+proc load*(f: TypedInputFile): f.ContentType =
+  when f.Format is Unspecified or f.ContentType is Unspecified:
+    {.fatal: "To use `InputFile.load`, please specify the Format and ContentType of the file".}
+
+  when f.Format is Txt:
+    # TODO: implement a proper Txt serialization format
+    mixin init
+    f.ContentType.init readFile(f.string).string
+  else:
+    mixin loadFile
+    loadFile(f.Format, f.string, f.ContentType)
 

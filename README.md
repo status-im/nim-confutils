@@ -70,7 +70,7 @@ type
       bootstrapNodesFile* {.
         desc: "Specifies a line-delimited file of bootsrap Ethereum network addresses"
         shortform: "f"
-        defaultValue: "".}: InputFilePath
+        defaultValue: "".}: InputFile
 
       tcpPort* {.
         desc: "TCP listening port".}: int
