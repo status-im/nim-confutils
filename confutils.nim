@@ -10,6 +10,7 @@ type
     name: string
     options: seq[OptionDesc]
     subCommands: seq[CommandDesc]
+    defaultSubCommand: int
     fieldIdx: int
     argumentsFieldIdx: int
 
@@ -32,6 +33,17 @@ else:
 
   template write(args: varargs[untyped]) =
     stdout.write(args)
+
+when defined(debugCmdTree):
+  proc printCmdTree(cmd: CommandDesc, indent = 0) =
+    let blanks = repeat(' ', indent)
+    echo blanks, "> ", cmd.name
+    for opt in cmd.options:
+      echo blanks, "  - ", opt.name, ": ", opt.typename
+    for subcmd in cmd.subCommands:
+      printCmdTree(subcmd, indent + 2)
+else:
+  template printCmdTree(cmd: CommandDesc) = discard
 
 proc describeCmdOptions(cmd: CommandDesc) =
   for opt in cmd.options:
@@ -229,31 +241,44 @@ proc load*(Configuration: type,
 
   macro buildCommandTree(RecordType: type): untyped =
     var recordDef = RecordType.getType[1].getImpl
+    var fieldIdx = 0
+    # TODO Handle arbitrary sub-command trees more properly
+    # var cmdStack = newSeq[(NimNode, CommandDesc)]()
     var res: CommandDesc
     res.argumentsFieldIdx = -1
+    res.defaultSubCommand = -1
 
-    var fieldIdx = 0
     for field in recordFields(recordDef):
       let
         isCommand = field.readPragma"command" != nil
-        hasDefault = field.readPragma"defaultValue" != nil
+        isDiscriminator = field.caseField != nil and field.caseBranch == nil
+        defaultValue = field.readPragma"defaultValue"
         shortform = field.readPragma"shortform"
         longform = field.readPragma"longform"
         desc = field.readPragma"desc"
 
-      if isCommand:
+      if isDiscriminator:
+        # TODO Handle
         let cmdType = field.typ.getImpl[^1]
         if cmdType.kind != nnkEnumTy:
-          error "The command pragma should be specified only on enum fields", field.name
-        for i in 2 ..< cmdType.len:
-          res.subCommands.add CommandDesc(name: $cmdType[i],
+          error "Only enums are supported as case object discriminators", field.name
+        for i in 1 ..< cmdType.len:
+          let name = $cmdType[i]
+          if defaultValue != nil and $name == $defaultValue:
+            res.defaultSubCommand = res.subCommands.len
+          res.subCommands.add CommandDesc(name: name,
                                           fieldIdx: fieldIdx,
-                                          argumentsFieldIdx: -1)
+                                          argumentsFieldIdx: -1,
+                                          defaultSubCommand: -1)
+      elif isCommand:
+        # TODO Handle string commands
+        # (But perhaps these are no different than arguments)
+        discard
       else:
         var option: OptionDesc
         option.fieldIdx = fieldIdx
         option.name = $field.name
-        option.hasDefault = hasDefault
+        option.hasDefault = defaultValue != nil
         option.typename = field.typ.repr
         if desc != nil: option.desc = desc.strVal
         if longform != nil: option.name = longform.strVal
@@ -278,6 +303,8 @@ proc load*(Configuration: type,
 
   let fieldSetters = generateFieldSetters(Configuration)
   var rootCmd = buildCommandTree(Configuration)
+  printCmdTree rootCmd
+
   let confAddr = addr result
 
   proc fail(msg: string) =
@@ -323,7 +350,9 @@ proc load*(Configuration: type,
         elif o.hasDefault:
           discard fieldSetters[o.fieldIdx][1](conf, TaintedString(""))
 
-  var currentCmd = addr rootCmd
+  var activeCmds = @[addr rootCmd]
+  template currentCmd: auto = activeCmds[^1]
+
   var rejectNextArgument = currentCmd.argumentsFieldIdx == -1
 
   for kind, key, val in getopt(cmdLine):
@@ -347,7 +376,8 @@ proc load*(Configuration: type,
       let subCmd = currentCmd.findSubcommand(key)
       if subCmd != nil:
         discard applySetter(subCmd.fieldIdx, key)
-        currentCmd = subCmd
+        currentCmd.defaultSubCommand = -1
+        activeCmds.add subCmd
         rejectNextArgument = currentCmd.argumentsFieldIdx == -1
       else:
         if rejectNextArgument:
@@ -359,7 +389,10 @@ proc load*(Configuration: type,
     else:
       discard
 
-  result.processMissingOptions(currentCmd)
+  for cmd in activeCmds:
+    result.processMissingOptions(cmd)
+    if cmd.defaultSubCommand != -1:
+      result.processMissingOptions(addr cmd.subCommands[cmd.defaultSubCommand])
 
 proc dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
   # Here, we'll create a configuration object with fields matching
