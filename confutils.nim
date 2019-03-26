@@ -53,7 +53,7 @@ proc describeCmdOptions(cmd: CommandDesc) =
     write "\n"
 
 proc showHelp(version: string, cmd: CommandDesc) =
-  let app = appName & " " & version
+  let app = appName
 
   write "Usage: ", styleBright, app
   if cmd.name.len > 0: write " ", cmd.name
@@ -65,11 +65,15 @@ proc showHelp(version: string, cmd: CommandDesc) =
     write "\n\nThe following options are supported:\n\n"
     describeCmdOptions(cmd)
 
+  if cmd.defaultSubCommand != -1:
+    describeCmdOptions(cmd.subCommands[cmd.defaultSubCommand])
+
   if cmd.subCommands.len > 0:
-    write "\nAvailable sub-commands:\n\n"
-    for subcmd in cmd.subCommands:
-      write "  ", styleBright, app, " ", subcmd.name, "\n\n"
-      describeCmdOptions(subcmd)
+    write "\nAvailable sub-commands:\n"
+    for i in 0 ..< cmd.subCommands.len:
+      if i != cmd.defaultSubCommand:
+        write "\n  ", styleBright, app, " ", cmd.subCommands[i].name, "\n\n"
+        describeCmdOptions(cmd.subCommands[i])
 
   write "\n"
   quit(0)
