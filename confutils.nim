@@ -306,6 +306,9 @@ proc load*(Configuration: type,
   printCmdTree rootCmd
 
   let confAddr = addr result
+  var activeCmds = @[addr rootCmd]
+  template lastCmd: auto = activeCmds[^1]
+  var rejectNextArgument = lastCmd.argumentsFieldIdx == -1
 
   proc fail(msg: string) =
     if quitOnFailure:
@@ -315,11 +318,12 @@ proc load*(Configuration: type,
     else:
       raise newException(ConfigurationError, msg)
 
-  proc findOption(cmd: ptr CommandDesc, name: TaintedString): ptr OptionDesc =
-    for o in cmd.options.mitems:
-      if cmpIgnoreStyle(o.name, string(name)) == 0 or
-         cmpIgnoreStyle(o.shortform, string(name)) == 0:
-        return addr(o)
+  proc findOption(cmds: seq[ptr CommandDesc], name: TaintedString): ptr OptionDesc =
+    for i in countdown(cmds.len - 1, 0):
+      for o in cmds[i].options.mitems:
+        if cmpIgnoreStyle(o.name, string(name)) == 0 or
+           cmpIgnoreStyle(o.shortform, string(name)) == 0:
+          return addr(o)
 
     return nil
 
@@ -350,18 +354,29 @@ proc load*(Configuration: type,
         elif o.hasDefault:
           discard fieldSetters[o.fieldIdx][1](conf, TaintedString(""))
 
-  var activeCmds = @[addr rootCmd]
-  template currentCmd: auto = activeCmds[^1]
-
-  var rejectNextArgument = currentCmd.argumentsFieldIdx == -1
+  template activateCmd(activatedCmd: ptr CommandDesc, key: TaintedString) =
+    let cmd = activatedCmd
+    discard applySetter(cmd.fieldIdx, key)
+    lastCmd.defaultSubCommand = -1
+    activeCmds.add cmd
+    rejectNextArgument = cmd.argumentsFieldIdx == -1
 
   for kind, key, val in getopt(cmdLine):
     case kind
     of cmdLongOption, cmdShortOption:
       if string(key) == "help":
-        showHelp version, currentCmd[]
+        showHelp version, lastCmd[]
 
-      let option = currentCmd.findOption(key)
+      var option = findOption(activeCmds, key)
+      if option == nil:
+        # We didn't find the option.
+        # Check if it's from the default command and activate it if necessary:
+        if lastCmd.defaultSubCommand != -1:
+          let defaultSubCmd = addr lastCmd.subCommands[lastCmd.defaultSubCommand]
+          option = findOption(@[defaultSubCmd], key)
+          if option != nil:
+            activateCmd(defaultSubCmd, TaintedString(""))
+
       if option != nil:
         if option.rejectNext:
           fail "The options '$1' should not be specified more than once" % [string(key)]
@@ -370,19 +385,16 @@ proc load*(Configuration: type,
         fail "Unrecognized option '$1'" % [string(key)]
 
     of cmdArgument:
-      if string(key) == "help" and currentCmd.subCommands.len > 0:
-        showHelp version, currentCmd[]
+      if string(key) == "help" and lastCmd.subCommands.len > 0:
+        showHelp version, lastCmd[]
 
-      let subCmd = currentCmd.findSubcommand(key)
+      let subCmd = lastCmd.findSubcommand(key)
       if subCmd != nil:
-        discard applySetter(subCmd.fieldIdx, key)
-        currentCmd.defaultSubCommand = -1
-        activeCmds.add subCmd
-        rejectNextArgument = currentCmd.argumentsFieldIdx == -1
+        activateCmd(subCmd, key)
       else:
         if rejectNextArgument:
-          fail "The command '$1' does not accept additional arguments" % [currentCmd.name]
-        let argumentIdx = currentCmd.argumentsFieldIdx
+          fail "The command '$1' does not accept additional arguments" % [lastCmd.name]
+        let argumentIdx = lastCmd.argumentsFieldIdx
         doAssert argumentIdx != -1
         rejectNextArgument = applySetter(argumentIdx, key)
 
