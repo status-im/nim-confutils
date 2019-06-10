@@ -410,6 +410,9 @@ proc load*(Configuration: type,
     if cmd.defaultSubCommand != -1:
       result.processMissingOptions(addr cmd.subCommands[cmd.defaultSubCommand])
 
+proc defaults*(Configuration: type): Configuration =
+  load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
+
 proc dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
   # Here, we'll create a configuration object with fields matching
   # the CLI proc params. We'll also generate a call to the designated
