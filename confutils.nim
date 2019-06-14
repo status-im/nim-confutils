@@ -9,7 +9,7 @@ when not defined(nimscript):
   import os, terminal
 
 type
-  CommandDesc = object
+  CommandDesc = ref object
     name: string
     options: seq[OptionDesc]
     subCommands: seq[CommandDesc]
@@ -17,15 +17,20 @@ type
     fieldIdx: int
     argumentsFieldIdx: int
 
-  OptionDesc = object
+  OptionDesc = ref object
     name, typename, shortform: string
     hasDefault: bool
     rejectNext: bool
     fieldIdx: int
     desc: string
 
-  CommandPtr = ptr CommandDesc
-  OptionPtr = ptr OptionDesc
+  CommandPtr = CommandDesc
+  OptionPtr = OptionDesc
+
+proc newLitFixed*(arg: ref): NimNode {.compileTime.} =
+  result = nnkObjConstr.newTree(arg.type.getTypeInst[1])
+  for a, b in fieldPairs(arg[]):
+    result.add nnkExprColonExpr.newTree( newIdentNode(a), newLitFixed(b) )
 
 when defined(nimscript):
   proc appInvocation: string =
@@ -122,14 +127,14 @@ proc findOption(cmds: seq[CommandPtr], name: TaintedString): OptionPtr =
     for o in cmds[i].options.mitems:
       if cmpIgnoreStyle(o.name, string(name)) == 0 or
          cmpIgnoreStyle(o.shortform, string(name)) == 0:
-        return addr(o)
+        return o
 
   return nil
 
 proc findSubcommand(cmd: CommandPtr, name: TaintedString): CommandPtr =
   for subCmd in cmd.subCommands.mitems:
     if cmpIgnoreStyle(subCmd.name, string(name)) == 0:
-      return addr(subCmd)
+      return subCmd
 
   return nil
 
@@ -316,7 +321,7 @@ proc load*(Configuration: type,
     var fieldIdx = 0
     # TODO Handle arbitrary sub-command trees more properly
     # var cmdStack = newSeq[(NimNode, CommandDesc)]()
-    var res: CommandDesc
+    var res = CommandDesc()
     res.argumentsFieldIdx = -1
     res.defaultSubCommand = -1
 
@@ -347,7 +352,7 @@ proc load*(Configuration: type,
         # (But perhaps these are no different than arguments)
         discard
       else:
-        var option: OptionDesc
+        var option = OptionDesc()
         option.fieldIdx = fieldIdx
         option.name = $field.name
         option.hasDefault = defaultValue != nil
@@ -378,7 +383,7 @@ proc load*(Configuration: type,
   printCmdTree rootCmd
 
   let confAddr = addr result
-  var activeCmds = @[addr rootCmd]
+  var activeCmds = @[rootCmd]
   template lastCmd: auto = activeCmds[^1]
   var rejectNextArgument = lastCmd.argumentsFieldIdx == -1
 
@@ -421,14 +426,14 @@ proc load*(Configuration: type,
     case kind
     of cmdLongOption, cmdShortOption:
       if string(key) == "help":
-        showHelp version, lastCmd[]
+        showHelp version, lastCmd
 
       var option = findOption(activeCmds, key)
       if option == nil:
         # We didn't find the option.
         # Check if it's from the default command and activate it if necessary:
         if lastCmd.defaultSubCommand != -1:
-          let defaultSubCmd = addr lastCmd.subCommands[lastCmd.defaultSubCommand]
+          let defaultSubCmd = lastCmd.subCommands[lastCmd.defaultSubCommand]
           option = findOption(@[defaultSubCmd], key)
           if option != nil:
             activateCmd(defaultSubCmd, TaintedString(""))
@@ -442,7 +447,7 @@ proc load*(Configuration: type,
 
     of cmdArgument:
       if string(key) == "help" and lastCmd.subCommands.len > 0:
-        showHelp version, lastCmd[]
+        showHelp version, lastCmd
 
       let subCmd = lastCmd.findSubcommand(key)
       if subCmd != nil:
@@ -461,7 +466,7 @@ proc load*(Configuration: type,
   for cmd in activeCmds:
     result.processMissingOptions(cmd)
     if cmd.defaultSubCommand != -1:
-      result.processMissingOptions(addr cmd.subCommands[cmd.defaultSubCommand])
+      result.processMissingOptions(cmd.subCommands[cmd.defaultSubCommand])
 
 proc defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
