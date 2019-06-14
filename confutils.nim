@@ -1,9 +1,12 @@
 import
-  os, parseopt, strutils, options, std_shims/macros_shim, typetraits, terminal,
-  confutils/defs
+  strutils, options, std_shims/macros_shim, typetraits,
+  confutils/[defs, cli_parser]
 
 export
   defs
+
+when not defined(nimscript):
+  import os, terminal
 
 type
   CommandDesc = object
@@ -21,29 +24,65 @@ type
     fieldIdx: int
     desc: string
 
-template appName: string =
-  getAppFilename().splitFile.name
+  CommandPtr = ptr CommandDesc
+  OptionPtr = ptr OptionDesc
 
-when not defined(confutils_no_colors):
+when defined(nimscript):
+  proc appInvocation: string =
+    "nim " & (if paramCount() > 1: paramStr(1) else: "<nims-script>")
+
+  type stderr = object
+
+  template writeLine(T: type stderr, msg: string) =
+    echo msg
+
+  proc commandLineParams(): seq[string] =
+    for i in 2 .. paramCount():
+      result.add paramStr(i)
+
+  # TODO: Why isn't this available in NimScript?
+  proc getCurrentExceptionMsg(): string =
+    ""
+
+else:
+  template appInvocation: string =
+    getAppFilename().splitFile.name
+
+when defined(nimscript):
+  const styleBright = ""
+
+  # Deal with the issue that `stdout` is not defined in nimscript
+  var buffer = ""
+  proc write(args: varargs[string, `$`]) =
+    for arg in args:
+      buffer.add arg
+    if args[^1][^1] == '\n':
+      buffer.setLen(buffer.len - 1)
+      echo buffer
+      buffer = ""
+
+elif not defined(confutils_no_colors):
   template write(args: varargs[untyped]) =
     stdout.styledWrite(args)
+
 else:
-  const
-    styleBright = ""
+  const styleBright = ""
 
   template write(args: varargs[untyped]) =
     stdout.write(args)
 
-when defined(debugCmdTree):
-  proc printCmdTree(cmd: CommandDesc, indent = 0) =
-    let blanks = repeat(' ', indent)
-    echo blanks, "> ", cmd.name
-    for opt in cmd.options:
-      echo blanks, "  - ", opt.name, ": ", opt.typename
-    for subcmd in cmd.subCommands:
-      printCmdTree(subcmd, indent + 2)
-else:
-  template printCmdTree(cmd: CommandDesc) = discard
+template hasArguments(cmd: CommandPtr): bool =
+  cmd.argumentsFieldIdx != -1
+
+template isSubCommand(cmd: CommandPtr): bool =
+  cmd.name.len > 0
+
+proc noMoreArgumentsError(cmd: CommandPtr): string =
+  result = if cmd.isSubCommand: "The command '$1'" % [cmd.name]
+           else: appInvocation()
+  result.add " does not accept"
+  if cmd.hasArguments: result.add " additional"
+  result.add " arguments"
 
 proc describeCmdOptions(cmd: CommandDesc) =
   for opt in cmd.options:
@@ -53,7 +92,7 @@ proc describeCmdOptions(cmd: CommandDesc) =
     write "\n"
 
 proc showHelp(version: string, cmd: CommandDesc) =
-  let app = appName
+  let app = appInvocation()
 
   write "Usage: ", styleBright, app
   if cmd.name.len > 0: write " ", cmd.name
@@ -78,6 +117,33 @@ proc showHelp(version: string, cmd: CommandDesc) =
   write "\n"
   quit(0)
 
+proc findOption(cmds: seq[CommandPtr], name: TaintedString): OptionPtr =
+  for i in countdown(cmds.len - 1, 0):
+    for o in cmds[i].options.mitems:
+      if cmpIgnoreStyle(o.name, string(name)) == 0 or
+         cmpIgnoreStyle(o.shortform, string(name)) == 0:
+        return addr(o)
+
+  return nil
+
+proc findSubcommand(cmd: CommandPtr, name: TaintedString): CommandPtr =
+  for subCmd in cmd.subCommands.mitems:
+    if cmpIgnoreStyle(subCmd.name, string(name)) == 0:
+      return addr(subCmd)
+
+  return nil
+
+when defined(debugCmdTree):
+  proc printCmdTree(cmd: CommandDesc, indent = 0) =
+    let blanks = repeat(' ', indent)
+    echo blanks, "> ", cmd.name
+    for opt in cmd.options:
+      echo blanks, "  - ", opt.name, ": ", opt.typename
+    for subcmd in cmd.subCommands:
+      printCmdTree(subcmd, indent + 2)
+else:
+  template printCmdTree(cmd: CommandDesc) = discard
+
 # TODO remove the overloads here to get better "missing overload" error message
 proc parseCmdArg*(T: type InputDir, p: TaintedString): T =
   if not dirExists(p.string):
@@ -92,11 +158,12 @@ proc parseCmdArg*(T: type InputFile, p: TaintedString): T =
   if not fileExists(p.string):
     raise newException(ValueError, "File doesn't exist")
 
-  try:
-    let f = open(p.string, fmRead)
-    close f
-  except IOError:
-    raise newException(ValueError, "File not accessible")
+  when not defined(nimscript):
+    try:
+      let f = open(p.string, fmRead)
+      close f
+    except IOError:
+      raise newException(ValueError, "File not accessible")
 
   result = T(p.string)
 
@@ -108,11 +175,12 @@ proc parseCmdArg*(T: type TypedInputFile, p: TaintedString): T =
   if not fileExists(path):
     raise newException(ValueError, "File doesn't exist")
 
-  try:
-    let f = open(path, fmRead)
-    close f
-  except IOError:
-    raise newException(ValueError, "File not accessible")
+  when not defined(nimscript):
+    try:
+      let f = open(path, fmRead)
+      close f
+    except IOError:
+      raise newException(ValueError, "File not accessible")
 
   result = T(path)
 
@@ -317,26 +385,10 @@ proc load*(Configuration: type,
   proc fail(msg: string) =
     if quitOnFailure:
       stderr.writeLine(msg)
-      stderr.writeLine("Try '$1 --help' for more information" % appName)
+      stderr.writeLine("Try '$1 --help' for more information" % appInvocation())
       quit 1
     else:
       raise newException(ConfigurationError, msg)
-
-  proc findOption(cmds: seq[ptr CommandDesc], name: TaintedString): ptr OptionDesc =
-    for i in countdown(cmds.len - 1, 0):
-      for o in cmds[i].options.mitems:
-        if cmpIgnoreStyle(o.name, string(name)) == 0 or
-           cmpIgnoreStyle(o.shortform, string(name)) == 0:
-          return addr(o)
-
-    return nil
-
-  proc findSubcommand(cmd: ptr CommandDesc, name: TaintedString): ptr CommandDesc =
-    for subCmd in cmd.subCommands.mitems:
-      if cmpIgnoreStyle(subCmd.name, string(name)) == 0:
-        return addr(subCmd)
-
-    return nil
 
   template applySetter(setterIdx: int, cmdLineVal: TaintedString): bool =
     var r: bool
@@ -350,7 +402,7 @@ proc load*(Configuration: type,
   template required(opt: OptionDesc): bool =
     fieldSetters[opt.fieldIdx][2] and not opt.hasDefault
 
-  proc processMissingOptions(conf: var Configuration, cmd: ptr CommandDesc) =
+  proc processMissingOptions(conf: var Configuration, cmd: CommandPtr) =
     for o in cmd.options:
       if o.rejectNext == false:
         if o.required:
@@ -358,12 +410,12 @@ proc load*(Configuration: type,
         elif o.hasDefault:
           discard fieldSetters[o.fieldIdx][1](conf, TaintedString(""))
 
-  template activateCmd(activatedCmd: ptr CommandDesc, key: TaintedString) =
+  template activateCmd(activatedCmd: CommandPtr, key: TaintedString) =
     let cmd = activatedCmd
     discard applySetter(cmd.fieldIdx, key)
     lastCmd.defaultSubCommand = -1
     activeCmds.add cmd
-    rejectNextArgument = cmd.argumentsFieldIdx == -1
+    rejectNextArgument = not cmd.hasArguments
 
   for kind, key, val in getopt(cmdLine):
     case kind
@@ -397,7 +449,8 @@ proc load*(Configuration: type,
         activateCmd(subCmd, key)
       else:
         if rejectNextArgument:
-          fail "The command '$1' does not accept additional arguments" % [lastCmd.name]
+          fail lastCmd.noMoreArgumentsError
+
         let argumentIdx = lastCmd.argumentsFieldIdx
         doAssert argumentIdx != -1
         rejectNextArgument = applySetter(argumentIdx, key)
@@ -415,8 +468,7 @@ proc defaults*(Configuration: type): Configuration =
 
 proc dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
   # Here, we'll create a configuration object with fields matching
-  # the CLI proc params. We'll also generate a call to the designated
-  # p
+  # the CLI proc params. We'll also generate a call to the designated proc
   let configType = genSym(nskType, "CliConfig")
   let configFields = newTree(nnkRecList)
   let configVar = genSym(nskLet, "config")

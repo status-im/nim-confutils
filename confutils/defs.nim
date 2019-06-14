@@ -1,5 +1,3 @@
-import os
-
 type
   ConfigurationError* = object of CatchableError
 
