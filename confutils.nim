@@ -1,6 +1,6 @@
 import
   strutils, options, std_shims/macros_shim, typetraits,
-  confutils/[defs, cli_parser]
+  confutils/[defs, cli_parser, shell_completion]
 
 export
   defs
@@ -417,6 +417,92 @@ proc load*(Configuration: type,
     lastCmd.defaultSubCommand = -1
     activeCmds.add cmd
     rejectNextArgument = not cmd.hasArguments
+
+  type
+    ArgKindFilter = enum
+      longForm
+      shortForm
+
+  proc showMatchingOptions(cmd: CommandPtr, prefix: string, filterKind: set[ArgKindFilter]) =
+    var matchingOptions: seq[OptionDesc]
+
+    if len(prefix) > 0:
+      # Filter the options according to the input prefix
+      for opt in cmd.options:
+        if longForm in filterKind:
+          if len(opt.name) > 0 and normalize(opt.name).startsWith(prefix):
+            matchingOptions.add(opt)
+        if shortForm in filterKind:
+          if len(opt.shortform) > 0 and
+            normalize(opt.shortform).startsWith(prefix):
+            matchingOptions.add(opt)
+    else:
+      matchingOptions = cmd.options
+
+    for opt in matchingOptions:
+      # The trailing '=' means the switch accepts an argument
+      let trailing = if opt.typename != "bool": '=' else: ' '
+
+      if longForm in filterKind:
+        stdout.writeLine("--", opt.name, trailing)
+      if shortForm in filterKind:
+        stdout.writeLine('-', opt.shortform, trailing)
+
+  let completion = splitCompletionLine()
+  # If we're not asked to complete a command line the result is an empty list
+  if len(completion) != 0:
+    var cmdStack = @[rootCmd]
+    # Try to understand what the active chain of commands is without parsing the
+    # whole command line
+    for tok in completion[1..^1]:
+      if not tok.startsWith('-'):
+        let subCmd = findSubcommand(cmdStack[^1], tok)
+        if subCmd != nil: cmdStack.add(subCmd)
+
+    let cur_word = normalize(completion[^1])
+    let prev_word = if len(completion) > 2: normalize(completion[^2]) else: ""
+    let prev_prev_word = if len(completion) > 3: normalize(completion[^3]) else: ""
+
+    if cur_word.startsWith('-'):
+      # Show all the options matching the prefix input by the user
+      let isLong = cur_word.startsWith("--")
+      var option_word = cur_word
+      option_word.removePrefix('-')
+
+      for i in countdown(cmdStack.len - 1, 0):
+        let argFilter =
+          if isLong:
+            {longForm}
+          elif len(cur_word) > 1:
+            # If the user entered a single hypen then we show both long & short
+            # variants
+            {shortForm}
+          else:
+            {longForm, shortForm}
+
+        showMatchingOptions(cmdStack[i], option_word, argFilter)
+    elif (prev_word.startsWith('-') or
+        (prev_word == "=" and prev_prev_word.startsWith('-'))):
+      # Handle cases where we want to complete a switch choice
+      # -switch
+      # -switch=
+      var option_word = if len(prev_word) == 1: prev_prev_word else: prev_word
+      option_word.removePrefix('-')
+
+      stderr.writeLine("TODO: options for ", option_word)
+    elif len(cmdStack[^1].subCommands) != 0:
+      # Show all the available subcommands
+      for subCmd in cmdStack[^1].subCommands:
+        if startsWith(normalize(subCmd.name), cur_word):
+          stdout.writeLine(subCmd.name)
+    else:
+      # Full options listing
+      for i in countdown(cmdStack.len - 1, 0):
+        showMatchingOptions(cmdStack[i], "", {longForm, shortForm})
+
+    stdout.flushFile()
+
+    return
 
   for kind, key, val in getopt(cmdLine):
     case kind
