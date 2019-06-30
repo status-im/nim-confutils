@@ -441,7 +441,7 @@ proc load*(Configuration: type,
 
     for opt in matchingOptions:
       # The trailing '=' means the switch accepts an argument
-      let trailing = if opt.typename != "bool": '=' else: ' '
+      let trailing = if opt.typename != "bool": "=" else: ""
 
       if longForm in filterKind:
         stdout.writeLine("--", opt.name, trailing)

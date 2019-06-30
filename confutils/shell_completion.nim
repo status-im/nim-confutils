@@ -13,6 +13,7 @@ type
 
 const
   WORDBREAKS = "\"'@><=;|&(:"
+  SAFE_CHARS = {'a'..'z', 'A'..'Z', '0'..'9', '@', '%', '+', '=', ':', ',', '.', '/', '-'}
 
 proc open(l: var ShellLexer, input: Stream, wordBreakChars: string = WORDBREAKS, preserveTrailingWs = true) =
   lexbase.open(l, input)
@@ -139,6 +140,20 @@ proc splitCompletionLine*(): seq[string] =
       break
     result.add(token.get())
 
+proc quoteWord*(word: string): string =
+  if len(word) == 0:
+    return "''"
+
+  if allCharsInSet(word, SAFE_CHARS):
+    return word
+
+  result.add('\'')
+  for ch in word:
+    if ch == '\'': result.add('\\')
+    result.add(ch)
+
+  result.add('\'')
+
 # Test data lifted from python's shlex unit-tests
 const data = """
 foo bar|foo|bar|
@@ -224,4 +239,11 @@ when isMainModule:
     if got != expected:
       echo "got ", got
       echo "expected ", expected
-      assert(false)
+      doAssert(false)
+
+  doAssert(quoteWord("") == "''")
+  doAssert(quoteWord("\\\"") == "'\\\"'")
+  doAssert(quoteWord("foobar") == "foobar")
+  doAssert(quoteWord("foo$bar") == "'foo$bar'")
+  doAssert(quoteWord("foo bar") == "'foo bar'")
+  doAssert(quoteWord("foo'bar") == "'foo\\'bar'")
