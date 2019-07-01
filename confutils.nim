@@ -220,6 +220,34 @@ proc parseCmdArgAux(T: type, s: TaintedString): T = # {.raises: [ValueError].} =
   mixin parseCmdArg
   parseCmdArg(T, s)
 
+proc completeCmdArg(T: type enum): seq[string] =
+  for e in low(T)..high(T):
+    result.add($e)
+
+proc completeCmdArg(T: type SomeNumber): seq[string] =
+  return @[]
+
+proc completeCmdArg(T: type bool): seq[string] =
+  return @[]
+
+proc completeCmdArg(T: type string): seq[string] =
+  return @[]
+
+proc completeCmdArg*(T: type[InputFile|InputDir]): seq[string] =
+  return @[]
+
+proc completeCmdArg*(T: type[OutFile|OutDir|OutPath]): seq[string] =
+  return @[]
+
+proc completeCmdArg[T](_: type seq[T]): seq[string] =
+  return @[]
+
+proc completeCmdArg[T](_: type Option[T]): seq[string] =
+  return completeCmdArg(type(T))
+
+proc completeCmdArgAux(T: type): seq[string] =
+  return completeCmdArg(T)
+
 template setField[T](loc: var T, val: TaintedString, defaultVal: untyped): bool =
   type FieldType = type(loc)
   loc = if len(val) > 0: parseCmdArgAux(FieldType, val)
@@ -268,6 +296,7 @@ proc load*(Configuration: type,
 
   type
     FieldSetter = proc (cfg: var Configuration, val: TaintedString): bool {.nimcall.}
+    FieldCompleter = proc (val: TaintedString): seq[string] {.nimcall.}
 
   template readPragma(field, name): NimNode =
     let p = field.pragmas.findPragma bindSym(name)
@@ -287,6 +316,7 @@ proc load*(Configuration: type,
         configVar = ident "config"
         configField = newTree(nnkDotExpr, configVar, fieldName)
         defaultValue = field.readPragma"defaultValue"
+        completerName = ident($field.name & "Complete")
 
       if defaultValue == nil:
         defaultValue = newCall(makeDefaultValue, newTree(nnkTypeOfExpr, configField))
@@ -298,9 +328,13 @@ proc load*(Configuration: type,
       settersArray.add newTree(nnkTupleConstr,
                                newLit($fieldName),
                                newCall(bindSym"FieldSetter", setterName),
-                               newCall(bindSym"requiresInput", fixedFieldType))
+                               newCall(bindSym"requiresInput", fixedFieldType),
+                               newCall(bindSym"FieldCompleter", completerName))
 
       result.add quote do:
+        proc `completerName`(val: TaintedString): seq[string] {.nimcall.} =
+          return completeCmdArgAux(`fixedFieldType`)
+
         proc `setterName`(`configVar`: var `RecordType`, val: TaintedString): bool {.nimcall.} =
           when `configField` is enum:
             # TODO: For some reason, the normal `setField` rejects enum fields
@@ -407,6 +441,9 @@ proc load*(Configuration: type,
   template required(opt: OptionDesc): bool =
     fieldSetters[opt.fieldIdx][2] and not opt.hasDefault
 
+  template getArgCompletions(opt: OptionDesc): seq[string] =
+    fieldSetters[opt.fieldIdx][3]("")
+
   proc processMissingOptions(conf: var Configuration, cmd: CommandPtr) =
     for o in cmd.options:
       if o.rejectNext == false:
@@ -493,7 +530,13 @@ proc load*(Configuration: type,
       var option_word = if len(prev_word) == 1: prev_prev_word else: prev_word
       option_word.removePrefix('-')
 
-      stderr.writeLine("TODO: options for ", option_word)
+      let option = findOption(cmdStack, option_word)
+      if option != nil:
+        for arg in getArgCompletions(option):
+          if startsWith(normalize(arg), cur_word):
+            # zsh's bashcompinit is pretty dumb and doesn't understand quotes
+            # nor escape characters
+            stdout.writeLine(quoteWord(arg))
     elif len(cmdStack[^1].subCommands) != 0:
       # Show all the available subcommands
       for subCmd in cmdStack[^1].subCommands:
