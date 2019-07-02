@@ -269,10 +269,6 @@ proc load*(Configuration: type,
   type
     FieldSetter = proc (cfg: var Configuration, val: TaintedString): bool {.nimcall.}
 
-  template readPragma(field, name): NimNode =
-    let p = field.pragmas.findPragma bindSym(name)
-    if p != nil and p.len == 2: p[1] else: p
-
   macro generateFieldSetters(RecordType: type): untyped =
     var recordDef = RecordType.getType[1].getImpl
     let makeDefaultValue = bindSym"makeDefaultValue"
