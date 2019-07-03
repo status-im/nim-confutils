@@ -260,9 +260,7 @@ proc completeCmdArg(T: type string, val: TaintedString): seq[string] =
 proc completeCmdArg*(T: type[InputFile|InputDir], val: TaintedString): seq[string] =
   let (dir, name, ext) = splitFile(val)
   let tail = name & ext
-  # Expand the directory component for the directory walker routine, we still
-  # gotta use the user-supplied `dir` as a prefix in order to let the shell
-  # recognize the entry
+  # Expand the directory component for the directory walker routine
   let dir_path = if dir == "": "." else: expandTilde(dir)
   # Dotfiles are hidden unless the user entered a dot as prefix
   let show_dotfiles = len(name) > 0 and name[0] == '.'
@@ -277,9 +275,9 @@ proc completeCmdArg*(T: type[InputFile|InputDir], val: TaintedString): seq[strin
       if path.startsWith(tail):
         if type(T) is InputDir:
           # Add a trailing slash so that completions can be chained
-          result.add(dir / path & '/')
+          result.add(dir_path / path & '/')
         else:
-          result.add(dir / path)
+          result.add(dir_path / path)
 
 proc completeCmdArg*(T: type[OutFile|OutDir|OutPath], val: TaintedString): seq[string] =
   return @[]
