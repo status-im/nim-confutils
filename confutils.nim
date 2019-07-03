@@ -275,7 +275,11 @@ proc completeCmdArg*(T: type[InputFile|InputDir], val: TaintedString): seq[strin
        type(T) is InputDir and kind in {pcDir, pcLinkToDir}:
       # Note, no normalization is needed here
       if path.startsWith(tail):
-        result.add(dir / path)
+        if type(T) is InputDir:
+          # Add a trailing slash so that completions can be chained
+          result.add(dir / path & '/')
+        else:
+          result.add(dir / path)
 
 proc completeCmdArg*(T: type[OutFile|OutDir|OutPath], val: TaintedString): seq[string] =
   return @[]
