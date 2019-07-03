@@ -220,33 +220,54 @@ proc parseCmdArgAux(T: type, s: TaintedString): T = # {.raises: [ValueError].} =
   mixin parseCmdArg
   parseCmdArg(T, s)
 
-proc completeCmdArg(T: type enum): seq[string] =
+proc completeCmdArg(T: type enum, val: TaintedString): seq[string] =
+  let norm_prefix = normalize(val)
+
   for e in low(T)..high(T):
-    result.add($e)
+    let as_str = $e
+    if as_str.startsWith(norm_prefix):
+      result.add($e)
 
-proc completeCmdArg(T: type SomeNumber): seq[string] =
+proc completeCmdArg(T: type SomeNumber, val: TaintedString): seq[string] =
   return @[]
 
-proc completeCmdArg(T: type bool): seq[string] =
+proc completeCmdArg(T: type bool, val: TaintedString): seq[string] =
   return @[]
 
-proc completeCmdArg(T: type string): seq[string] =
+proc completeCmdArg(T: type string, val: TaintedString): seq[string] =
   return @[]
 
-proc completeCmdArg*(T: type[InputFile|InputDir]): seq[string] =
+proc completeCmdArg*(T: type[InputFile|InputDir], val: TaintedString): seq[string] =
+  let (dir, name, ext) = splitFile(val)
+  let tail = name & ext
+  # Expand the directory component for the directory walker routine, we still
+  # gotta use the user-supplied `dir` as a prefix in order to let the shell
+  # recognize the entry
+  let dir_path = if dir == "": "." else: expandTilde(dir)
+  # Dotfiles are hidden unless the user entered a dot as prefix
+  let show_dotfiles = len(name) > 0 and name[0] == '.'
+
+  for kind, path in walkDir(dir_path, relative=true):
+    if not show_dotfiles and path[0] == '.':
+      continue
+
+    if type(T) is InputFile and kind in {pcFile, pcLinkToFile} or
+       type(T) is InputDir and kind in {pcDir, pcLinkToDir}:
+      # Note, no normalization is needed here
+      if path.startsWith(tail):
+        result.add(dir / path)
+
+proc completeCmdArg*(T: type[OutFile|OutDir|OutPath], val: TaintedString): seq[string] =
   return @[]
 
-proc completeCmdArg*(T: type[OutFile|OutDir|OutPath]): seq[string] =
+proc completeCmdArg[T](_: type seq[T], val: TaintedString): seq[string] =
   return @[]
 
-proc completeCmdArg[T](_: type seq[T]): seq[string] =
-  return @[]
+proc completeCmdArg[T](_: type Option[T], val: TaintedString): seq[string] =
+  return completeCmdArg(type(T), val)
 
-proc completeCmdArg[T](_: type Option[T]): seq[string] =
-  return completeCmdArg(type(T))
-
-proc completeCmdArgAux(T: type): seq[string] =
-  return completeCmdArg(T)
+proc completeCmdArgAux(T: type, val: TaintedString): seq[string] =
+  return completeCmdArg(T, val)
 
 template setField[T](loc: var T, val: TaintedString, defaultVal: untyped): bool =
   type FieldType = type(loc)
@@ -333,7 +354,7 @@ proc load*(Configuration: type,
 
       result.add quote do:
         proc `completerName`(val: TaintedString): seq[string] {.nimcall.} =
-          return completeCmdArgAux(`fixedFieldType`)
+          return completeCmdArgAux(`fixedFieldType`, val)
 
         proc `setterName`(`configVar`: var `RecordType`, val: TaintedString): bool {.nimcall.} =
           when `configField` is enum:
@@ -441,8 +462,8 @@ proc load*(Configuration: type,
   template required(opt: OptionDesc): bool =
     fieldSetters[opt.fieldIdx][2] and not opt.hasDefault
 
-  template getArgCompletions(opt: OptionDesc): seq[string] =
-    fieldSetters[opt.fieldIdx][3]("")
+  template getArgCompletions(opt: OptionDesc, prefix: TaintedString): seq[string] =
+    fieldSetters[opt.fieldIdx][3](prefix)
 
   proc processMissingOptions(conf: var Configuration, cmd: CommandPtr) =
     for o in cmd.options:
@@ -468,14 +489,16 @@ proc load*(Configuration: type,
     var matchingOptions: seq[OptionDesc]
 
     if len(prefix) > 0:
+      # Ignore the case differences as the option parser would do
+      let norm_prefix = normalize(prefix)
       # Filter the options according to the input prefix
       for opt in cmd.options:
         if longForm in filterKind:
-          if len(opt.name) > 0 and normalize(opt.name).startsWith(prefix):
+          if len(opt.name) > 0 and normalize(opt.name).startsWith(norm_prefix):
             matchingOptions.add(opt)
         if shortForm in filterKind:
           if len(opt.shortform) > 0 and
-            normalize(opt.shortform).startsWith(prefix):
+            normalize(opt.shortform).startsWith(norm_prefix):
             matchingOptions.add(opt)
     else:
       matchingOptions = cmd.options
@@ -500,9 +523,9 @@ proc load*(Configuration: type,
         let subCmd = findSubcommand(cmdStack[^1], tok)
         if subCmd != nil: cmdStack.add(subCmd)
 
-    let cur_word = normalize(completion[^1])
-    let prev_word = if len(completion) > 2: normalize(completion[^2]) else: ""
-    let prev_prev_word = if len(completion) > 3: normalize(completion[^3]) else: ""
+    let cur_word = completion[^1]
+    let prev_word = if len(completion) > 2: completion[^2] else: ""
+    let prev_prev_word = if len(completion) > 3: completion[^3] else: ""
 
     if cur_word.startsWith('-'):
       # Show all the options matching the prefix input by the user
@@ -532,11 +555,8 @@ proc load*(Configuration: type,
 
       let option = findOption(cmdStack, option_word)
       if option != nil:
-        for arg in getArgCompletions(option):
-          if startsWith(normalize(arg), cur_word):
-            # zsh's bashcompinit is pretty dumb and doesn't understand quotes
-            # nor escape characters
-            stdout.writeLine(quoteWord(arg))
+        for arg in getArgCompletions(option, cur_word):
+          stdout.writeLine(arg)
     elif len(cmdStack[^1].subCommands) != 0:
       # Show all the available subcommands
       for subCmd in cmdStack[^1].subCommands:
