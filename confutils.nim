@@ -138,6 +138,28 @@ proc findSubcommand(cmd: CommandPtr, name: TaintedString): CommandPtr =
 
   return nil
 
+proc startsWithIgnoreStyle(s: string, prefix: string): bool =
+  # Similar in spirit to cmpIgnoreStyle, but compare only the prefix.
+  var i = 0
+  var j = 0
+
+  while true:
+    # Skip any underscore
+    while i < s.len and s[i] == '_': inc i
+    while j < prefix.len and prefix[j] == '_': inc j
+
+    if j == prefix.len:
+      # The whole prefix matches
+      return true
+    elif i == s.len:
+      # We've reached the end of `s` without matching the prefix
+      return false
+    elif toLowerAscii(s[i]) != toLowerAscii(prefix[j]):
+      return false
+
+    inc i
+    inc j
+
 when defined(debugCmdTree):
   proc printCmdTree(cmd: CommandDesc, indent = 0) =
     let blanks = repeat(' ', indent)
@@ -221,11 +243,9 @@ proc parseCmdArgAux(T: type, s: TaintedString): T = # {.raises: [ValueError].} =
   parseCmdArg(T, s)
 
 proc completeCmdArg(T: type enum, val: TaintedString): seq[string] =
-  let norm_prefix = normalize(val)
-
   for e in low(T)..high(T):
     let as_str = $e
-    if as_str.startsWith(norm_prefix):
+    if startsWithIgnoreStyle(as_str, val):
       result.add($e)
 
 proc completeCmdArg(T: type SomeNumber, val: TaintedString): seq[string] =
@@ -485,16 +505,14 @@ proc load*(Configuration: type,
     var matchingOptions: seq[OptionDesc]
 
     if len(prefix) > 0:
-      # Ignore the case differences as the option parser would do
-      let norm_prefix = normalize(prefix)
       # Filter the options according to the input prefix
       for opt in cmd.options:
         if longForm in filterKind:
-          if len(opt.name) > 0 and normalize(opt.name).startsWith(norm_prefix):
+          if len(opt.name) > 0 and startsWithIgnoreStyle(opt.name, prefix):
             matchingOptions.add(opt)
         if shortForm in filterKind:
           if len(opt.shortform) > 0 and
-            normalize(opt.shortform).startsWith(norm_prefix):
+            startsWithIgnoreStyle(opt.shortform, prefix):
             matchingOptions.add(opt)
     else:
       matchingOptions = cmd.options
@@ -556,7 +574,7 @@ proc load*(Configuration: type,
     elif len(cmdStack[^1].subCommands) != 0:
       # Show all the available subcommands
       for subCmd in cmdStack[^1].subCommands:
-        if startsWith(normalize(subCmd.name), cur_word):
+        if startsWithIgnoreStyle(subCmd.name, cur_word):
           stdout.writeLine(subCmd.name)
     else:
       # Full options listing
