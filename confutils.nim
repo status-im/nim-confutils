@@ -257,7 +257,7 @@ proc completeCmdArg(T: type bool, val: TaintedString): seq[string] =
 proc completeCmdArg(T: type string, val: TaintedString): seq[string] =
   return @[]
 
-proc completeCmdArg*(T: type[InputFile|InputDir], val: TaintedString): seq[string] =
+proc completeCmdArg*(T: type[InputFile|InputDir|OutFile|OutDir|OutPath], val: TaintedString): seq[string] =
   let (dir, name, ext) = splitFile(val)
   let tail = name & ext
   # Expand the directory component for the directory walker routine
@@ -272,21 +272,17 @@ proc completeCmdArg*(T: type[InputFile|InputDir], val: TaintedString): seq[strin
     # Do not show files if asked for directories, on the other hand we must show
     # directories even if a file is requested to allow the user to select a file
     # inside those
-    if type(T) is InputDir and kind notin {pcDir, pcLinkToDir}:
+    if type(T) is InputDir|OutDir and kind notin {pcDir, pcLinkToDir}:
       continue
 
     # Note, no normalization is needed here
     if path.startsWith(tail):
-      let match = if kind in {pcDir, pcLinkToDir}:
-        # Add a trailing slash so that completions can be chained
-        dir_path & DirSep & path & DirSep
-      else:
-        dir_path & DirSep & path
+      var match = dir_path / path
+      # Add a trailing slash so that completions can be chained
+      if kind in {pcDir, pcLinkToDir}:
+        match &= DirSep
 
       result.add(shellPathEscape(match))
-
-proc completeCmdArg*(T: type[OutFile|OutDir|OutPath], val: TaintedString): seq[string] =
-  return @[]
 
 proc completeCmdArg[T](_: type seq[T], val: TaintedString): seq[string] =
   return @[]
