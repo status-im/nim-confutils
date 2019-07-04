@@ -515,12 +515,11 @@ proc load*(Configuration: type,
     if len(prefix) > 0:
       # Filter the options according to the input prefix
       for opt in cmd.options:
-        if longForm in filterKind:
-          if len(opt.name) > 0 and startsWithIgnoreStyle(opt.name, prefix):
+        if longForm in filterKind and len(opt.name) > 0:
+          if startsWithIgnoreStyle(opt.name, prefix):
             matchingOptions.add(opt)
-        if shortForm in filterKind:
-          if len(opt.shortform) > 0 and
-            startsWithIgnoreStyle(opt.shortform, prefix):
+        if shortForm in filterKind and len(opt.shortform) > 0:
+          if startsWithIgnoreStyle(opt.shortform, prefix):
             matchingOptions.add(opt)
     else:
       matchingOptions = cmd.options
@@ -529,9 +528,9 @@ proc load*(Configuration: type,
       # The trailing '=' means the switch accepts an argument
       let trailing = if opt.typename != "bool": "=" else: ""
 
-      if longForm in filterKind:
+      if longForm in filterKind and len(opt.name) > 0:
         stdout.writeLine("--", opt.name, trailing)
-      if shortForm in filterKind:
+      if shortForm in filterKind and len(opt.shortform) > 0:
         stdout.writeLine('-', opt.shortform, trailing)
 
   let completion = splitCompletionLine()
