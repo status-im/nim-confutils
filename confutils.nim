@@ -273,11 +273,13 @@ proc completeCmdArg*(T: type[InputFile|InputDir], val: TaintedString): seq[strin
        type(T) is InputDir and kind in {pcDir, pcLinkToDir}:
       # Note, no normalization is needed here
       if path.startsWith(tail):
-        if type(T) is InputDir:
+        let match = if kind in {pcDir, pcLinkToDir}:
           # Add a trailing slash so that completions can be chained
-          result.add(dir_path / path & '/')
+          dir_path & DirSep & path & DirSep
         else:
-          result.add(dir_path / path)
+          dir_path & DirSep & path
+
+        result.add(shellPathEscape(match))
 
 proc completeCmdArg*(T: type[OutFile|OutDir|OutPath], val: TaintedString): seq[string] =
   return @[]
