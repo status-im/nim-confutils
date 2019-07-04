@@ -269,17 +269,21 @@ proc completeCmdArg*(T: type[InputFile|InputDir], val: TaintedString): seq[strin
     if not show_dotfiles and path[0] == '.':
       continue
 
-    if type(T) is InputFile and kind in {pcFile, pcLinkToFile} or
-       type(T) is InputDir and kind in {pcDir, pcLinkToDir}:
-      # Note, no normalization is needed here
-      if path.startsWith(tail):
-        let match = if kind in {pcDir, pcLinkToDir}:
-          # Add a trailing slash so that completions can be chained
-          dir_path & DirSep & path & DirSep
-        else:
-          dir_path & DirSep & path
+    # Do not show files if asked for directories, on the other hand we must show
+    # directories even if a file is requested to allow the user to select a file
+    # inside those
+    if type(T) is InputDir and kind notin {pcDir, pcLinkToDir}:
+      continue
 
-        result.add(shellPathEscape(match))
+    # Note, no normalization is needed here
+    if path.startsWith(tail):
+      let match = if kind in {pcDir, pcLinkToDir}:
+        # Add a trailing slash so that completions can be chained
+        dir_path & DirSep & path & DirSep
+      else:
+        dir_path & DirSep & path
+
+      result.add(shellPathEscape(match))
 
 proc completeCmdArg*(T: type[OutFile|OutDir|OutPath], val: TaintedString): seq[string] =
   return @[]
