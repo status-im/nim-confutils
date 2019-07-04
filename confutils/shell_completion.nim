@@ -140,7 +140,7 @@ proc splitCompletionLine*(): seq[string] =
       break
     result.add(token.get())
 
-proc quoteWord*(word: string): string =
+proc shellQuote*(word: string): string =
   if len(word) == 0:
     return "''"
 
@@ -153,6 +153,15 @@ proc quoteWord*(word: string): string =
     result.add(ch)
 
   result.add('\'')
+
+proc shellPathEscape*(path: string): string =
+  if allCharsInSet(path, SAFE_CHARS):
+    return path
+
+  for ch in path:
+    if ch notin SAFE_CHARS:
+      result.add('\\')
+    result.add(ch)
 
 # Test data lifted from python's shlex unit-tests
 const data = """
