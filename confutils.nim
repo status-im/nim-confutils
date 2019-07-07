@@ -1,5 +1,5 @@
 import
-  strutils, options, std_shims/macros_shim, typetraits,
+  strutils, options, stew/shims/macros, typetraits,
   confutils/[defs, cli_parser]
 
 export
