@@ -272,7 +272,7 @@ proc completeCmdArg*(T: type[InputFile|InputDir|OutFile|OutDir|OutPath], val: Ta
     # Do not show files if asked for directories, on the other hand we must show
     # directories even if a file is requested to allow the user to select a file
     # inside those
-    if type(T) is InputDir|OutDir and kind notin {pcDir, pcLinkToDir}:
+    if type(T) is (InputDir or OutDir) and kind notin {pcDir, pcLinkToDir}:
       continue
 
     # Note, no normalization is needed here
