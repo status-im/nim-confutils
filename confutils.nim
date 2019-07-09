@@ -257,7 +257,8 @@ proc completeCmdArg(T: type bool, val: TaintedString): seq[string] =
 proc completeCmdArg(T: type string, val: TaintedString): seq[string] =
   return @[]
 
-proc completeCmdArg*(T: type[InputFile|InputDir|OutFile|OutDir|OutPath], val: TaintedString): seq[string] =
+proc completeCmdArg*(T: type[InputFile|TypedInputFile|InputDir|OutFile|OutDir|OutPath],
+                     val: TaintedString): seq[string] =
   let (dir, name, ext) = splitFile(val)
   let tail = name & ext
   # Expand the directory component for the directory walker routine
