@@ -28,3 +28,9 @@ template required* {.pragma.}
 template command* {.pragma.}
 template argument* {.pragma.}
 
+template implicitlySelectable* {.pragma.}
+  ## This can be applied to a case object discriminator
+  ## to allow the value of the discriminator to be determined
+  ## implicitly when the user specifies any of the sub-options
+  ## that depend on the disciminator value.
+

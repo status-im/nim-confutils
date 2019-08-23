@@ -1,36 +1,62 @@
 import
-  strutils, options, stew/shims/macros, typetraits,
+  std/[strutils, wordwrap, options, typetraits],
+  stew/shims/macros,
   confutils/[defs, cli_parser, shell_completion]
 
 export
   defs
 
+const
+  useBufferedOutput = true # defined(nimscript)
+  noColors = useBufferedOutput or defined(confutils_no_colors)
+  descriptionPadding = 6
+  minLongformsWidth =  24 - descriptionPadding
+
 when not defined(nimscript):
   import os, terminal
 
 type
-  CommandDesc = ref object
+  HelpAppInfo = ref object
+    appInvocation: string
+    helpBanner: string
+    hasShortforms: bool
+    maxLongformLen: int
+    terminalWidth: int
+    longformsWidth: int
+
+  CmdInfo = ref object
     name: string
-    options: seq[OptionDesc]
-    subCommands: seq[CommandDesc]
-    defaultSubCommand: int
-    fieldIdx: int
-    argumentsFieldIdx: int
+    opts: seq[OptInfo]
+    shortHelpString: string
 
-  OptionDesc = ref object
-    name, typename, shortform: string
+  OptKind = enum
+    Discriminator
+    CliSwitch
+    Arg
+
+  OptInfo = ref object
+    longform, shortform, desc, typename: string
+    idx: int
     hasDefault: bool
-    rejectNext: bool
-    fieldIdx: int
-    desc: string
+    case kind: OptKind
+    of Discriminator:
+      isCommand: bool
+      isImplicitlySelectable: bool
+      subCmds: seq[CmdInfo]
+      defaultSubCmd: int
+    else:
+      discard
 
-  CommandPtr = CommandDesc
-  OptionPtr = OptionDesc
-
-proc newLitFixed*(arg: ref): NimNode {.compileTime.} =
+proc newLit*(arg: ref): NimNode {.compileTime.} =
   result = nnkObjConstr.newTree(arg.type.getTypeInst[1])
   for a, b in fieldPairs(arg[]):
-    result.add nnkExprColonExpr.newTree( newIdentNode(a), newLitFixed(b) )
+    result.add nnkExprColonExpr.newTree(newIdentNode(a), newLit(b))
+
+proc getFieldName(caseField: NimNode): NimNode =
+  result = caseField
+  if result.kind == nnkIdentDefs: result = result[0]
+  if result.kind == nnkPragmaExpr: result = result[0]
+  if result.kind == nnkPostfix: result = result[1]
 
 when defined(nimscript):
   proc appInvocation: string =
@@ -49,92 +75,250 @@ when defined(nimscript):
   proc getCurrentExceptionMsg(): string =
     ""
 
+  template terminalWidth: int =
+    100000
+
 else:
   template appInvocation: string =
     getAppFilename().splitFile.name
 
-when defined(nimscript):
+when noColors:
   const styleBright = ""
 
-  # Deal with the issue that `stdout` is not defined in nimscript
-  var buffer = ""
-  proc write(args: varargs[string, `$`]) =
+when useBufferedOutput:
+  template helpOutput(args: varargs[string]) =
     for arg in args:
-      buffer.add arg
-    if args[^1][^1] == '\n':
-      buffer.setLen(buffer.len - 1)
-      echo buffer
-      buffer = ""
+      help.add arg
 
-elif not defined(confutils_no_colors):
-  template write(args: varargs[untyped]) =
-    stdout.styledWrite(args)
+  template flushHelp =
+    echo help
 
 else:
-  const styleBright = ""
+  template helpOutput(args: varargs[untyped]) =
+    stdout.styledWrite args
 
-  template write(args: varargs[untyped]) =
-    stdout.write(args)
+  template flushHelp =
+    discard
 
-template hasArguments(cmd: CommandPtr): bool =
-  cmd.argumentsFieldIdx != -1
+func isCliSwitch(opt: OptInfo): bool =
+  opt.kind == CliSwitch or
+  (opt.kind == Discriminator and opt.isCommand == false)
 
-template isSubCommand(cmd: CommandPtr): bool =
+func hasOpts(cmd: CmdInfo): bool =
+  cmd.opts.len > 0 and cmd.opts[0].isCliSwitch
+
+func hasArgs(cmd: CmdInfo): bool =
+  cmd.opts.len > 0 and cmd.opts[^1].kind == Arg
+
+func firstArgIdx(cmd: CmdInfo): int =
+  # This will work correctly only if the command has arguments.
+  result = cmd.opts.len - 1
+  while result > 0:
+    if cmd.opts[result - 1].kind != Arg:
+      return
+
+iterator args(cmd: CmdInfo): OptInfo =
+  if cmd.hasArgs:
+    for i in cmd.firstArgIdx ..< cmd.opts.len:
+      yield cmd.opts[i]
+
+func getSubCmdDiscriminator(cmd: CmdInfo): OptInfo =
+  for i in countdown(cmd.opts.len - 1, 0):
+    let opt = cmd.opts[i]
+    if opt.kind != Arg:
+      if opt.kind == Discriminator and opt.isCommand:
+        return opt
+      else:
+        return nil
+
+template hasSubCommands(cmd: CmdInfo): bool =
+  getSubCmdDiscriminator(cmd) != nil
+
+iterator subCmds(cmd: CmdInfo): CmdInfo =
+  let subCmdDiscriminator = cmd.getSubCmdDiscriminator
+  if subCmdDiscriminator != nil:
+    for cmd in subCmdDiscriminator.subCmds:
+      yield cmd
+
+proc getDefaultSubCmd(cmd: CmdInfo): CmdInfo =
+  let subCmdDiscriminator = cmd.getSubCmdDiscriminator
+  if subCmdDiscriminator != nil and subCmdDiscriminator.defaultSubCmd != -1:
+    return subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
+
+template isSubCommand(cmd: CmdInfo): bool =
   cmd.name.len > 0
 
-proc noMoreArgumentsError(cmd: CommandPtr): string =
+func maxLongformLen(cmd: CmdInfo): int =
+  result = 0
+  for opt in cmd.opts:
+    if opt.kind == Arg or opt.kind == Discriminator and opt.isCommand:
+      continue
+    result = max(result, opt.longform.len)
+    if opt.kind == Discriminator:
+      for subCmd in opt.subCmds:
+        result = max(result, subCmd.maxLongformLen)
+
+func hasShortforms(cmd: CmdInfo): bool =
+  for opt in cmd.opts:
+    if opt.kind == Arg or opt.kind == Discriminator and opt.isCommand:
+      continue
+    if opt.shortform.len > 0:
+      return true
+    if opt.kind == Discriminator:
+      for subCmd in opt.subCmds:
+        if hasShortforms(subCmd):
+          return true
+
+func humaneName(opt: OptInfo): string =
+  if opt.longform.len > 0: opt.longform
+  else: opt.shortform
+
+proc paddedOutput(help: var string, output: string, desiredWidth: int) =
+  helpOutput output, spaces(max(desiredWidth - output.len, 0))
+
+proc writeDesc(help: var string, appInfo: HelpAppInfo, desc: string) =
+  let
+    nonDescColumns = (6 + appInfo.longformsWidth)
+    remainingColumns = appInfo.terminalWidth - nonDescColumns
+
+  if remainingColumns < 36:
+    helpOutput "\p ", wrapWords(desc, appInfo.terminalWidth - 1,
+                                newLine = "\p ")
+  else:
+    helpOutput wrapWords(desc, remainingColumns,
+                         newLine = "\p" & spaces(nonDescColumns))
+
+proc describeInvocation(cmd: CmdInfo, cmdInvocation: string,
+                        appInfo: HelpAppInfo, help: var string) =
+  helpOutput styleBright, cmdInvocation
+  var longestArg = 0
+
+  if cmd.opts.len > 0:
+    if cmd.hasOpts: helpOutput " [OPTIONS]..."
+
+    let subCmdDiscriminator = cmd.getSubCmdDiscriminator
+    if subCmdDiscriminator != nil: helpOutput " command"
+
+    for arg in cmd.args:
+      helpOutput " <", arg.longform, ">"
+      longestArg = max(longestArg, arg.longform.len)
+
+  helpOutput "\p\p"
+
+  for arg in cmd.args:
+    if arg.desc.len > 0:
+      help.paddedOutput("<" & arg.humaneName & ">",
+                        6 + appInfo.longformsWidth)
+      help.writeDesc appInfo, arg.desc
+
+proc describeOptions(cmd: CmdInfo, cmdInvocation: string,
+                     appInfo: HelpAppInfo, help: var string) =
+  if cmd.hasOpts:
+    helpOutput "The following options are available:\p\p"
+    for opt in cmd.opts:
+      if opt.kind == Arg: continue
+      if opt.kind == Discriminator:
+        if opt.isCommand: continue
+
+      if opt.shortform.len > 0:
+        helpOutput styleBright, " -", opt.shortform, " "
+      elif appInfo.hasShortforms:
+        helpOutput "    "
+
+      if opt.longform.len > 0:
+        help.paddedOutput("--" & opt.longform, appInfo.longformsWidth)
+      else:
+        helpOutput spaces(2 + appInfo.longformsWidth)
+
+      if opt.desc.len > 0:
+        help.writeDesc appInfo, opt.desc.replace("%t", opt.typename)
+
+      helpOutput "\p"
+
+      if opt.kind == Discriminator:
+        for i, subCmd in opt.subCmds:
+          helpOutput "\pWhen ", opt.humaneName, "=", subCmd.name
+          if i == opt.defaultSubCmd: helpOutput " (default)"
+          helpOutput ":\p\p"
+          subCmd.describeOptions cmdInvocation, appInfo, help
+
+    helpOutput "\p"
+
+  let subCmdDiscriminator = cmd.getSubCmdDiscriminator
+  if subCmdDiscriminator != nil:
+    let defaultCmdIdx = subCmdDiscriminator.defaultSubCmd
+    if defaultCmdIdx != -1:
+      let defaultCmd = subCmdDiscriminator.subCmds[defaultCmdIdx]
+      defaultCmd.describeOptions cmdInvocation, appInfo, help
+
+    helpOutput "Available sub-commands:\p\p"
+
+    for i, subCmd in subCmdDiscriminator.subCmds:
+      if i != subCmdDiscriminator.defaultSubCmd:
+        let subCmdInvocation = cmdInvocation & " " & subCmd.name
+        subCmd.describeInvocation subCmdInvocation, appInfo, help
+        subCmd.describeOptions subCmdInvocation, appInfo, help
+
+proc showHelp(appInfo: HelpAppInfo, activeCmds: openarray[CmdInfo]) =
+  var help = ""
+  helpOutput appInfo.helpBanner
+
+  let cmd = activeCmds[^1]
+
+  appInfo.maxLongformLen = cmd.maxLongformLen
+  appInfo.hasShortforms = cmd.hasShortforms
+  appInfo.terminalWidth = terminalWidth()
+  appInfo.longformsWidth = min(minLongformsWidth, appInfo.maxLongformLen) +
+                           descriptionPadding
+
+  var cmdInvocation = appInfo.appInvocation
+  for i in 1 ..< activeCmds.len:
+    cmdInvocation.add " "
+    cmdInvocation.add activeCmds[i].name
+
+  # Write out the app or script name
+  helpOutput "Usage: "
+  cmd.describeInvocation cmdInvocation, appInfo, help
+  cmd.describeOptions cmdInvocation, appInfo, help
+
+  flushHelp
+  quit 1
+
+func getNextArgIdx(cmd: CmdInfo, consumedArgIdx: int): int =
+  for i in consumedArgIdx + 1 ..< cmd.opts.len:
+    if cmd.opts[i].kind == Arg:
+      return i
+
+  return -1
+
+proc noMoreArgsError(cmd: CmdInfo): string =
   result = if cmd.isSubCommand: "The command '$1'" % [cmd.name]
            else: appInvocation()
   result.add " does not accept"
-  if cmd.hasArguments: result.add " additional"
+  if cmd.hasArgs: result.add " additional"
   result.add " arguments"
 
-proc describeCmdOptions(cmd: CommandDesc) =
-  for opt in cmd.options:
-    write "  --", opt.name, "=", opt.typename
-    if opt.desc.len > 0:
-      write repeat(" ", max(0, 40 - opt.name.len - opt.typename.len)), ": ", opt.desc
-    write "\n"
+proc findOpt(opts: openarray[OptInfo], name: string): OptInfo =
+  for opt in opts:
+    if cmpIgnoreStyle(opt.longform, name) == 0 or
+       cmpIgnoreStyle(opt.shortform, name) == 0:
+      return opt
 
-proc showHelp(version: string, cmd: CommandDesc) =
-  let app = appInvocation()
+proc findOpt(activeCmds: openarray[CmdInfo], name: string): OptInfo =
+  for i in countdown(activeCmds.len - 1, 0):
+    let found = findOpt(activeCmds[i].opts, name)
+    if found != nil: return found
 
-  write "Usage: ", styleBright, app
-  if cmd.name.len > 0: write " ", cmd.name
-  if cmd.options.len > 0: write " [OPTIONS]"
-  if cmd.subCommands.len > 0: write " <command>"
-  if cmd.argumentsFieldIdx != -1: write " [<args>]"
+proc findCmd(cmds: openarray[CmdInfo], name: string): CmdInfo =
+  for cmd in cmds:
+    if cmpIgnoreStyle(cmd.name, name) == 0:
+      return cmd
 
-  if cmd.options.len > 0:
-    write "\n\nThe following options are supported:\n\n"
-    describeCmdOptions(cmd)
-
-  if cmd.defaultSubCommand != -1:
-    describeCmdOptions(cmd.subCommands[cmd.defaultSubCommand])
-
-  if cmd.subCommands.len > 0:
-    write "\nAvailable sub-commands:\n"
-    for i in 0 ..< cmd.subCommands.len:
-      if i != cmd.defaultSubCommand:
-        write "\n  ", styleBright, app, " ", cmd.subCommands[i].name, "\n\n"
-        describeCmdOptions(cmd.subCommands[i])
-
-  write "\n"
-  quit(0)
-
-proc findOption(cmds: seq[CommandPtr], name: TaintedString): OptionPtr =
-  for i in countdown(cmds.len - 1, 0):
-    for o in cmds[i].options.mitems:
-      if cmpIgnoreStyle(o.name, string(name)) == 0 or
-         cmpIgnoreStyle(o.shortform, string(name)) == 0:
-        return o
-
-  return nil
-
-proc findSubcommand(cmd: CommandPtr, name: TaintedString): CommandPtr =
-  for subCmd in cmd.subCommands.mitems:
-    if cmpIgnoreStyle(subCmd.name, string(name)) == 0:
-      return subCmd
+proc findSubCmd(cmd: CmdInfo, name: string): CmdInfo =
+  let subCmdDiscriminator = cmd.getSubCmdDiscriminator
+  if subCmdDiscriminator != nil:
+    let cmd = findCmd(subCmdDiscriminator.subCmds, name)
+    if cmd != nil: return cmd
 
   return nil
 
@@ -161,15 +345,19 @@ proc startsWithIgnoreStyle(s: string, prefix: string): bool =
     inc j
 
 when defined(debugCmdTree):
-  proc printCmdTree(cmd: CommandDesc, indent = 0) =
-    let blanks = repeat(' ', indent)
+  proc printCmdTree(cmd: CmdInfo, indent = 0) =
+    let blanks = spaces(indent)
     echo blanks, "> ", cmd.name
-    for opt in cmd.options:
-      echo blanks, "  - ", opt.name, ": ", opt.typename
-    for subcmd in cmd.subCommands:
-      printCmdTree(subcmd, indent + 2)
+
+    for opt in cmd.opts:
+      if opt.kind == Discriminator:
+        for subcmd in opt.subCmds:
+          printCmdTree(subcmd, indent + 2)
+      else:
+        echo blanks, "  - ", opt.longform, ": ", opt.typename
+
 else:
-  template printCmdTree(cmd: CommandDesc) = discard
+  template printCmdTree(cmd: CmdInfo) = discard
 
 # TODO remove the overloads here to get better "missing overload" error message
 proc parseCmdArg*(T: type InputDir, p: TaintedString): T =
@@ -294,15 +482,13 @@ proc completeCmdArg[T](_: type Option[T], val: TaintedString): seq[string] =
 proc completeCmdArgAux(T: type, val: TaintedString): seq[string] =
   return completeCmdArg(T, val)
 
-template setField[T](loc: var T, val: TaintedString, defaultVal: untyped): bool =
+template setField[T](loc: var T, val: TaintedString, defaultVal: untyped) =
   type FieldType = type(loc)
   loc = if len(val) > 0: parseCmdArgAux(FieldType, val)
         else: FieldType(defaultVal)
-  true
 
-template setField[T](loc: var seq[T], val: TaintedString, defaultVal: untyped): bool =
+template setField[T](loc: var seq[T], val: TaintedString, defaultVal: untyped) =
   loc.add parseCmdArgAux(type(loc[0]), val)
-  false
 
 template simpleSet(loc: var auto) =
   discard
@@ -311,7 +497,10 @@ proc makeDefaultValue*(T: type): T =
   discard
 
 proc requiresInput*(T: type): bool =
-  result = not ((T is seq) or (T is Option))
+  not ((T is seq) or (T is Option))
+
+proc acceptsMultipleValues*(T: type): bool =
+  T is seq
 
 # TODO: The usage of this should be replacable with just `type(x)`,
 # but Nim is not able to handle it at the moment.
@@ -341,7 +530,7 @@ proc load*(Configuration: type,
   # over time.
 
   type
-    FieldSetter = proc (cfg: var Configuration, val: TaintedString): bool {.nimcall.}
+    FieldSetter = proc (cfg: var Configuration, val: TaintedString) {.nimcall.}
     FieldCompleter = proc (val: TaintedString): seq[string] {.nimcall.}
 
   macro generateFieldSetters(RecordType: type): untyped =
@@ -370,14 +559,15 @@ proc load*(Configuration: type,
       settersArray.add newTree(nnkTupleConstr,
                                newLit($fieldName),
                                newCall(bindSym"FieldSetter", setterName),
+                               newCall(bindSym"FieldCompleter", completerName),
                                newCall(bindSym"requiresInput", fixedFieldType),
-                               newCall(bindSym"FieldCompleter", completerName))
+                               newCall(bindSym"acceptsMultipleValues", fixedFieldType))
 
       result.add quote do:
         proc `completerName`(val: TaintedString): seq[string] {.nimcall.} =
           return completeCmdArgAux(`fixedFieldType`, val)
 
-        proc `setterName`(`configVar`: var `RecordType`, val: TaintedString): bool {.nimcall.} =
+        proc `setterName`(`configVar`: var `RecordType`, val: TaintedString) {.nimcall.} =
           when `configField` is enum:
             # TODO: For some reason, the normal `setField` rejects enum fields
             # when they are used as case discriminators. File this as a bug.
@@ -385,83 +575,86 @@ proc load*(Configuration: type,
               `configField` = parseEnum[type(`configField`)](string(val))
             else:
               `configField` = `defaultValue`
-            return true
           else:
-            return setField(`configField`, val, `defaultValue`)
+            setField(`configField`, val, `defaultValue`)
 
     result.add settersArray
     debugMacroResult "Field Setters"
 
   macro buildCommandTree(RecordType: type): untyped =
-    var recordDef = RecordType.getType[1].getImpl
-    var fieldIdx = 0
-    # TODO Handle arbitrary sub-command trees more properly
-    # var cmdStack = newSeq[(NimNode, CommandDesc)]()
-    var res = CommandDesc()
-    res.argumentsFieldIdx = -1
-    res.defaultSubCommand = -1
+    var
+      recordDef = RecordType.getType[1].getImpl
+      res = CmdInfo()
+      discriminatorFields = newSeq[OptInfo]()
+      fieldIdx = 0
 
     for field in recordFields(recordDef):
       let
-        isCommand = field.readPragma"command" != nil
         isDiscriminator = field.caseField != nil and field.caseBranch == nil
+        isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
         defaultValue = field.readPragma"defaultValue"
         shortform = field.readPragma"shortform"
         longform = field.readPragma"longform"
         desc = field.readPragma"desc"
 
-      if isDiscriminator:
-        # TODO Handle
-        let cmdType = field.typ.getImpl[^1]
-        if cmdType.kind != nnkEnumTy:
-          error "Only enums are supported as case object discriminators", field.name
-        for i in 1 ..< cmdType.len:
-          let name = $cmdType[i]
-          if defaultValue != nil and $name == $defaultValue:
-            res.defaultSubCommand = res.subCommands.len
-          res.subCommands.add CommandDesc(name: name,
-                                          fieldIdx: fieldIdx,
-                                          argumentsFieldIdx: -1,
-                                          defaultSubCommand: -1)
-      elif isCommand:
-        # TODO Handle string commands
-        # (But perhaps these are no different than arguments)
-        discard
-      else:
-        var option = OptionDesc()
-        option.fieldIdx = fieldIdx
-        option.name = $field.name
-        option.hasDefault = defaultValue != nil
-        option.typename = field.typ.repr
-        if desc != nil: option.desc = desc.strVal
-        if longform != nil: option.name = longform.strVal
-        if shortform != nil: option.shortform = shortform.strVal
+      var opt = OptInfo(kind: if isDiscriminator: Discriminator else: CliSwitch,
+                        idx: fieldIdx,
+                        longform: $field.name,
+                        hasDefault: defaultValue != nil,
+                        typename: field.typ.repr)
 
-        var isSubcommandOption = false
-        if field.caseBranch != nil:
-          let branchCmd = $field.caseBranch[0]
-          for cmd in mitems(res.subCommands):
-            if cmd.name == branchCmd:
-              cmd.options.add option
-              isSubcommandOption = true
-              break
-
-        if not isSubcommandOption:
-          res.options.add option
+      if desc != nil: opt.desc = desc.strVal
+      if longform != nil: opt.longform = longform.strVal
+      if shortform != nil: opt.shortform = shortform.strVal
 
       inc fieldIdx
 
-    result = newLitFixed(res)
+      if isDiscriminator:
+        discriminatorFields.add opt
+        let cmdType = field.typ.getImpl[^1]
+        if cmdType.kind != nnkEnumTy:
+          error "Only enums are supported as case object discriminators", field.name
+
+        opt.isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
+        opt.isCommand = field.readPragma"command" != nil
+
+        for i in 1 ..< cmdType.len:
+          let name = $cmdType[i]
+          if defaultValue != nil and eqIdent(name, defaultValue):
+            opt.defaultSubCmd = i - 1
+          opt.subCmds.add CmdInfo(name: name)
+
+        if defaultValue == nil:
+          opt.defaultSubCmd = -1
+        else:
+          if opt.defaultSubCmd == -1:
+            error "The default value is not a valid enum value", defaultValue
+
+      else:
+        if field.caseField != nil:
+          let fieldName = field.caseField.getFieldName
+          var discriminator = findOpt(discriminatorFields, $fieldName)
+          if discriminator == nil:
+            error "Unable to find " & $fieldName
+          let branchEnumVal = field.caseBranch[0]
+          var cmd = findCmd(discriminator.subCmds, $branchEnumVal)
+          cmd.opts.add opt
+        else:
+          res.opts.add opt
+
+    result = newLit(res)
     debugMacroResult "Command Tree"
 
   let fieldSetters = generateFieldSetters(Configuration)
+  var fieldCounters: array[fieldSetters.len, int]
+
   var rootCmd = buildCommandTree(Configuration)
   printCmdTree rootCmd
 
   let confAddr = addr result
   var activeCmds = @[rootCmd]
   template lastCmd: auto = activeCmds[^1]
-  var rejectNextArgument = lastCmd.argumentsFieldIdx == -1
+  var nextArgIdx = lastCmd.getNextArgIdx(-1)
 
   proc fail(msg: string) =
     if quitOnFailure:
@@ -471,62 +664,63 @@ proc load*(Configuration: type,
     else:
       raise newException(ConfigurationError, msg)
 
-  template applySetter(setterIdx: int, cmdLineVal: TaintedString): bool =
-    var r: bool
+  template applySetter(setterIdx: int, cmdLineVal: TaintedString) =
     try:
-      r = fieldSetters[setterIdx][1](confAddr[], cmdLineVal)
+      fieldSetters[setterIdx][1](confAddr[], cmdLineVal)
+      inc fieldCounters[setterIdx]
     except:
       fail("Invalid value for " & fieldSetters[setterIdx][0] & ": " &
            getCurrentExceptionMsg())
-    r
 
-  template required(opt: OptionDesc): bool =
-    fieldSetters[opt.fieldIdx][2] and not opt.hasDefault
+  template getArgCompletions(opt: OptInfo, prefix: TaintedString): seq[string] =
+    fieldSetters[opt.idx][2](prefix)
 
-  template getArgCompletions(opt: OptionDesc, prefix: TaintedString): seq[string] =
-    fieldSetters[opt.fieldIdx][3](prefix)
+  template required(opt: OptInfo): bool =
+    fieldSetters[opt.idx][3] and not opt.hasDefault
 
-  proc processMissingOptions(conf: var Configuration, cmd: CommandPtr) =
-    for o in cmd.options:
-      if o.rejectNext == false:
-        if o.required:
-          fail "The required option '$1' was not specified" % [o.name]
-        elif o.hasDefault:
-          discard fieldSetters[o.fieldIdx][1](conf, TaintedString(""))
+  template allowNextValue(opt: OptInfo): bool =
+    fieldSetters[opt.idx][4] or fieldCounters[opt.idx] == 0
 
-  template activateCmd(activatedCmd: CommandPtr, key: TaintedString) =
+  proc processMissingOpts(conf: var Configuration, cmd: CmdInfo) =
+    for opt in cmd.opts:
+      if fieldCounters[opt.idx] == 0:
+        if opt.required:
+          fail "The required option '$1' was not specified" % [opt.longform]
+        elif opt.hasDefault:
+          fieldSetters[opt.idx][1](conf, TaintedString(""))
+
+  template activateCmd(discriminator: OptInfo, activatedCmd: CmdInfo) =
     let cmd = activatedCmd
-    discard applySetter(cmd.fieldIdx, key)
-    lastCmd.defaultSubCommand = -1
+    applySetter(discriminator.idx, TaintedString(cmd.name))
     activeCmds.add cmd
-    rejectNextArgument = not cmd.hasArguments
+    nextArgIdx = cmd.getNextArgIdx(-1)
 
   type
     ArgKindFilter = enum
       longForm
       shortForm
 
-  proc showMatchingOptions(cmd: CommandPtr, prefix: string, filterKind: set[ArgKindFilter]) =
-    var matchingOptions: seq[OptionDesc]
+  proc showMatchingOptions(cmd: CmdInfo, prefix: string, filterKind: set[ArgKindFilter]) =
+    var matchingOptions: seq[OptInfo]
 
     if len(prefix) > 0:
       # Filter the options according to the input prefix
-      for opt in cmd.options:
-        if longForm in filterKind and len(opt.name) > 0:
-          if startsWithIgnoreStyle(opt.name, prefix):
+      for opt in cmd.opts:
+        if longForm in filterKind and len(opt.longform) > 0:
+          if startsWithIgnoreStyle(opt.longform, prefix):
             matchingOptions.add(opt)
         if shortForm in filterKind and len(opt.shortform) > 0:
           if startsWithIgnoreStyle(opt.shortform, prefix):
             matchingOptions.add(opt)
     else:
-      matchingOptions = cmd.options
+      matchingOptions = cmd.opts
 
     for opt in matchingOptions:
       # The trailing '=' means the switch accepts an argument
       let trailing = if opt.typename != "bool": "=" else: ""
 
-      if longForm in filterKind and len(opt.name) > 0:
-        stdout.writeLine("--", opt.name, trailing)
+      if longForm in filterKind and len(opt.longform) > 0:
+        stdout.writeLine("--", opt.longform, trailing)
       if shortForm in filterKind and len(opt.shortform) > 0:
         stdout.writeLine('-', opt.shortform, trailing)
 
@@ -538,7 +732,7 @@ proc load*(Configuration: type,
     # whole command line
     for tok in completion[1..^1]:
       if not tok.startsWith('-'):
-        let subCmd = findSubcommand(cmdStack[^1], tok)
+        let subCmd = findSubCmd(cmdStack[^1], string(tok))
         if subCmd != nil: cmdStack.add(subCmd)
 
     let cur_word = completion[^1]
@@ -571,13 +765,13 @@ proc load*(Configuration: type,
       var option_word = if len(prev_word) == 1: prev_prev_word else: prev_word
       option_word.removePrefix('-')
 
-      let option = findOption(cmdStack, option_word)
-      if option != nil:
-        for arg in getArgCompletions(option, cur_word):
+      let opt = findOpt(cmdStack, string(option_word))
+      if opt != nil:
+        for arg in getArgCompletions(opt, cur_word):
           stdout.writeLine(arg)
-    elif len(cmdStack[^1].subCommands) != 0:
+    elif cmdStack[^1].hasSubCommands:
       # Show all the available subcommands
-      for subCmd in cmdStack[^1].subCommands:
+      for subCmd in subCmds(cmdStack[^1]):
         if startsWithIgnoreStyle(subCmd.name, cur_word):
           stdout.writeLine(subCmd.name)
     else:
@@ -589,51 +783,70 @@ proc load*(Configuration: type,
 
     return
 
+  proc lazyHelpAppInfo: HelpAppInfo =
+    HelpAppInfo(appInvocation: appInvocation())
+
   for kind, key, val in getopt(cmdLine):
+    let key = string(key)
     case kind
     of cmdLongOption, cmdShortOption:
-      if string(key) == "help":
-        showHelp version, lastCmd
+      if cmpIgnoreStyle(key, "help") == 0:
+        showHelp lazyHelpAppInfo(), activeCmds
 
-      var option = findOption(activeCmds, key)
-      if option == nil:
+      var opt = findOpt(activeCmds, key)
+      if opt == nil:
         # We didn't find the option.
         # Check if it's from the default command and activate it if necessary:
-        if lastCmd.defaultSubCommand != -1:
-          let defaultSubCmd = lastCmd.subCommands[lastCmd.defaultSubCommand]
-          option = findOption(@[defaultSubCmd], key)
-          if option != nil:
-            activateCmd(defaultSubCmd, TaintedString(""))
+        let subCmdDiscriminator = lastCmd.getSubCmdDiscriminator
+        if subCmdDiscriminator != nil:
+          if subCmdDiscriminator.defaultSubCmd != -1:
+            let defaultCmd = subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
+            opt = findOpt(defaultCmd.opts, key)
+            if opt != nil:
+              activateCmd(subCmdDiscriminator, defaultCmd)
+          else:
+            discard
 
-      if option != nil:
-        if option.rejectNext:
-          fail "The options '$1' should not be specified more than once" % [string(key)]
-        option.rejectNext = applySetter(option.fieldIdx, val)
+      if opt != nil:
+        if opt.allowNextValue:
+          applySetter(opt.idx, val)
+        else:
+          fail "The options '$1' should not be specified more than once" % [key]
       else:
-        fail "Unrecognized option '$1'" % [string(key)]
+        fail "Unrecognized option '$1'" % [key]
 
     of cmdArgument:
-      if string(key) == "help" and lastCmd.subCommands.len > 0:
-        showHelp version, lastCmd
+      if cmpIgnoreStyle(key, "help") == 0 and lastCmd.hasSubCommands:
+        showHelp lazyHelpAppInfo(), activeCmds
 
-      let subCmd = lastCmd.findSubcommand(key)
-      if subCmd != nil:
-        activateCmd(subCmd, key)
-      else:
-        if rejectNextArgument:
-          fail lastCmd.noMoreArgumentsError
+      block processArg:
+        let subCmdDiscriminator = lastCmd.getSubCmdDiscriminator
+        if subCmdDiscriminator != nil:
+          let subCmd = findCmd(subCmdDiscriminator.subCmds, key)
+          if subCmd != nil:
+            activateCmd(subCmdDiscriminator, subCmd)
+            break processArg
 
-        let argumentIdx = lastCmd.argumentsFieldIdx
-        doAssert argumentIdx != -1
-        rejectNextArgument = applySetter(argumentIdx, key)
+        if nextArgIdx == -1:
+          fail lastCmd.noMoreArgsError
+
+        applySetter(nextArgIdx, key)
+
+        if not fieldSetters[nextArgIdx][4]:
+          nextArgIdx = lastCmd.getNextArgIdx(nextArgIdx)
 
     else:
       discard
 
+  let subCmdDiscriminator = lastCmd.getSubCmdDiscriminator
+  if subCmdDiscriminator != nil and
+     subCmdDiscriminator.defaultSubCmd != -1 and
+     fieldCounters[subCmdDiscriminator.idx] == 0:
+    let defaultCmd = subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
+    activateCmd(subCmdDiscriminator, defaultCmd)
+
   for cmd in activeCmds:
-    result.processMissingOptions(cmd)
-    if cmd.defaultSubCommand != -1:
-      result.processMissingOptions(cmd.subCommands[cmd.defaultSubCommand])
+    result.processMissingOpts(cmd)
 
 proc defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
