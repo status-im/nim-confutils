@@ -502,11 +502,6 @@ proc requiresInput*(T: type): bool =
 proc acceptsMultipleValues*(T: type): bool =
   T is seq
 
-# TODO: The usage of this should be replacable with just `type(x)`,
-# but Nim is not able to handle it at the moment.
-macro typeof(x: typed): untyped =
-  result = x.getType
-
 template debugMacroResult(macroName: string) {.dirty.} =
   when defined(debugMacros) or defined(debugConfutils):
     echo "\n-------- ", macroName, " ----------------------"
