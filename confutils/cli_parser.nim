@@ -1,9 +1,6 @@
 # Copyright 2018 Status Research & Development GmbH
 # Parts taken from Nim's Runtime Library (c) Copyright 2015 Andreas Rumpf
 
-import
-  strutils
-
 type
   CmdLineKind* = enum         ## The detected command line token.
     cmdEnd,                   ## End of command line reached

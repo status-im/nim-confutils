@@ -1,19 +1,21 @@
 import
-  std/[strutils, wordwrap, options, typetraits],
+  std/[options, strutils, wordwrap],
   stew/shims/macros,
-  confutils/[defs, cli_parser, shell_completion]
+  confutils/[defs, cli_parser]
 
 export
   defs
 
 const
-  useBufferedOutput = true # defined(nimscript)
+  useBufferedOutput = defined(nimscript)
   noColors = useBufferedOutput or defined(confutils_no_colors)
   descriptionPadding = 6
   minLongformsWidth =  24 - descriptionPadding
 
 when not defined(nimscript):
-  import os, terminal
+  import
+    os, terminal,
+    confutils/shell_completion
 
 type
   HelpAppInfo = ref object
@@ -46,6 +48,9 @@ type
       defaultSubCmd: int
     else:
       discard
+
+  FieldSetter[Configuration] = proc (cfg: var Configuration, val: TaintedString) {.nimcall, gcsafe.}
+  FieldCompleter = proc (val: TaintedString): seq[string] {.nimcall, gcsafe.}
 
 proc newLit*(arg: ref): NimNode {.compileTime.} =
   result = nnkObjConstr.newTree(arg.type.getTypeInst[1])
@@ -83,7 +88,13 @@ else:
     getAppFilename().splitFile.name
 
 when noColors:
-  const styleBright = ""
+  const
+    styleBright = ""
+    fgYellow = ""
+    fgWhite = ""
+    fgGreen = ""
+    fgCyan = ""
+    fgBlue = ""
 
 when useBufferedOutput:
   template helpOutput(args: varargs[string]) =
@@ -99,6 +110,13 @@ else:
 
   template flushHelp =
     discard
+
+const
+  fgSection = fgYellow
+  fgCommand = fgCyan
+  fgOption = fgBlue
+  fgValue = fgGreen
+  fgType = fgYellow
 
 func isCliSwitch(opt: OptInfo): bool =
   opt.kind == CliSwitch or
@@ -173,8 +191,8 @@ func humaneName(opt: OptInfo): string =
   if opt.longform.len > 0: opt.longform
   else: opt.shortform
 
-proc paddedOutput(help: var string, output: string, desiredWidth: int) =
-  helpOutput output, spaces(max(desiredWidth - output.len, 0))
+template padding(output: string, desiredWidth: int): string =
+  spaces(max(desiredWidth - output.len, 0))
 
 proc writeDesc(help: var string, appInfo: HelpAppInfo, desc: string) =
   let
@@ -188,9 +206,10 @@ proc writeDesc(help: var string, appInfo: HelpAppInfo, desc: string) =
     helpOutput wrapWords(desc, remainingColumns,
                          newLine = "\p" & spaces(nonDescColumns))
 
-proc describeInvocation(cmd: CmdInfo, cmdInvocation: string,
-                        appInfo: HelpAppInfo, help: var string) =
-  helpOutput styleBright, cmdInvocation
+proc describeInvocation(help: var string,
+                        cmd: CmdInfo, cmdInvocation: string,
+                        appInfo: HelpAppInfo) =
+  helpOutput styleBright, "\p", fgCommand, cmdInvocation
   var longestArg = 0
 
   if cmd.opts.len > 0:
@@ -203,30 +222,41 @@ proc describeInvocation(cmd: CmdInfo, cmdInvocation: string,
       helpOutput " <", arg.longform, ">"
       longestArg = max(longestArg, arg.longform.len)
 
-  helpOutput "\p\p"
+  helpOutput "\p"
 
   for arg in cmd.args:
     if arg.desc.len > 0:
-      help.paddedOutput("<" & arg.humaneName & ">",
-                        6 + appInfo.longformsWidth)
+      let cliArg = "<" & arg.humaneName & ">"
+      helpOutput cliArg, padding(cliArg, 6 + appInfo.longformsWidth)
       help.writeDesc appInfo, arg.desc
 
-proc describeOptions(cmd: CmdInfo, cmdInvocation: string,
-                     appInfo: HelpAppInfo, help: var string) =
+proc describeOptions(help: var string,
+                     cmd: CmdInfo, cmdInvocation: string,
+                     appInfo: HelpAppInfo, isSubOptions = false) =
   if cmd.hasOpts:
-    helpOutput "The following options are available:\p\p"
+    if isSubOptions:
+      helpOutput ", the following additional options are available:\p\p"
+    else:
+      helpOutput "\pThe following options are available:\p\p"
+
     for opt in cmd.opts:
       if opt.kind == Arg: continue
       if opt.kind == Discriminator:
         if opt.isCommand: continue
 
+      # Indent all command-line switches
+      helpOutput " "
+
       if opt.shortform.len > 0:
-        helpOutput styleBright, " -", opt.shortform, " "
+        helpOutput fgOption, styleBright, "-", opt.shortform, ", "
       elif appInfo.hasShortforms:
+        # Add additional indentatition, so all longforms are aligned
         helpOutput "    "
 
       if opt.longform.len > 0:
-        help.paddedOutput("--" & opt.longform, appInfo.longformsWidth)
+        let switch = "--" & opt.longform
+        helpOutput fgOption, styleBright,
+                   switch, padding(switch, appInfo.longformsWidth)
       else:
         helpOutput spaces(2 + appInfo.longformsWidth)
 
@@ -237,27 +267,27 @@ proc describeOptions(cmd: CmdInfo, cmdInvocation: string,
 
       if opt.kind == Discriminator:
         for i, subCmd in opt.subCmds:
-          helpOutput "\pWhen ", opt.humaneName, "=", subCmd.name
-          if i == opt.defaultSubCmd: helpOutput " (default)"
-          helpOutput ":\p\p"
-          subCmd.describeOptions cmdInvocation, appInfo, help
+          if not subCmd.hasOpts: continue
 
-    helpOutput "\p"
+          helpOutput "\pWhen ", styleBright, fgBlue, opt.humaneName, fgWhite, " = ", fgGreen, subCmd.name
+
+          if i == opt.defaultSubCmd: helpOutput " (default)"
+          help.describeOptions subCmd, cmdInvocation, appInfo, isSubOptions = true
 
   let subCmdDiscriminator = cmd.getSubCmdDiscriminator
   if subCmdDiscriminator != nil:
     let defaultCmdIdx = subCmdDiscriminator.defaultSubCmd
     if defaultCmdIdx != -1:
       let defaultCmd = subCmdDiscriminator.subCmds[defaultCmdIdx]
-      defaultCmd.describeOptions cmdInvocation, appInfo, help
+      help.describeOptions defaultCmd, cmdInvocation, appInfo
 
-    helpOutput "Available sub-commands:\p\p"
+    helpOutput fgSection, "\pAvailable sub-commands:\p"
 
     for i, subCmd in subCmdDiscriminator.subCmds:
       if i != subCmdDiscriminator.defaultSubCmd:
         let subCmdInvocation = cmdInvocation & " " & subCmd.name
-        subCmd.describeInvocation subCmdInvocation, appInfo, help
-        subCmd.describeOptions subCmdInvocation, appInfo, help
+        help.describeInvocation subCmd, subCmdInvocation, appInfo
+        help.describeOptions subCmd, subCmdInvocation, appInfo
 
 proc showHelp(appInfo: HelpAppInfo, activeCmds: openarray[CmdInfo]) =
   var help = ""
@@ -277,9 +307,10 @@ proc showHelp(appInfo: HelpAppInfo, activeCmds: openarray[CmdInfo]) =
     cmdInvocation.add activeCmds[i].name
 
   # Write out the app or script name
-  helpOutput "Usage: "
-  cmd.describeInvocation cmdInvocation, appInfo, help
-  cmd.describeOptions cmdInvocation, appInfo, help
+  helpOutput fgSection, "Usage: \p"
+  help.describeInvocation cmd, cmdInvocation, appInfo
+  help.describeOptions cmd, cmdInvocation, appInfo
+  helpOutput "\p"
 
   flushHelp
   quit 1
@@ -447,31 +478,32 @@ proc completeCmdArg(T: type string, val: TaintedString): seq[string] =
 
 proc completeCmdArg*(T: type[InputFile|TypedInputFile|InputDir|OutFile|OutDir|OutPath],
                      val: TaintedString): seq[string] =
-  let (dir, name, ext) = splitFile(val)
-  let tail = name & ext
-  # Expand the directory component for the directory walker routine
-  let dir_path = if dir == "": "." else: expandTilde(dir)
-  # Dotfiles are hidden unless the user entered a dot as prefix
-  let show_dotfiles = len(name) > 0 and name[0] == '.'
+  when not defined(nimscript):
+    let (dir, name, ext) = splitFile(val)
+    let tail = name & ext
+    # Expand the directory component for the directory walker routine
+    let dir_path = if dir == "": "." else: expandTilde(dir)
+    # Dotfiles are hidden unless the user entered a dot as prefix
+    let show_dotfiles = len(name) > 0 and name[0] == '.'
 
-  for kind, path in walkDir(dir_path, relative=true):
-    if not show_dotfiles and path[0] == '.':
-      continue
+    for kind, path in walkDir(dir_path, relative=true):
+      if not show_dotfiles and path[0] == '.':
+        continue
 
-    # Do not show files if asked for directories, on the other hand we must show
-    # directories even if a file is requested to allow the user to select a file
-    # inside those
-    if type(T) is (InputDir or OutDir) and kind notin {pcDir, pcLinkToDir}:
-      continue
+      # Do not show files if asked for directories, on the other hand we must show
+      # directories even if a file is requested to allow the user to select a file
+      # inside those
+      if type(T) is (InputDir or OutDir) and kind notin {pcDir, pcLinkToDir}:
+        continue
 
-    # Note, no normalization is needed here
-    if path.startsWith(tail):
-      var match = dir_path / path
-      # Add a trailing slash so that completions can be chained
-      if kind in {pcDir, pcLinkToDir}:
-        match &= DirSep
+      # Note, no normalization is needed here
+      if path.startsWith(tail):
+        var match = dir_path / path
+        # Add a trailing slash so that completions can be chained
+        if kind in {pcDir, pcLinkToDir}:
+          match &= DirSep
 
-      result.add(shellPathEscape(match))
+        result.add(shellPathEscape(match))
 
 proc completeCmdArg[T](_: type seq[T], val: TaintedString): seq[string] =
   return @[]
@@ -507,6 +539,115 @@ template debugMacroResult(macroName: string) {.dirty.} =
     echo "\n-------- ", macroName, " ----------------------"
     echo result.repr
 
+macro generateFieldSetters(RecordType: type): untyped =
+  var recordDef = RecordType.getType[1].getImpl
+  let makeDefaultValue = bindSym"makeDefaultValue"
+
+  result = newTree(nnkStmtListExpr)
+  var settersArray = newTree(nnkBracket)
+
+  for field in recordFields(recordDef):
+    var
+      setterName = ident($field.name & "Setter")
+      fieldName = field.name
+      configVar = ident "config"
+      configField = newTree(nnkDotExpr, configVar, fieldName)
+      defaultValue = field.readPragma"defaultValue"
+      completerName = ident($field.name & "Complete")
+
+    if defaultValue == nil:
+      defaultValue = newCall(makeDefaultValue, newTree(nnkTypeOfExpr, configField))
+
+    # TODO: This shouldn't be necessary. The type symbol returned from Nim should
+    # be typed as a tyTypeDesc[tyString] instead of just `tyString`. To be filed.
+    var fixedFieldType = newTree(nnkTypeOfExpr, field.typ)
+
+    settersArray.add newTree(nnkTupleConstr,
+                             newLit($fieldName),
+                             setterName, completerName,
+                             newCall(bindSym"requiresInput", fixedFieldType),
+                             newCall(bindSym"acceptsMultipleValues", fixedFieldType))
+
+    result.add quote do:
+      proc `completerName`(val: TaintedString): seq[string] {.nimcall, gcsafe.} =
+        return completeCmdArgAux(`fixedFieldType`, val)
+
+      proc `setterName`(`configVar`: var `RecordType`, val: TaintedString) {.nimcall, gcsafe.} =
+        when `configField` is enum:
+          # TODO: For some reason, the normal `setField` rejects enum fields
+          # when they are used as case discriminators. File this as a bug.
+          if len(val) > 0:
+            `configField` = parseEnum[type(`configField`)](string(val))
+          else:
+            `configField` = `defaultValue`
+        else:
+          setField(`configField`, val, `defaultValue`)
+
+  result.add settersArray
+  debugMacroResult "Field Setters"
+
+macro buildCommandTree(RecordType: type): untyped =
+  var
+    recordDef = RecordType.getType[1].getImpl
+    res = CmdInfo()
+    discriminatorFields = newSeq[OptInfo]()
+    fieldIdx = 0
+
+  for field in recordFields(recordDef):
+    let
+      isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
+      defaultValue = field.readPragma"defaultValue"
+      shortform = field.readPragma"shortform"
+      longform = field.readPragma"longform"
+      desc = field.readPragma"desc"
+
+    var opt = OptInfo(kind: if field.isDiscriminator: Discriminator else: CliSwitch,
+                      idx: fieldIdx,
+                      longform: $field.name,
+                      hasDefault: defaultValue != nil,
+                      typename: field.typ.repr)
+
+    if desc != nil: opt.desc = desc.strVal
+    if longform != nil: opt.longform = longform.strVal
+    if shortform != nil: opt.shortform = shortform.strVal
+
+    inc fieldIdx
+
+    if field.isDiscriminator:
+      discriminatorFields.add opt
+      let cmdType = field.typ.getImpl[^1]
+      if cmdType.kind != nnkEnumTy:
+        error "Only enums are supported as case object discriminators", field.name
+
+      opt.isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
+      opt.isCommand = field.readPragma"command" != nil
+
+      for i in 1 ..< cmdType.len:
+        let name = $cmdType[i]
+        if defaultValue != nil and eqIdent(name, defaultValue):
+          opt.defaultSubCmd = i - 1
+        opt.subCmds.add CmdInfo(name: name)
+
+      if defaultValue == nil:
+        opt.defaultSubCmd = -1
+      else:
+        if opt.defaultSubCmd == -1:
+          error "The default value is not a valid enum value", defaultValue
+
+    if field.caseField != nil and field.caseBranch != nil:
+      let fieldName = field.caseField.getFieldName
+      var discriminator = findOpt(discriminatorFields, $fieldName)
+      if discriminator == nil:
+        error "Unable to find " & $fieldName
+      let branchEnumVal = field.caseBranch[0]
+      var cmd = findCmd(discriminator.subCmds, $branchEnumVal)
+      cmd.opts.add opt
+    else:
+      res.opts.add opt
+
+  result = newLit(res)
+  debugMacroResult "Command Tree"
+
 proc load*(Configuration: type,
            cmdLine = commandLineParams(),
            version = "",
@@ -523,122 +664,6 @@ proc load*(Configuration: type,
 
   # This is an initial naive implementation that will be improved
   # over time.
-
-  type
-    FieldSetter = proc (cfg: var Configuration, val: TaintedString) {.nimcall.}
-    FieldCompleter = proc (val: TaintedString): seq[string] {.nimcall.}
-
-  macro generateFieldSetters(RecordType: type): untyped =
-    var recordDef = RecordType.getType[1].getImpl
-    let makeDefaultValue = bindSym"makeDefaultValue"
-
-    result = newTree(nnkStmtListExpr)
-    var settersArray = newTree(nnkBracket)
-
-    for field in recordFields(recordDef):
-      var
-        setterName = ident($field.name & "Setter")
-        fieldName = field.name
-        configVar = ident "config"
-        configField = newTree(nnkDotExpr, configVar, fieldName)
-        defaultValue = field.readPragma"defaultValue"
-        completerName = ident($field.name & "Complete")
-
-      if defaultValue == nil:
-        defaultValue = newCall(makeDefaultValue, newTree(nnkTypeOfExpr, configField))
-
-      # TODO: This shouldn't be necessary. The type symbol returned from Nim should
-      # be typed as a tyTypeDesc[tyString] instead of just `tyString`. To be filed.
-      var fixedFieldType = newTree(nnkTypeOfExpr, field.typ)
-
-      settersArray.add newTree(nnkTupleConstr,
-                               newLit($fieldName),
-                               newCall(bindSym"FieldSetter", setterName),
-                               newCall(bindSym"FieldCompleter", completerName),
-                               newCall(bindSym"requiresInput", fixedFieldType),
-                               newCall(bindSym"acceptsMultipleValues", fixedFieldType))
-
-      result.add quote do:
-        proc `completerName`(val: TaintedString): seq[string] {.nimcall.} =
-          return completeCmdArgAux(`fixedFieldType`, val)
-
-        proc `setterName`(`configVar`: var `RecordType`, val: TaintedString) {.nimcall.} =
-          when `configField` is enum:
-            # TODO: For some reason, the normal `setField` rejects enum fields
-            # when they are used as case discriminators. File this as a bug.
-            if len(val) > 0:
-              `configField` = parseEnum[type(`configField`)](string(val))
-            else:
-              `configField` = `defaultValue`
-          else:
-            setField(`configField`, val, `defaultValue`)
-
-    result.add settersArray
-    debugMacroResult "Field Setters"
-
-  macro buildCommandTree(RecordType: type): untyped =
-    var
-      recordDef = RecordType.getType[1].getImpl
-      res = CmdInfo()
-      discriminatorFields = newSeq[OptInfo]()
-      fieldIdx = 0
-
-    for field in recordFields(recordDef):
-      let
-        isDiscriminator = field.caseField != nil and field.caseBranch == nil
-        isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
-        defaultValue = field.readPragma"defaultValue"
-        shortform = field.readPragma"shortform"
-        longform = field.readPragma"longform"
-        desc = field.readPragma"desc"
-
-      var opt = OptInfo(kind: if isDiscriminator: Discriminator else: CliSwitch,
-                        idx: fieldIdx,
-                        longform: $field.name,
-                        hasDefault: defaultValue != nil,
-                        typename: field.typ.repr)
-
-      if desc != nil: opt.desc = desc.strVal
-      if longform != nil: opt.longform = longform.strVal
-      if shortform != nil: opt.shortform = shortform.strVal
-
-      inc fieldIdx
-
-      if isDiscriminator:
-        discriminatorFields.add opt
-        let cmdType = field.typ.getImpl[^1]
-        if cmdType.kind != nnkEnumTy:
-          error "Only enums are supported as case object discriminators", field.name
-
-        opt.isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
-        opt.isCommand = field.readPragma"command" != nil
-
-        for i in 1 ..< cmdType.len:
-          let name = $cmdType[i]
-          if defaultValue != nil and eqIdent(name, defaultValue):
-            opt.defaultSubCmd = i - 1
-          opt.subCmds.add CmdInfo(name: name)
-
-        if defaultValue == nil:
-          opt.defaultSubCmd = -1
-        else:
-          if opt.defaultSubCmd == -1:
-            error "The default value is not a valid enum value", defaultValue
-
-      else:
-        if field.caseField != nil:
-          let fieldName = field.caseField.getFieldName
-          var discriminator = findOpt(discriminatorFields, $fieldName)
-          if discriminator == nil:
-            error "Unable to find " & $fieldName
-          let branchEnumVal = field.caseBranch[0]
-          var cmd = findCmd(discriminator.subCmds, $branchEnumVal)
-          cmd.opts.add opt
-        else:
-          res.opts.add opt
-
-    result = newLit(res)
-    debugMacroResult "Command Tree"
 
   let fieldSetters = generateFieldSetters(Configuration)
   var fieldCounters: array[fieldSetters.len, int]
@@ -695,88 +720,89 @@ proc load*(Configuration: type,
       longForm
       shortForm
 
-  proc showMatchingOptions(cmd: CmdInfo, prefix: string, filterKind: set[ArgKindFilter]) =
-    var matchingOptions: seq[OptInfo]
+  when not defined(nimscript):
+    proc showMatchingOptions(cmd: CmdInfo, prefix: string, filterKind: set[ArgKindFilter]) =
+      var matchingOptions: seq[OptInfo]
 
-    if len(prefix) > 0:
-      # Filter the options according to the input prefix
-      for opt in cmd.opts:
+      if len(prefix) > 0:
+        # Filter the options according to the input prefix
+        for opt in cmd.opts:
+          if longForm in filterKind and len(opt.longform) > 0:
+            if startsWithIgnoreStyle(opt.longform, prefix):
+              matchingOptions.add(opt)
+          if shortForm in filterKind and len(opt.shortform) > 0:
+            if startsWithIgnoreStyle(opt.shortform, prefix):
+              matchingOptions.add(opt)
+      else:
+        matchingOptions = cmd.opts
+
+      for opt in matchingOptions:
+        # The trailing '=' means the switch accepts an argument
+        let trailing = if opt.typename != "bool": "=" else: ""
+
         if longForm in filterKind and len(opt.longform) > 0:
-          if startsWithIgnoreStyle(opt.longform, prefix):
-            matchingOptions.add(opt)
+          stdout.writeLine("--", opt.longform, trailing)
         if shortForm in filterKind and len(opt.shortform) > 0:
-          if startsWithIgnoreStyle(opt.shortform, prefix):
-            matchingOptions.add(opt)
-    else:
-      matchingOptions = cmd.opts
+          stdout.writeLine('-', opt.shortform, trailing)
 
-    for opt in matchingOptions:
-      # The trailing '=' means the switch accepts an argument
-      let trailing = if opt.typename != "bool": "=" else: ""
+    let completion = splitCompletionLine()
+    # If we're not asked to complete a command line the result is an empty list
+    if len(completion) != 0:
+      var cmdStack = @[rootCmd]
+      # Try to understand what the active chain of commands is without parsing the
+      # whole command line
+      for tok in completion[1..^1]:
+        if not tok.startsWith('-'):
+          let subCmd = findSubCmd(cmdStack[^1], string(tok))
+          if subCmd != nil: cmdStack.add(subCmd)
 
-      if longForm in filterKind and len(opt.longform) > 0:
-        stdout.writeLine("--", opt.longform, trailing)
-      if shortForm in filterKind and len(opt.shortform) > 0:
-        stdout.writeLine('-', opt.shortform, trailing)
+      let cur_word = completion[^1]
+      let prev_word = if len(completion) > 2: completion[^2] else: ""
+      let prev_prev_word = if len(completion) > 3: completion[^3] else: ""
 
-  let completion = splitCompletionLine()
-  # If we're not asked to complete a command line the result is an empty list
-  if len(completion) != 0:
-    var cmdStack = @[rootCmd]
-    # Try to understand what the active chain of commands is without parsing the
-    # whole command line
-    for tok in completion[1..^1]:
-      if not tok.startsWith('-'):
-        let subCmd = findSubCmd(cmdStack[^1], string(tok))
-        if subCmd != nil: cmdStack.add(subCmd)
+      if cur_word.startsWith('-'):
+        # Show all the options matching the prefix input by the user
+        let isLong = cur_word.startsWith("--")
+        var option_word = cur_word
+        option_word.removePrefix('-')
 
-    let cur_word = completion[^1]
-    let prev_word = if len(completion) > 2: completion[^2] else: ""
-    let prev_prev_word = if len(completion) > 3: completion[^3] else: ""
+        for i in countdown(cmdStack.len - 1, 0):
+          let argFilter =
+            if isLong:
+              {longForm}
+            elif len(cur_word) > 1:
+              # If the user entered a single hypen then we show both long & short
+              # variants
+              {shortForm}
+            else:
+              {longForm, shortForm}
 
-    if cur_word.startsWith('-'):
-      # Show all the options matching the prefix input by the user
-      let isLong = cur_word.startsWith("--")
-      var option_word = cur_word
-      option_word.removePrefix('-')
+          showMatchingOptions(cmdStack[i], option_word, argFilter)
+      elif (prev_word.startsWith('-') or
+          (prev_word == "=" and prev_prev_word.startsWith('-'))):
+        # Handle cases where we want to complete a switch choice
+        # -switch
+        # -switch=
+        var option_word = if len(prev_word) == 1: prev_prev_word else: prev_word
+        option_word.removePrefix('-')
 
-      for i in countdown(cmdStack.len - 1, 0):
-        let argFilter =
-          if isLong:
-            {longForm}
-          elif len(cur_word) > 1:
-            # If the user entered a single hypen then we show both long & short
-            # variants
-            {shortForm}
-          else:
-            {longForm, shortForm}
+        let opt = findOpt(cmdStack, string(option_word))
+        if opt != nil:
+          for arg in getArgCompletions(opt, cur_word):
+            stdout.writeLine(arg)
+      elif cmdStack[^1].hasSubCommands:
+        # Show all the available subcommands
+        for subCmd in subCmds(cmdStack[^1]):
+          if startsWithIgnoreStyle(subCmd.name, cur_word):
+            stdout.writeLine(subCmd.name)
+      else:
+        # Full options listing
+        for i in countdown(cmdStack.len - 1, 0):
+          showMatchingOptions(cmdStack[i], "", {longForm, shortForm})
 
-        showMatchingOptions(cmdStack[i], option_word, argFilter)
-    elif (prev_word.startsWith('-') or
-        (prev_word == "=" and prev_prev_word.startsWith('-'))):
-      # Handle cases where we want to complete a switch choice
-      # -switch
-      # -switch=
-      var option_word = if len(prev_word) == 1: prev_prev_word else: prev_word
-      option_word.removePrefix('-')
+      stdout.flushFile()
 
-      let opt = findOpt(cmdStack, string(option_word))
-      if opt != nil:
-        for arg in getArgCompletions(opt, cur_word):
-          stdout.writeLine(arg)
-    elif cmdStack[^1].hasSubCommands:
-      # Show all the available subcommands
-      for subCmd in subCmds(cmdStack[^1]):
-        if startsWithIgnoreStyle(subCmd.name, cur_word):
-          stdout.writeLine(subCmd.name)
-    else:
-      # Full options listing
-      for i in countdown(cmdStack.len - 1, 0):
-        showMatchingOptions(cmdStack[i], "", {longForm, shortForm})
-
-    stdout.flushFile()
-
-    return
+      return
 
   proc lazyHelpAppInfo: HelpAppInfo =
     HelpAppInfo(appInvocation: appInvocation())

@@ -10,15 +10,39 @@ type
     innerCmd1
     innerCmd2
 
+  OuterOpt = enum
+    outerOpt1
+    outerOpt2
+
+  InnerOpt = enum
+    innerOpt1
+    innerOpt2
+
   Conf = object
     commonOptional: Option[string]
-    commonMandatory: int
-    case cmd: OuterCmd
+    commonMandatory {.
+      desc: "A mandatory option"
+      shortform: "m" .}: int
+
+    case opt: OuterOpt
+    of outerOpt1:
+      case innerOpt: InnerOpt
+      of innerOpt1:
+        io1Mandatory: string
+        io1Optional: Option[int]
+      else:
+        discard
+    of outerOpt2:
+      ooMandatory: string
+
+    case cmd {.command.}: OuterCmd
     of outerCmd1:
       case innerCmd: InnerCmd
       of innerCmd1:
         ic1Mandatory: string
-        ic1Optional: Option[int]
+        ic1Optional {.
+          desc: "Delay in seconds"
+          shortform: "s" .}: Option[int]
       else:
         discard
     of outerCmd2:
