@@ -605,8 +605,11 @@ macro buildCommandTree(RecordType: type): untyped =
       shortform = field.readPragma"shortform"
       longform = field.readPragma"longform"
       desc = field.readPragma"desc"
+      optKind = if field.isDiscriminator: Discriminator
+                elif field.readPragma("argument") != nil: Arg
+                else: CliSwitch
 
-    var opt = OptInfo(kind: if field.isDiscriminator: Discriminator else: CliSwitch,
+    var opt = OptInfo(kind: optKind,
                       idx: fieldIdx,
                       longform: $field.name,
                       hasDefault: defaultValue != nil,
