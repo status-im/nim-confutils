@@ -190,16 +190,17 @@ template padding(output: string, desiredWidth: int): string =
   spaces(max(desiredWidth - output.len, 0))
 
 proc writeDesc(help: var string, appInfo: HelpAppInfo, desc: string) =
+  const descSpacing = "  "
   let
-    nonDescColumns = (6 + appInfo.longformsWidth)
-    remainingColumns = appInfo.terminalWidth - nonDescColumns
+    descIndent = (5 + appInfo.longformsWidth + descSpacing.len)
+    remainingColumns = appInfo.terminalWidth - descIndent
 
   if remainingColumns < 36:
-    helpOutput "\p ", wrapWords(desc, appInfo.terminalWidth - 1,
+    helpOutput "\p ", wrapWords(desc, appInfo.terminalWidth - 2,
                                 newLine = "\p ")
   else:
-    helpOutput wrapWords(desc, remainingColumns,
-                         newLine = "\p" & spaces(nonDescColumns))
+    helpOutput descSpacing, wrapWords(desc, remainingColumns,
+                                      newLine = "\p" & spaces(descIndent))
 
 proc describeInvocation(help: var string,
                         cmd: CmdInfo, cmdInvocation: string,
@@ -225,14 +226,23 @@ proc describeInvocation(help: var string,
       helpOutput cliArg, padding(cliArg, 6 + appInfo.longformsWidth)
       help.writeDesc appInfo, arg.desc
 
+type
+  OptionsType = enum
+    normalOpts
+    defaultCmdOpts
+    conditionalOpts
+
 proc describeOptions(help: var string,
                      cmd: CmdInfo, cmdInvocation: string,
-                     appInfo: HelpAppInfo, isSubOptions = false) =
+                     appInfo: HelpAppInfo, optionsType = normalOpts) =
   if cmd.hasOpts:
-    if isSubOptions:
-      helpOutput ", the following additional options are available:\p\p"
-    else:
+    case optionsType
+    of normalOpts:
       helpOutput "\pThe following options are available:\p\p"
+    of conditionalOpts:
+      helpOutput ", the following additional options are available:\p\p"
+    of defaultCmdOpts:
+      discard
 
     for opt in cmd.opts:
       if opt.kind == Arg: continue
@@ -267,14 +277,14 @@ proc describeOptions(help: var string,
           helpOutput "\pWhen ", styleBright, fgBlue, opt.humaneName, fgWhite, " = ", fgGreen, subCmd.name
 
           if i == opt.defaultSubCmd: helpOutput " (default)"
-          help.describeOptions subCmd, cmdInvocation, appInfo, isSubOptions = true
+          help.describeOptions subCmd, cmdInvocation, appInfo, conditionalOpts
 
   let subCmdDiscriminator = cmd.getSubCmdDiscriminator
   if subCmdDiscriminator != nil:
     let defaultCmdIdx = subCmdDiscriminator.defaultSubCmd
     if defaultCmdIdx != -1:
       let defaultCmd = subCmdDiscriminator.subCmds[defaultCmdIdx]
-      help.describeOptions defaultCmd, cmdInvocation, appInfo
+      help.describeOptions defaultCmd, cmdInvocation, appInfo, defaultCmdOpts
 
     helpOutput fgSection, "\pAvailable sub-commands:\p"
 
