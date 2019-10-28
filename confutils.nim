@@ -52,11 +52,6 @@ type
   FieldSetter[Configuration] = proc (cfg: var Configuration, val: TaintedString) {.nimcall, gcsafe.}
   FieldCompleter = proc (val: TaintedString): seq[string] {.nimcall, gcsafe.}
 
-proc newLit*(arg: ref): NimNode {.compileTime.} =
-  result = nnkObjConstr.newTree(arg.type.getTypeInst[1])
-  for a, b in fieldPairs(arg[]):
-    result.add nnkExprColonExpr.newTree(newIdentNode(a), newLit(b))
-
 proc getFieldName(caseField: NimNode): NimNode =
   result = caseField
   if result.kind == nnkIdentDefs: result = result[0]
@@ -645,7 +640,7 @@ macro buildCommandTree(RecordType: type): untyped =
     else:
       res.opts.add opt
 
-  result = newLit(res)
+  result = newLitFixed(res)
   debugMacroResult "Command Tree"
 
 proc load*(Configuration: type,
