@@ -59,8 +59,15 @@ proc getFieldName(caseField: NimNode): NimNode =
   if result.kind == nnkPostfix: result = result[1]
 
 when defined(nimscript):
+  func scriptNameParamIdx: int =
+    for i in 1 ..< paramCount():
+      var param = paramStr(i)
+      if param.len > 0 and param[0] != '-':
+        return i
+
   proc appInvocation: string =
-    "nim " & (if paramCount() > 1: paramStr(1) else: "<nims-script>")
+    let scriptNameIdx = scriptNameParamIdx()
+    "nim " & (if paramCount() > scriptNameIdx: paramStr(scriptNameIdx) else: "<nims-script>")
 
   type stderr = object
 
@@ -68,7 +75,7 @@ when defined(nimscript):
     echo msg
 
   proc commandLineParams(): seq[string] =
-    for i in 2 .. paramCount():
+    for i in scriptNameParamIdx() + 1 .. paramCount():
       result.add paramStr(i)
 
   # TODO: Why isn't this available in NimScript?

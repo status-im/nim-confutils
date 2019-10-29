@@ -89,8 +89,8 @@ proc next*(p: var OptParser) =
   var i = p.pos
   while i < p.cmds[p.idx].len and p.cmds[p.idx][i] in {'\t', ' '}: inc(i)
   p.pos = i
-  setLen(p.key.string, 0)
-  setLen(p.val.string, 0)
+  setLen(p.key, 0)
+  setLen(p.val, 0)
   if p.inShortState:
     p.inShortState = false
     if i >= p.cmds[p.idx].len:
