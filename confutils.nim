@@ -330,7 +330,7 @@ proc showHelp(appInfo: HelpAppInfo, activeCmds: openarray[CmdInfo]) =
 func getNextArgIdx(cmd: CmdInfo, consumedArgIdx: int): int =
   for i in consumedArgIdx + 1 ..< cmd.opts.len:
     if cmd.opts[i].kind == Arg:
-      return i
+      return cmd.opts[i].idx
 
   return -1
 
