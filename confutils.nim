@@ -97,16 +97,24 @@ when noColors:
     fgGreen = ""
     fgCyan = ""
     fgBlue = ""
+    resetStyle = ""
 
 when useBufferedOutput:
   template helpOutput(args: varargs[string]) =
     for arg in args:
       help.add arg
 
+
+  template errorOutput(args: varargs[string]) =
+    helpOutput(args)
+
   template flushHelp =
     echo help
 
 else:
+  template errorOutput(args: varargs[untyped]) =
+    styledWrite stderr, args
+
   template helpOutput(args: varargs[untyped]) =
     stdout.styledWrite args
 
@@ -281,7 +289,7 @@ proc describeOptions(help: var string,
         for i, subCmd in opt.subCmds:
           if not subCmd.hasOpts: continue
 
-          helpOutput "\pWhen ", styleBright, fgBlue, opt.humaneName, fgWhite, " = ", fgGreen, subCmd.name
+          helpOutput "\pWhen ", styleBright, fgBlue, opt.humaneName, resetStyle, " = ", fgGreen, subCmd.name
 
           if i == opt.defaultSubCmd: helpOutput " (default)"
           help.describeOptions subCmd, cmdInvocation, appInfo, conditionalOpts
@@ -301,8 +309,9 @@ proc describeOptions(help: var string,
         help.describeInvocation subCmd, subCmdInvocation, appInfo
         help.describeOptions subCmd, subCmdInvocation, appInfo
 
-proc showHelp(appInfo: HelpAppInfo, activeCmds: openarray[CmdInfo]) =
-  var help = ""
+proc showHelp(help: var string,
+              appInfo: HelpAppInfo,
+              activeCmds: openarray[CmdInfo]) =
   helpOutput appInfo.helpBanner
 
   let cmd = activeCmds[^1]
@@ -461,7 +470,10 @@ proc parseCmdArg*(T: type SomeFloat, p: TaintedString): T =
   result = parseFloat(p)
 
 proc parseCmdArg*(T: type bool, p: TaintedString): T =
-  result = p.len == 0 or parseBool(p)
+  try:
+    result = p.len == 0 or parseBool(p)
+  except CatchableError:
+    raise newException(ValueError, "'" & p.string & "' is not a valid boolean value. Supported values are on/off, yes/no, true/false or 1/0")
 
 proc parseCmdArg*(T: type enum, s: TaintedString): T =
   parseEnum[T](string(s))
@@ -691,20 +703,30 @@ proc load*(Configuration: type,
   template lastCmd: auto = activeCmds[^1]
   var nextArgIdx = lastCmd.getNextArgIdx(-1)
 
-  proc fail(msg: string) =
+  var help = ""
+
+  proc suggestCallingHelp =
+    errorOutput "Try ", fgCommand, ("$1 --help" % appInvocation())
+    errorOutput " for more information.\p"
+    quit 1
+
+  template fail(args: varargs[untyped]) =
     if quitOnFailure:
-      stderr.writeLine(msg)
-      stderr.writeLine("Try '$1 --help' for more information" % appInvocation())
-      quit 1
+      errorOutput args
+      errorOutput "\p"
+      suggestCallingHelp()
     else:
-      raise newException(ConfigurationError, msg)
+      # TODO: populate this string
+      raise newException(ConfigurationError, "")
 
   template applySetter(setterIdx: int, cmdLineVal: TaintedString) =
     try:
       fieldSetters[setterIdx][1](confAddr[], some(cmdLineVal))
       inc fieldCounters[setterIdx]
     except:
-      fail("Invalid value for " & fieldSetters[setterIdx][0] & ": " &
+      fail("Error while processing the '",
+           fgOption, fieldSetters[setterIdx][0], resetStyle,
+           "' parameter:\p" &
            getCurrentExceptionMsg())
 
   template getArgCompletions(opt: OptInfo, prefix: TaintedString): seq[string] =
@@ -827,7 +849,7 @@ proc load*(Configuration: type,
     case kind
     of cmdLongOption, cmdShortOption:
       if cmpIgnoreStyle(key, "help") == 0:
-        showHelp lazyHelpAppInfo(), activeCmds
+        help.showHelp lazyHelpAppInfo(), activeCmds
 
       var opt = findOpt(activeCmds, key)
       if opt == nil:
@@ -853,7 +875,7 @@ proc load*(Configuration: type,
 
     of cmdArgument:
       if cmpIgnoreStyle(key, "help") == 0 and lastCmd.hasSubCommands:
-        showHelp lazyHelpAppInfo(), activeCmds
+        help.showHelp lazyHelpAppInfo(), activeCmds
 
       block processArg:
         let subCmdDiscriminator = lastCmd.getSubCmdDiscriminator
