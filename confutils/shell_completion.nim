@@ -163,8 +163,9 @@ proc shellPathEscape*(path: string): string =
       result.add('\\')
     result.add(ch)
 
-# Test data lifted from python's shlex unit-tests
-const data = """
+when isMainModule:
+  # Test data lifted from python's shlex unit-tests
+  const data = """
 foo bar|foo|bar|
  foo bar|foo|bar|
  foo bar |foo|bar|
@@ -226,8 +227,6 @@ foo\ bar|foo bar|
 :-) ;-)|:-)|;-)|
 áéíóú|áéíóú|
 """
-
-when isMainModule:
   var corpus = newStringStream(data)
   var line = ""
   while corpus.readLine(line):

@@ -49,9 +49,6 @@ type
     else:
       discard
 
-  FieldSetter[Configuration] = proc (cfg: var Configuration, val: TaintedString) {.nimcall, gcsafe.}
-  FieldCompleter = proc (val: TaintedString): seq[string] {.nimcall, gcsafe.}
-
 proc getFieldName(caseField: NimNode): NimNode =
   result = caseField
   if result.kind == nnkIdentDefs: result = result[0]
@@ -125,8 +122,9 @@ const
   fgSection = fgYellow
   fgCommand = fgCyan
   fgOption = fgBlue
-  fgValue = fgGreen
-  fgType = fgYellow
+  # TODO: Start using these:
+  # fgValue = fgGreen
+  # fgType = fgYellow
 
 func isCliSwitch(opt: OptInfo): bool =
   opt.kind == CliSwitch or
@@ -167,11 +165,6 @@ iterator subCmds(cmd: CmdInfo): CmdInfo =
   if subCmdDiscriminator != nil:
     for cmd in subCmdDiscriminator.subCmds:
       yield cmd
-
-proc getDefaultSubCmd(cmd: CmdInfo): CmdInfo =
-  let subCmdDiscriminator = cmd.getSubCmdDiscriminator
-  if subCmdDiscriminator != nil and subCmdDiscriminator.defaultSubCmd != -1:
-    return subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
 
 template isSubCommand(cmd: CmdInfo): bool =
   cmd.name.len > 0
@@ -546,9 +539,6 @@ template setField[T](loc: var T, val: Option[TaintedString], defaultVal: untyped
 template setField[T](loc: var seq[T], val: Option[TaintedString], defaultVal: untyped) =
   loc.add parseCmdArgAux(type(loc[0]), val.get)
 
-template simpleSet(loc: var auto) =
-  discard
-
 proc makeDefaultValue*(T: type): T =
   discard
 
@@ -646,7 +636,7 @@ macro buildCommandTree(RecordType: type): untyped =
       if cmdType.kind != nnkEnumTy:
         error "Only enums are supported as case object discriminators", field.name
 
-      opt.isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
+      opt.isImplicitlySelectable = isImplicitlySelectable
       opt.isCommand = field.readPragma"command" != nil
 
       for i in 1 ..< cmdType.len:
@@ -790,7 +780,7 @@ proc load*(Configuration: type,
       # whole command line
       for tok in completion[1..^1]:
         if not tok.startsWith('-'):
-          let subCmd = findSubCmd(cmdStack[^1], string(tok))
+          let subCmd = findSubCmd(cmdStack[^1], tok)
           if subCmd != nil: cmdStack.add(subCmd)
 
       let cur_word = completion[^1]
@@ -823,7 +813,7 @@ proc load*(Configuration: type,
         var option_word = if len(prev_word) == 1: prev_prev_word else: prev_word
         option_word.removePrefix('-')
 
-        let opt = findOpt(cmdStack, string(option_word))
+        let opt = findOpt(cmdStack, option_word)
         if opt != nil:
           for arg in getArgCompletions(opt, cur_word):
             stdout.writeLine(arg)
