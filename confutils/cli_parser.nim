@@ -114,7 +114,8 @@ proc next*(p: var OptParser) =
         inc(i)
         while i < p.cmds[p.idx].len and p.cmds[p.idx][i] in {'\t', ' '}: inc(i)
         # if we're at the end, use the next command line option:
-        if i >= p.cmds[p.idx].len and p.idx < p.cmds.len and p.allowWhitespaceAfterColon:
+        if p.allowWhitespaceAfterColon and i >= p.cmds[p.idx].len and
+           p.idx + 1 < p.cmds.len and p.cmds[p.idx + 1][0] != '-':
           inc p.idx
           i = 0
         if p.idx < p.cmds.len:
