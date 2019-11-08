@@ -461,7 +461,7 @@ proc parseCmdArg*(T: type SomeFloat, p: TaintedString): T =
   result = parseFloat(p)
 
 proc parseCmdArg*(T: type bool, p: TaintedString): T =
-  result = parseBool(p)
+  result = p.len == 0 or parseBool(p)
 
 proc parseCmdArg*(T: type enum, s: TaintedString): T =
   parseEnum[T](string(s))
@@ -526,13 +526,13 @@ proc completeCmdArg[T](_: type Option[T], val: TaintedString): seq[string] =
 proc completeCmdArgAux(T: type, val: TaintedString): seq[string] =
   return completeCmdArg(T, val)
 
-template setField[T](loc: var T, val: TaintedString, defaultVal: untyped) =
+template setField[T](loc: var T, val: Option[TaintedString], defaultVal: untyped) =
   type FieldType = type(loc)
-  loc = if len(val) > 0: parseCmdArgAux(FieldType, val)
+  loc = if isSome(val): parseCmdArgAux(FieldType, val.get)
         else: FieldType(defaultVal)
 
-template setField[T](loc: var seq[T], val: TaintedString, defaultVal: untyped) =
-  loc.add parseCmdArgAux(type(loc[0]), val)
+template setField[T](loc: var seq[T], val: Option[TaintedString], defaultVal: untyped) =
+  loc.add parseCmdArgAux(type(loc[0]), val.get)
 
 template simpleSet(loc: var auto) =
   discard
@@ -541,7 +541,7 @@ proc makeDefaultValue*(T: type): T =
   discard
 
 proc requiresInput*(T: type): bool =
-  not ((T is seq) or (T is Option))
+  not ((T is seq) or (T is Option) or (T is bool))
 
 proc acceptsMultipleValues*(T: type): bool =
   T is seq
@@ -584,12 +584,12 @@ macro generateFieldSetters(RecordType: type): untyped =
       proc `completerName`(val: TaintedString): seq[string] {.nimcall, gcsafe.} =
         return completeCmdArgAux(`fixedFieldType`, val)
 
-      proc `setterName`(`configVar`: var `RecordType`, val: TaintedString) {.nimcall, gcsafe.} =
+      proc `setterName`(`configVar`: var `RecordType`, val: Option[TaintedString]) {.nimcall, gcsafe.} =
         when `configField` is enum:
           # TODO: For some reason, the normal `setField` rejects enum fields
           # when they are used as case discriminators. File this as a bug.
-          if len(val) > 0:
-            `configField` = parseEnum[type(`configField`)](string(val))
+          if val.isSome:
+            `configField` = parseEnum[type(`configField`)](string(val.get))
           else:
             `configField` = `defaultValue`
         else:
@@ -701,7 +701,7 @@ proc load*(Configuration: type,
 
   template applySetter(setterIdx: int, cmdLineVal: TaintedString) =
     try:
-      fieldSetters[setterIdx][1](confAddr[], cmdLineVal)
+      fieldSetters[setterIdx][1](confAddr[], some(cmdLineVal))
       inc fieldCounters[setterIdx]
     except:
       fail("Invalid value for " & fieldSetters[setterIdx][0] & ": " &
@@ -722,7 +722,7 @@ proc load*(Configuration: type,
         if opt.required:
           fail "The required option '$1' was not specified" % [opt.longform]
         elif opt.hasDefault:
-          fieldSetters[opt.idx][1](conf, TaintedString(""))
+          fieldSetters[opt.idx][1](conf, none[TaintedString]())
 
   template activateCmd(discriminator: OptInfo, activatedCmd: CmdInfo) =
     let cmd = activatedCmd
