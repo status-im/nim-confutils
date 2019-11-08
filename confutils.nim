@@ -418,7 +418,7 @@ proc parseCmdArg*(T: type InputFile, p: TaintedString): T =
 
   when not defined(nimscript):
     try:
-      let f = open(p.string, fmRead)
+      let f = system.open(p.string, fmRead)
       close f
     except IOError:
       raise newException(ValueError, "File not accessible")
@@ -435,7 +435,7 @@ proc parseCmdArg*(T: type TypedInputFile, p: TaintedString): T =
 
   when not defined(nimscript):
     try:
-      let f = open(path, fmRead)
+      let f = system.open(path, fmRead)
       close f
     except IOError:
       raise newException(ValueError, "File not accessible")
