@@ -191,7 +191,8 @@ dispatch(main)
 Under the hood, using these APIs will result in calling `load` on an anonymous
 configuration type having the same fields as the supplied proc params.
 Any additional arguments given as `cli(args) do ...` and `dispatch(fn, args)`
-will be passed to `load` without modification.
+will be passed to `load` without modification. Please note that this requires
+all parameters types to be concrete (non-generic).
 
 This covers the basic usage of the library and the rest of the documentation
 will describe the various ways the default behavior can be tweaked or extended.
