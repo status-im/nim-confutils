@@ -9,8 +9,8 @@ export
 const
   useBufferedOutput = defined(nimscript)
   noColors = useBufferedOutput or defined(confutils_no_colors)
-  descriptionPadding = 6
-  minLongformsWidth =  24 - descriptionPadding
+  descPadding = 6
+  minNameWidth =  24 - descPadding
 
 when not defined(nimscript):
   import
@@ -21,10 +21,10 @@ type
   HelpAppInfo = ref object
     appInvocation: string
     copyrightBanner: string
-    hasShortforms: bool
-    maxLongformLen: int
+    hasAbbrs: bool
+    maxNameLen: int
     terminalWidth: int
-    longformsWidth: int
+    namesWidth: int
 
   CmdInfo = ref object
     name: string
@@ -169,7 +169,7 @@ iterator subCmds(cmd: CmdInfo): CmdInfo =
 template isSubCommand(cmd: CmdInfo): bool =
   cmd.name.len > 0
 
-func maxLongformLen(cmd: CmdInfo): int =
+func maxNameLen(cmd: CmdInfo): int =
   result = 0
   for opt in cmd.opts:
     if opt.kind == Arg or opt.kind == Discriminator and opt.isCommand:
@@ -177,9 +177,9 @@ func maxLongformLen(cmd: CmdInfo): int =
     result = max(result, opt.name.len)
     if opt.kind == Discriminator:
       for subCmd in opt.subCmds:
-        result = max(result, subCmd.maxLongformLen)
+        result = max(result, subCmd.maxNameLen)
 
-func hasShortforms(cmd: CmdInfo): bool =
+func hasAbbrs(cmd: CmdInfo): bool =
   for opt in cmd.opts:
     if opt.kind == Arg or opt.kind == Discriminator and opt.isCommand:
       continue
@@ -187,7 +187,7 @@ func hasShortforms(cmd: CmdInfo): bool =
       return true
     if opt.kind == Discriminator:
       for subCmd in opt.subCmds:
-        if hasShortforms(subCmd):
+        if hasAbbrs(subCmd):
           return true
 
 func humaneName(opt: OptInfo): string =
@@ -200,7 +200,7 @@ template padding(output: string, desiredWidth: int): string =
 proc writeDesc(help: var string, appInfo: HelpAppInfo, desc: string) =
   const descSpacing = "  "
   let
-    descIndent = (5 + appInfo.longformsWidth + descSpacing.len)
+    descIndent = (5 + appInfo.namesWidth + descSpacing.len)
     remainingColumns = appInfo.terminalWidth - descIndent
 
   if remainingColumns < 36:
@@ -231,7 +231,7 @@ proc describeInvocation(help: var string,
   for arg in cmd.args:
     if arg.desc.len > 0:
       let cliArg = "<" & arg.humaneName & ">"
-      helpOutput cliArg, padding(cliArg, 6 + appInfo.longformsWidth)
+      helpOutput cliArg, padding(cliArg, 6 + appInfo.namesWidth)
       help.writeDesc appInfo, arg.desc
 
 type
@@ -262,16 +262,16 @@ proc describeOptions(help: var string,
 
       if opt.abbr.len > 0:
         helpOutput fgOption, styleBright, "-", opt.abbr, ", "
-      elif appInfo.hasShortforms:
-        # Add additional indentatition, so all longforms are aligned
+      elif appInfo.hasAbbrs:
+        # Add additional indentatition, so all names are aligned
         helpOutput "    "
 
       if opt.name.len > 0:
         let switch = "--" & opt.name
         helpOutput fgOption, styleBright,
-                   switch, padding(switch, appInfo.longformsWidth)
+                   switch, padding(switch, appInfo.namesWidth)
       else:
-        helpOutput spaces(2 + appInfo.longformsWidth)
+        helpOutput spaces(2 + appInfo.namesWidth)
 
       if opt.desc.len > 0:
         help.writeDesc appInfo, opt.desc.replace("%t", opt.typename)
@@ -310,11 +310,10 @@ proc showHelp(help: var string,
 
   let cmd = activeCmds[^1]
 
-  appInfo.maxLongformLen = cmd.maxLongformLen
-  appInfo.hasShortforms = cmd.hasShortforms
+  appInfo.maxNameLen = cmd.maxNameLen
+  appInfo.hasAbbrs = cmd.hasAbbrs
   appInfo.terminalWidth = terminalWidth()
-  appInfo.longformsWidth = min(minLongformsWidth, appInfo.maxLongformLen) +
-                           descriptionPadding
+  appInfo.namesWidth = min(minNameWidth, appInfo.maxNameLen) + descPadding
 
   var cmdInvocation = appInfo.appInvocation
   for i in 1 ..< activeCmds.len:
@@ -791,13 +790,13 @@ proc load*(Configuration: type,
 
       if cur_word.startsWith('-'):
         # Show all the options matching the prefix input by the user
-        let isLong = cur_word.startsWith("--")
+        let isFullName = cur_word.startsWith("--")
         var option_word = cur_word
         option_word.removePrefix('-')
 
         for i in countdown(cmdStack.len - 1, 0):
           let argFilter =
-            if isLong:
+            if isFullName:
               {argName}
             elif len(cur_word) > 1:
               # If the user entered a single hypen then we show both long & short
