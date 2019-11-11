@@ -37,8 +37,8 @@ type
     # additional metadata that is used to augment the behavior of the library.
     #
     logLevel* {.
-      desc: "Sets the log level",
-      defaultValue: LogLevel.INFO.}: LogLevel
+      defaultValue: LogLevel.INFO
+      desc: "Sets the log level" }: LogLevel
     
     #
     # This program uses a CLI interface with sub-commands (similar to git).
@@ -54,50 +54,50 @@ type
     #
     case cmd* {.
       command
-      defaultValue: noCommand.}: StartUpCommand
+      defaultValue: noCommand }: StartUpCommand
 
     of noCommand:
       dataDir* {.
+        defaultValue: getConfigDir() / "nimbus"
         desc: "The directory where nimbus will store all blockchain data."
-        shortform: "d"
-        defaultValue: getConfigDir() / "nimbus".}: DirPath
+        abbr: "d" }: DirPath
 
       bootstrapNodes* {.
         desc: "Specifies one or more bootstrap nodes to use when connecting to the network."
-        longform: "bootstrapNode"
-        shortform: "b".}: seq[string]
+        abbr: "b"
+        name: "bootstrap-node" }: seq[string]
 
       bootstrapNodesFile* {.
+        defaultValue: ""
         desc: "Specifies a line-delimited file of bootsrap Ethereum network addresses"
-        shortform: "f"
-        defaultValue: "".}: InputFile
+        abbr: "f" }: InputFile
 
       tcpPort* {.
-        desc: "TCP listening port".}: int
+        desc: "TCP listening port" }: int
 
       udpPort* {.
-        desc: "UDP listening port".}: int
+        desc: "UDP listening port" }: int
 
       validators* {.
         required
         desc: "A path to a pair of public and private keys for a validator. " &
               "Nimbus will automatically add the extensions .privkey and .pubkey."
-        longform: "validator"
-        shortform: "v".}: seq[PrivateValidatorData]
+        abbr: "v"
+        name: "validator" }: seq[PrivateValidatorData]
 
       stateSnapshot* {.
         desc: "Json file specifying a recent state snapshot"
-        shortform: "s".}: Option[BeaconState]
+        abbr: "s" }: Option[BeaconState]
     
     of createChain:
       chainStartupData* {.
         desc: ""
-        shortform: "c".}: ChainStartupData
+        abbr: "c" }: ChainStartupData
 
       outputStateFile* {.
         desc: "Output file where to write the initial state snapshot"
-        longform: "out"
-        shortform: "o".}: OutFilePath
+        name: "out"
+        abbr: "o" }: OutFilePath
 
   StartUpCommand* = enum
     noCommand
@@ -164,14 +164,14 @@ import
 
 cli do (validators {.
           desc: "number of validators"
-          shortform: "v".}: int,
+          abbr: "v" }: int,
 
         outputDir {.
           desc: "output dir to store the generated files"
-          shortform: "o"}: OutPath,
+          abbr: "o" }: OutPath,
 
         startupDelay {.
-          desc: "delay in seconds before starting the simulation".} = 0):
+          desc: "delay in seconds before starting the simulation" } = 0):
   
   if validators < 64:
     echo "The number of validators must be greater than EPOCH_LENGTH (64)"
@@ -213,7 +213,7 @@ help messages.
 -----------------
 
 ```nim
-template longform*(v: string) {.pragma.}
+template name*(v: string) {.pragma.}
 ```
 
 A long name of the option.
@@ -224,7 +224,7 @@ for more details.
 -----------------
 
 ```nim
-template shortform*(v: string) {.pragma.}
+template abbr*(v: string) {.pragma.}
 
 ```
 

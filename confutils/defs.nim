@@ -21,8 +21,8 @@ template `/`*(dir: InputDir|OutDir, path: string): auto =
   string(dir) / path
 
 template desc*(v: string) {.pragma.}
-template longform*(v: string) {.pragma.}
-template shortform*(v: string) {.pragma.}
+template name*(v: string) {.pragma.}
+template abbr*(v: string) {.pragma.}
 template defaultValue*(v: untyped) {.pragma.}
 template required* {.pragma.}
 template command* {.pragma.}

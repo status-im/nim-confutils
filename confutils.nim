@@ -20,7 +20,7 @@ when not defined(nimscript):
 type
   HelpAppInfo = ref object
     appInvocation: string
-    helpBanner: string
+    copyrightBanner: string
     hasShortforms: bool
     maxLongformLen: int
     terminalWidth: int
@@ -305,7 +305,7 @@ proc describeOptions(help: var string,
 proc showHelp(help: var string,
               appInfo: HelpAppInfo,
               activeCmds: openarray[CmdInfo]) =
-  helpOutput appInfo.helpBanner
+  helpOutput appInfo.copyrightBanner
 
   let cmd = activeCmds[^1]
 
@@ -327,7 +327,7 @@ proc showHelp(help: var string,
   helpOutput "\p"
 
   flushHelp
-  quit 1
+  quit QuitSuccess
 
 func getNextArgIdx(cmd: CmdInfo, consumedArgIdx: int): int =
   for i in consumedArgIdx + 1 ..< cmd.opts.len:
@@ -668,6 +668,7 @@ macro buildCommandTree(RecordType: type): untyped =
 proc load*(Configuration: type,
            cmdLine = commandLineParams(),
            version = "",
+           copyrightBanner = "",
            printUsage = true,
            quitOnFailure = true): Configuration =
   ## Loads a program configuration by parsing command-line arguments
@@ -832,14 +833,23 @@ proc load*(Configuration: type,
       return
 
   proc lazyHelpAppInfo: HelpAppInfo =
-    HelpAppInfo(appInvocation: appInvocation())
+    HelpAppInfo(
+      copyrightBanner: copyrightBanner,
+      appInvocation: appInvocation())
+
+  template processHelpAndVersionOptions(optKey: string) =
+    let key = optKey
+    if cmpIgnoreStyle(key, "help") == 0:
+      help.showHelp lazyHelpAppInfo(), activeCmds
+    elif version.len > 0 and cmpIgnoreStyle(key, "version") == 0:
+      help.helpOutput version
+      quit QuitSuccess
 
   for kind, key, val in getopt(cmdLine):
     let key = string(key)
     case kind
     of cmdLongOption, cmdShortOption:
-      if cmpIgnoreStyle(key, "help") == 0:
-        help.showHelp lazyHelpAppInfo(), activeCmds
+      processHelpAndVersionOptions key
 
       var opt = findOpt(activeCmds, key)
       if opt == nil:
@@ -864,8 +874,8 @@ proc load*(Configuration: type,
         fail "Unrecognized option '$1'" % [key]
 
     of cmdArgument:
-      if cmpIgnoreStyle(key, "help") == 0 and lastCmd.hasSubCommands:
-        help.showHelp lazyHelpAppInfo(), activeCmds
+      if lastCmd.hasSubCommands:
+        processHelpAndVersionOptions key
 
       block processArg:
         let subCmdDiscriminator = lastCmd.getSubCmdDiscriminator
