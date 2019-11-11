@@ -305,7 +305,8 @@ proc describeOptions(help: var string,
 proc showHelp(help: var string,
               appInfo: HelpAppInfo,
               activeCmds: openarray[CmdInfo]) =
-  helpOutput appInfo.copyrightBanner
+  if appInfo.copyrightBanner.len > 0:
+    helpOutput appInfo.copyrightBanner, "\p\p"
 
   let cmd = activeCmds[^1]
 
@@ -842,7 +843,7 @@ proc load*(Configuration: type,
     if cmpIgnoreStyle(key, "help") == 0:
       help.showHelp lazyHelpAppInfo(), activeCmds
     elif version.len > 0 and cmpIgnoreStyle(key, "version") == 0:
-      help.helpOutput version
+      help.helpOutput version, "\p"
       quit QuitSuccess
 
   for kind, key, val in getopt(cmdLine):
