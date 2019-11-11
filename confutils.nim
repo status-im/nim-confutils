@@ -37,7 +37,7 @@ type
     Arg
 
   OptInfo = ref object
-    longform, shortform, desc, typename: string
+    name, abbr, desc, typename: string
     idx: int
     hasDefault: bool
     case kind: OptKind
@@ -113,7 +113,7 @@ else:
     styledWrite stderr, args
 
   template helpOutput(args: varargs[untyped]) =
-    stdout.styledWrite args
+    styledWrite stdout, args
 
   template flushHelp =
     discard
@@ -174,7 +174,7 @@ func maxLongformLen(cmd: CmdInfo): int =
   for opt in cmd.opts:
     if opt.kind == Arg or opt.kind == Discriminator and opt.isCommand:
       continue
-    result = max(result, opt.longform.len)
+    result = max(result, opt.name.len)
     if opt.kind == Discriminator:
       for subCmd in opt.subCmds:
         result = max(result, subCmd.maxLongformLen)
@@ -183,7 +183,7 @@ func hasShortforms(cmd: CmdInfo): bool =
   for opt in cmd.opts:
     if opt.kind == Arg or opt.kind == Discriminator and opt.isCommand:
       continue
-    if opt.shortform.len > 0:
+    if opt.abbr.len > 0:
       return true
     if opt.kind == Discriminator:
       for subCmd in opt.subCmds:
@@ -191,8 +191,8 @@ func hasShortforms(cmd: CmdInfo): bool =
           return true
 
 func humaneName(opt: OptInfo): string =
-  if opt.longform.len > 0: opt.longform
-  else: opt.shortform
+  if opt.name.len > 0: opt.name
+  else: opt.abbr
 
 template padding(output: string, desiredWidth: int): string =
   spaces(max(desiredWidth - output.len, 0))
@@ -223,8 +223,8 @@ proc describeInvocation(help: var string,
     if subCmdDiscriminator != nil: helpOutput " command"
 
     for arg in cmd.args:
-      helpOutput " <", arg.longform, ">"
-      longestArg = max(longestArg, arg.longform.len)
+      helpOutput " <", arg.name, ">"
+      longestArg = max(longestArg, arg.name.len)
 
   helpOutput "\p"
 
@@ -260,14 +260,14 @@ proc describeOptions(help: var string,
       # Indent all command-line switches
       helpOutput " "
 
-      if opt.shortform.len > 0:
-        helpOutput fgOption, styleBright, "-", opt.shortform, ", "
+      if opt.abbr.len > 0:
+        helpOutput fgOption, styleBright, "-", opt.abbr, ", "
       elif appInfo.hasShortforms:
         # Add additional indentatition, so all longforms are aligned
         helpOutput "    "
 
-      if opt.longform.len > 0:
-        let switch = "--" & opt.longform
+      if opt.name.len > 0:
+        let switch = "--" & opt.name
         helpOutput fgOption, styleBright,
                    switch, padding(switch, appInfo.longformsWidth)
       else:
@@ -345,8 +345,8 @@ proc noMoreArgsError(cmd: CmdInfo): string =
 
 proc findOpt(opts: openarray[OptInfo], name: string): OptInfo =
   for opt in opts:
-    if cmpIgnoreStyle(opt.longform, name) == 0 or
-       cmpIgnoreStyle(opt.shortform, name) == 0:
+    if cmpIgnoreStyle(opt.name, name) == 0 or
+       cmpIgnoreStyle(opt.abbr, name) == 0:
       return opt
 
 proc findOpt(activeCmds: openarray[CmdInfo], name: string): OptInfo =
@@ -399,7 +399,7 @@ when defined(debugCmdTree):
         for subcmd in opt.subCmds:
           printCmdTree(subcmd, indent + 2)
       else:
-        echo blanks, "  - ", opt.longform, ": ", opt.typename
+        echo blanks, "  - ", opt.name, ": ", opt.typename
 
 else:
   template printCmdTree(cmd: CmdInfo) = discard
@@ -611,8 +611,8 @@ macro buildCommandTree(RecordType: type): untyped =
     let
       isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
       defaultValue = field.readPragma"defaultValue"
-      shortform = field.readPragma"shortform"
-      longform = field.readPragma"longform"
+      abbr = field.readPragma"abbr"
+      name = field.readPragma"name"
       desc = field.readPragma"desc"
       optKind = if field.isDiscriminator: Discriminator
                 elif field.readPragma("argument") != nil: Arg
@@ -620,13 +620,13 @@ macro buildCommandTree(RecordType: type): untyped =
 
     var opt = OptInfo(kind: optKind,
                       idx: fieldIdx,
-                      longform: $field.name,
+                      name: $field.name,
                       hasDefault: defaultValue != nil,
                       typename: field.typ.repr)
 
     if desc != nil: opt.desc = desc.strVal
-    if longform != nil: opt.longform = longform.strVal
-    if shortform != nil: opt.shortform = shortform.strVal
+    if name != nil: opt.name = name.strVal
+    if abbr != nil: opt.abbr = abbr.strVal
 
     inc fieldIdx
 
@@ -733,7 +733,7 @@ proc load*(Configuration: type,
     for opt in cmd.opts:
       if fieldCounters[opt.idx] == 0:
         if opt.required:
-          fail "The required option '$1' was not specified" % [opt.longform]
+          fail "The required option '$1' was not specified" % [opt.name]
         elif opt.hasDefault:
           fieldSetters[opt.idx][1](conf, none[TaintedString]())
 
@@ -745,8 +745,8 @@ proc load*(Configuration: type,
 
   type
     ArgKindFilter = enum
-      longForm
-      shortForm
+      argName
+      argAbbr
 
   when not defined(nimscript):
     proc showMatchingOptions(cmd: CmdInfo, prefix: string, filterKind: set[ArgKindFilter]) =
@@ -755,11 +755,11 @@ proc load*(Configuration: type,
       if len(prefix) > 0:
         # Filter the options according to the input prefix
         for opt in cmd.opts:
-          if longForm in filterKind and len(opt.longform) > 0:
-            if startsWithIgnoreStyle(opt.longform, prefix):
+          if argName in filterKind and len(opt.name) > 0:
+            if startsWithIgnoreStyle(opt.name, prefix):
               matchingOptions.add(opt)
-          if shortForm in filterKind and len(opt.shortform) > 0:
-            if startsWithIgnoreStyle(opt.shortform, prefix):
+          if argAbbr in filterKind and len(opt.abbr) > 0:
+            if startsWithIgnoreStyle(opt.abbr, prefix):
               matchingOptions.add(opt)
       else:
         matchingOptions = cmd.opts
@@ -768,10 +768,10 @@ proc load*(Configuration: type,
         # The trailing '=' means the switch accepts an argument
         let trailing = if opt.typename != "bool": "=" else: ""
 
-        if longForm in filterKind and len(opt.longform) > 0:
-          stdout.writeLine("--", opt.longform, trailing)
-        if shortForm in filterKind and len(opt.shortform) > 0:
-          stdout.writeLine('-', opt.shortform, trailing)
+        if argName in filterKind and len(opt.name) > 0:
+          stdout.writeLine("--", opt.name, trailing)
+        if argAbbr in filterKind and len(opt.abbr) > 0:
+          stdout.writeLine('-', opt.abbr, trailing)
 
     let completion = splitCompletionLine()
     # If we're not asked to complete a command line the result is an empty list
@@ -797,13 +797,13 @@ proc load*(Configuration: type,
         for i in countdown(cmdStack.len - 1, 0):
           let argFilter =
             if isLong:
-              {longForm}
+              {argName}
             elif len(cur_word) > 1:
               # If the user entered a single hypen then we show both long & short
               # variants
-              {shortForm}
+              {argAbbr}
             else:
-              {longForm, shortForm}
+              {argName, argAbbr}
 
           showMatchingOptions(cmdStack[i], option_word, argFilter)
       elif (prev_word.startsWith('-') or
@@ -826,7 +826,7 @@ proc load*(Configuration: type,
       else:
         # Full options listing
         for i in countdown(cmdStack.len - 1, 0):
-          showMatchingOptions(cmdStack[i], "", {longForm, shortForm})
+          showMatchingOptions(cmdStack[i], "", {argName, argAbbr})
 
       stdout.flushFile()
 
