@@ -590,7 +590,7 @@ macro generateFieldSetters(RecordType: type): untyped =
         when `configField` is enum:
           # TODO: For some reason, the normal `setField` rejects enum fields
           # when they are used as case discriminators. File this as a bug.
-          if val.isSome:
+          if isSome(val):
             `configField` = parseEnum[type(`configField`)](string(val.get))
           else:
             `configField` = `defaultValue`
