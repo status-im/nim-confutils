@@ -105,7 +105,7 @@ when useBufferedOutput:
   template errorOutput(args: varargs[string]) =
     helpOutput(args)
 
-  template flushHelp =
+  template flushOutput =
     echo help
 
 else:
@@ -115,7 +115,7 @@ else:
   template helpOutput(args: varargs[untyped]) =
     styledWrite stdout, args
 
-  template flushHelp =
+  template flushOutput =
     discard
 
 const
@@ -125,6 +125,10 @@ const
   # TODO: Start using these:
   # fgValue = fgGreen
   # fgType = fgYellow
+
+template flushOutputAndQuit(exitCode: int) =
+  flushOutput
+  quit exitCode
 
 func isCliSwitch(opt: OptInfo): bool =
   opt.kind == CliSwitch or
@@ -326,8 +330,7 @@ proc showHelp(help: var string,
   help.describeOptions cmd, cmdInvocation, appInfo
   helpOutput "\p"
 
-  flushHelp
-  quit QuitSuccess
+  flushOutputAndQuit QuitSuccess
 
 func getNextArgIdx(cmd: CmdInfo, consumedArgIdx: int): int =
   for i in consumedArgIdx + 1 ..< cmd.opts.len:
@@ -699,7 +702,7 @@ proc load*(Configuration: type,
   proc suggestCallingHelp =
     errorOutput "Try ", fgCommand, ("$1 --help" % appInvocation())
     errorOutput " for more information.\p"
-    quit 1
+    flushOutputAndQuit QuitFailure
 
   template fail(args: varargs[untyped]) =
     if quitOnFailure:
@@ -843,7 +846,7 @@ proc load*(Configuration: type,
       help.showHelp lazyHelpAppInfo(), activeCmds
     elif version.len > 0 and cmpIgnoreStyle(key, "version") == 0:
       help.helpOutput version, "\p"
-      quit QuitSuccess
+      flushOutputAndQuit QuitSuccess
 
   for kind, key, val in getopt(cmdLine):
     let key = string(key)
