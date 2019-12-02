@@ -9,6 +9,7 @@ export
 const
   useBufferedOutput = defined(nimscript)
   noColors = useBufferedOutput or defined(confutils_no_colors)
+  hasCompletions = not defined(nimscript)
   descPadding = 6
   minNameWidth =  24 - descPadding
 
@@ -723,8 +724,9 @@ proc load*(Configuration: type,
            "' parameter:\p" &
            getCurrentExceptionMsg())
 
-  template getArgCompletions(opt: OptInfo, prefix: TaintedString): seq[string] =
-    fieldSetters[opt.idx][2](prefix)
+  when hasCompletions:
+    template getArgCompletions(opt: OptInfo, prefix: TaintedString): seq[string] =
+      fieldSetters[opt.idx][2](prefix)
 
   template required(opt: OptInfo): bool =
     fieldSetters[opt.idx][3] and not opt.hasDefault
@@ -746,12 +748,12 @@ proc load*(Configuration: type,
     activeCmds.add cmd
     nextArgIdx = cmd.getNextArgIdx(-1)
 
-  type
-    ArgKindFilter = enum
-      argName
-      argAbbr
+  when hasCompletions:
+    type
+      ArgKindFilter = enum
+        argName
+        argAbbr
 
-  when not defined(nimscript):
     proc showMatchingOptions(cmd: CmdInfo, prefix: string, filterKind: set[ArgKindFilter]) =
       var matchingOptions: seq[OptInfo]
 
