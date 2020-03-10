@@ -29,8 +29,8 @@ type
 
   CmdInfo = ref object
     name: string
+    desc: string
     opts: seq[OptInfo]
-    shortHelpString: string
 
   OptKind = enum
     Discriminator
@@ -232,6 +232,9 @@ proc describeInvocation(help: var string,
       longestArg = max(longestArg, arg.name.len)
 
   helpOutput "\p"
+
+  if cmd.desc.len > 0:
+    helpOutput "\p  ", cmd.desc, "\p"
 
   for arg in cmd.args:
     if arg.desc.len > 0:
@@ -644,10 +647,16 @@ macro buildCommandTree(RecordType: type): untyped =
       opt.isCommand = field.readPragma"command" != nil
 
       for i in 1 ..< cmdType.len:
-        let name = $cmdType[i]
+        let enumVal = cmdType[i]
+        var name, desc: string
+        if enumVal.kind == nnkEnumFieldDef:
+          name = $enumVal[0]
+          desc = $enumVal[1]
+        else:
+          name = $enumVal
         if defaultValue != nil and eqIdent(name, defaultValue):
           opt.defaultSubCmd = i - 1
-        opt.subCmds.add CmdInfo(name: name)
+        opt.subCmds.add CmdInfo(name: name, desc: desc)
 
       if defaultValue == nil:
         opt.defaultSubCmd = -1
