@@ -485,19 +485,19 @@ proc parseCmdArgAux(T: type, s: TaintedString): T = # {.raises: [ValueError].} =
   mixin parseCmdArg
   parseCmdArg(T, s)
 
-proc completeCmdArg(T: type enum, val: TaintedString): seq[string] =
+proc completeCmdArg*(T: type enum, val: TaintedString): seq[string] =
   for e in low(T)..high(T):
     let as_str = $e
     if startsWithIgnoreStyle(as_str, val):
       result.add($e)
 
-proc completeCmdArg(T: type SomeNumber, val: TaintedString): seq[string] =
+proc completeCmdArg*(T: type SomeNumber, val: TaintedString): seq[string] =
   return @[]
 
-proc completeCmdArg(T: type bool, val: TaintedString): seq[string] =
+proc completeCmdArg*(T: type bool, val: TaintedString): seq[string] =
   return @[]
 
-proc completeCmdArg(T: type string, val: TaintedString): seq[string] =
+proc completeCmdArg*(T: type string, val: TaintedString): seq[string] =
   return @[]
 
 proc completeCmdArg*(T: type[InputFile|TypedInputFile|InputDir|OutFile|OutDir|OutPath],
@@ -529,13 +529,15 @@ proc completeCmdArg*(T: type[InputFile|TypedInputFile|InputDir|OutFile|OutDir|Ou
 
         result.add(shellPathEscape(match))
 
-proc completeCmdArg[T](_: type seq[T], val: TaintedString): seq[string] =
+proc completeCmdArg*[T](_: type seq[T], val: TaintedString): seq[string] =
   return @[]
 
-proc completeCmdArg[T](_: type Option[T], val: TaintedString): seq[string] =
+proc completeCmdArg*[T](_: type Option[T], val: TaintedString): seq[string] =
+  mixin completeCmdArg
   return completeCmdArg(type(T), val)
 
 proc completeCmdArgAux(T: type, val: TaintedString): seq[string] =
+  mixin completeCmdArg
   return completeCmdArg(T, val)
 
 template setField[T](loc: var T, val: Option[TaintedString], defaultVal: untyped) =
