@@ -22,7 +22,7 @@ type
     commonOptional: Option[string]
     commonMandatory {.
       desc: "A mandatory option"
-      shortform: "m" .}: int
+      abbr: "m" .}: int
 
     case opt: OuterOpt
     of outerOpt1:
@@ -42,7 +42,7 @@ type
         ic1Mandatory: string
         ic1Optional {.
           desc: "Delay in seconds"
-          shortform: "s" .}: Option[int]
+          abbr: "s" .}: Option[int]
       else:
         discard
     of outerCmd2:
