@@ -510,24 +510,27 @@ proc completeCmdArg*(T: type[InputFile|TypedInputFile|InputDir|OutFile|OutDir|Ou
     # Dotfiles are hidden unless the user entered a dot as prefix
     let show_dotfiles = len(name) > 0 and name[0] == '.'
 
-    for kind, path in walkDir(dir_path, relative=true):
-      if not show_dotfiles and path[0] == '.':
-        continue
+    try:
+      for kind, path in walkDir(dir_path, relative=true):
+        if not show_dotfiles and path[0] == '.':
+          continue
 
-      # Do not show files if asked for directories, on the other hand we must show
-      # directories even if a file is requested to allow the user to select a file
-      # inside those
-      if type(T) is (InputDir or OutDir) and kind notin {pcDir, pcLinkToDir}:
-        continue
+        # Do not show files if asked for directories, on the other hand we must show
+        # directories even if a file is requested to allow the user to select a file
+        # inside those
+        if type(T) is (InputDir or OutDir) and kind notin {pcDir, pcLinkToDir}:
+          continue
 
-      # Note, no normalization is needed here
-      if path.startsWith(tail):
-        var match = dir_path / path
-        # Add a trailing slash so that completions can be chained
-        if kind in {pcDir, pcLinkToDir}:
-          match &= DirSep
+        # Note, no normalization is needed here
+        if path.startsWith(tail):
+          var match = dir_path / path
+          # Add a trailing slash so that completions can be chained
+          if kind in {pcDir, pcLinkToDir}:
+            match &= DirSep
 
-        result.add(shellPathEscape(match))
+          result.add(shellPathEscape(match))
+    except OSError:
+      discard
 
 proc completeCmdArg*[T](_: type seq[T], val: TaintedString): seq[string] =
   return @[]
@@ -592,10 +595,20 @@ macro generateFieldSetters(RecordType: type): untyped =
                              newCall(bindSym"acceptsMultipleValues", fixedFieldType))
 
     result.add quote do:
-      proc `completerName`(val: TaintedString): seq[string] {.nimcall, gcsafe.} =
+      proc `completerName`(val: TaintedString): seq[string] {.
+        nimcall
+        gcsafe
+        sideEffect
+        raises: [Defect]
+      .} =
         return completeCmdArgAux(`fixedFieldType`, val)
 
-      proc `setterName`(`configVar`: var `RecordType`, val: Option[TaintedString]) {.nimcall, gcsafe.} =
+      proc `setterName`(`configVar`: var `RecordType`, val: Option[TaintedString]) {.
+        nimcall
+        gcsafe
+        sideEffect
+        raises: [Defect, CatchableError]
+      .} =
         when `configField` is enum:
           # TODO: For some reason, the normal `setField` rejects enum fields
           # when they are used as case discriminators. File this as a bug.
