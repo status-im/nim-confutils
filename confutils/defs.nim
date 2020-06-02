@@ -17,8 +17,13 @@ type
   Unspecified* = object
   Txt* = object
 
+  SomeDistinctString = InputFile|InputDir|OutPath|OutDir|OutFile
+
 template `/`*(dir: InputDir|OutDir, path: string): auto =
   string(dir) / path
+
+template `$`*(x: SomeDistinctString): string =
+  string(x)
 
 template desc*(v: string) {.pragma.}
 template name*(v: string) {.pragma.}
