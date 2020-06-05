@@ -1,10 +1,11 @@
-import std/[net, parseutils]
-export net
+import std/parseutils
+import stew/shims/net as stewNet
+export stewNet
 
-func parseCmdArg*(T: type IpAddress, s: TaintedString): T =
-  parseIpAddress(string s)
+func parseCmdArg*(T: type ValidIpAddress, s: TaintedString): T =
+  ValidIpAddress.init(string s)
 
-proc completeCmdArg*(T: type IpAddress, val: TaintedString): seq[string] =
+proc completeCmdArg*(T: type ValidIpAddress, val: TaintedString): seq[string] =
   # TODO: Maybe complete the local IP address?
   return @[]
 
