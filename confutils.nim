@@ -102,7 +102,6 @@ when useBufferedOutput:
     for arg in args:
       help.add arg
 
-
   template errorOutput(args: varargs[string]) =
     helpOutput(args)
 
@@ -123,6 +122,8 @@ const
   fgSection = fgYellow
   fgCommand = fgCyan
   fgOption = fgBlue
+  fgArg = fgBlue
+
   # TODO: Start using these:
   # fgValue = fgGreen
   # fgType = fgYellow
@@ -147,6 +148,7 @@ func firstArgIdx(cmd: CmdInfo): int =
   while result > 0:
     if cmd.opts[result - 1].kind != Arg:
       return
+    dec result
 
 iterator args(cmd: CmdInfo): OptInfo =
   if cmd.hasArgs:
@@ -234,13 +236,21 @@ proc describeInvocation(help: var string,
   helpOutput "\p"
 
   if cmd.desc.len > 0:
-    helpOutput "\p  ", cmd.desc, "\p"
+    helpOutput "\p", cmd.desc, "\p"
+
+  var argsSectionStarted = false
 
   for arg in cmd.args:
     if arg.desc.len > 0:
-      let cliArg = "<" & arg.humaneName & ">"
-      helpOutput cliArg, padding(cliArg, 6 + appInfo.namesWidth)
+      if not argsSectionStarted:
+        helpOutput "\p"
+        argsSectionStarted = true
+
+      let cliArg = " <" & arg.humaneName & ">"
+      helpOutput fgArg, styleBright, cliArg
+      helpOutput padding(cliArg, 6 + appInfo.namesWidth)
       help.writeDesc appInfo, arg.desc
+      helpOutput "\p"
 
 type
   OptionsType = enum
@@ -565,8 +575,8 @@ template debugMacroResult(macroName: string) {.dirty.} =
     echo "\n-------- ", macroName, " ----------------------"
     echo result.repr
 
-macro generateFieldSetters(RecordType: type): untyped =
-  var recordDef = RecordType.getType[1].getImpl
+proc generateFieldSetters(RecordType: NimNode): NimNode =
+  var recordDef = getImpl(RecordType)
   let makeDefaultValue = bindSym"makeDefaultValue"
 
   result = newTree(nnkStmtListExpr)
@@ -622,10 +632,11 @@ macro generateFieldSetters(RecordType: type): untyped =
   result.add settersArray
   debugMacroResult "Field Setters"
 
-macro buildCommandTree(RecordType: type): untyped =
+proc cmdInfoFromType(T: NimNode): CmdInfo =
+  result = CmdInfo()
+
   var
-    recordDef = RecordType.getType[1].getImpl
-    res = CmdInfo()
+    recordDef = getImpl(T)
     discriminatorFields = newSeq[OptInfo]()
     fieldIdx = 0
 
@@ -682,16 +693,28 @@ macro buildCommandTree(RecordType: type): untyped =
     if field.caseField != nil and field.caseBranch != nil:
       let fieldName = field.caseField.getFieldName
       var discriminator = findOpt(discriminatorFields, $fieldName)
+
       if discriminator == nil:
         error "Unable to find " & $fieldName
+
+      if field.caseBranch.kind == nnkElse:
+        error "Sub-command parameters cannot appear in an else branch. " &
+              "Please specify the sub-command branch precisely", field.caseBranch[0]
+
       let branchEnumVal = field.caseBranch[0]
       var cmd = findCmd(discriminator.subCmds, $branchEnumVal)
       cmd.opts.add opt
-    else:
-      res.opts.add opt
 
-  result = newLitFixed(res)
-  debugMacroResult "Command Tree"
+    else:
+      result.opts.add opt
+
+macro configurationRtti(RecordType: type): untyped =
+  let
+    T = RecordType.getType[1]
+    cmdInfo = cmdInfoFromType T
+    fieldSetters = generateFieldSetters T
+
+  result = newTree(nnkPar, newLitFixed cmdInfo, fieldSetters)
 
 proc load*(Configuration: type,
            cmdLine = commandLineParams(),
@@ -711,10 +734,9 @@ proc load*(Configuration: type,
   # This is an initial naive implementation that will be improved
   # over time.
 
-  let fieldSetters = generateFieldSetters(Configuration)
+  let (rootCmd, fieldSetters) = configurationRtti(Configuration)
   var fieldCounters: array[fieldSetters.len, int]
 
-  var rootCmd = buildCommandTree(Configuration)
   printCmdTree rootCmd
 
   let confAddr = addr result
@@ -768,7 +790,8 @@ proc load*(Configuration: type,
 
   template activateCmd(discriminator: OptInfo, activatedCmd: CmdInfo) =
     let cmd = activatedCmd
-    applySetter(discriminator.idx, TaintedString(cmd.name))
+    applySetter(discriminator.idx, if cmd.desc.len > 0: TaintedString(cmd.desc)
+                                   else: TaintedString(cmd.name))
     activeCmds.add cmd
     nextArgIdx = cmd.getNextArgIdx(-1)
 

@@ -1,3 +1,6 @@
+import
+  options
+
 type
   ConfigurationError* = object of CatchableError
 
@@ -13,6 +16,20 @@ type
   OutPath* = distinct string
   OutDir* = distinct string
   OutFile* = distinct string
+
+  RestOfCmdLine* = distinct string
+  SubCommandArgs* = distinct string
+
+  Flag* = object
+    name*: TaintedString
+
+  FlagWithValue* = object
+    name*: TaintedString
+    value*: TaintedString
+
+  FlagWithOptionalValue* = object
+    name*: TaintedString
+    value*: Option[TaintedString]
 
   Unspecified* = object
   Txt* = object
@@ -32,6 +49,7 @@ template defaultValue*(v: untyped) {.pragma.}
 template required* {.pragma.}
 template command* {.pragma.}
 template argument* {.pragma.}
+template inlineConfiguration* {.pragma.}
 
 template implicitlySelectable* {.pragma.}
   ## This can be applied to a case object discriminator

@@ -7,12 +7,12 @@ type
     outerCmd2
 
   InnerCmd = enum
-    innerCmd1
+    innerCmd1 = "Inner cmd 1"
     innerCmd2
 
   OuterOpt = enum
-    outerOpt1
-    outerOpt2
+    outerOpt1 = "Outer option 1"
+    outerOpt2 = "Outer option 2"
 
   InnerOpt = enum
     innerOpt1
@@ -34,6 +34,9 @@ type
         discard
     of outerOpt2:
       ooMandatory: string
+      ooOptiona {.
+        defaultValue: "test"
+        desc: "Outer option optional" .}: string
 
     case cmd {.command.}: OuterCmd
     of outerCmd1:
@@ -43,8 +46,8 @@ type
         ic1Optional {.
           desc: "Delay in seconds"
           abbr: "s" .}: Option[int]
-      else:
-        discard
+      of innerCmd2:
+        innerArg {.argument.}: string
     of outerCmd2:
       oc2Mandatory: int
 
