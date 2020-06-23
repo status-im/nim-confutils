@@ -50,6 +50,10 @@ type
     else:
       discard
 
+const
+  confutils_description_width {.intdefine.} = 80
+  confutils_narrow_terminal_width {.intdefine.} = 36
+
 proc getFieldName(caseField: NimNode): NimNode =
   result = caseField
   if result.kind == nnkIdentDefs: result = result[0]
@@ -210,11 +214,12 @@ proc writeDesc(help: var string, appInfo: HelpAppInfo, desc: string) =
     descIndent = (5 + appInfo.namesWidth + descSpacing.len)
     remainingColumns = appInfo.terminalWidth - descIndent
 
-  if remainingColumns < 36:
+  if remainingColumns < confutils_narrow_terminal_width:
     helpOutput "\p ", wrapWords(desc, appInfo.terminalWidth - 2,
                                 newLine = "\p ")
   else:
-    helpOutput descSpacing, wrapWords(desc, remainingColumns,
+    let wrappingWidth = min(remainingColumns, confutils_description_width)
+    helpOutput descSpacing, wrapWords(desc & ".", wrappingWidth,
                                       newLine = "\p" & spaces(descIndent))
 
 proc describeInvocation(help: var string,
@@ -236,7 +241,7 @@ proc describeInvocation(help: var string,
   helpOutput "\p"
 
   if cmd.desc.len > 0:
-    helpOutput "\p", cmd.desc, "\p"
+    helpOutput "\p", cmd.desc, ".\p"
 
   var argsSectionStarted = false
 
