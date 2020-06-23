@@ -701,7 +701,9 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
         error "Sub-command parameters cannot appear in an else branch. " &
               "Please specify the sub-command branch precisely", field.caseBranch[0]
 
-      let branchEnumVal = field.caseBranch[0]
+      var branchEnumVal = field.caseBranch[0]
+      if branchEnumVal.kind == nnkDotExpr:
+        branchEnumVal = branchEnumVal[1]
       var cmd = findCmd(discriminator.subCmds, $branchEnumVal)
       cmd.opts.add opt
 
