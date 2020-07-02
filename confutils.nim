@@ -591,6 +591,9 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
     var
       setterName = ident($field.name & "Setter")
       fieldName = field.name
+      namePragma = field.readPragma"name"
+      paramName = if namePragma != nil: namePragma
+                  else: fieldName
       configVar = ident "config"
       configField = newTree(nnkDotExpr, configVar, fieldName)
       defaultValue = field.readPragma"defaultValue"
@@ -604,7 +607,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
     var fixedFieldType = newTree(nnkTypeOfExpr, field.typ)
 
     settersArray.add newTree(nnkTupleConstr,
-                             newLit($fieldName),
+                             newLit($paramName),
                              setterName, completerName,
                              newCall(bindSym"requiresInput", fixedFieldType),
                              newCall(bindSym"acceptsMultipleValues", fixedFieldType))
