@@ -777,7 +777,7 @@ proc load*(Configuration: type,
     except:
       fail("Error while processing the '",
            fgOption, fieldSetters[setterIdx][0], resetStyle,
-           "' parameter:\p" &
+           "' parameter: " &
            getCurrentExceptionMsg())
 
   when hasCompletions:
