@@ -588,6 +588,9 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
   var settersArray = newTree(nnkBracket)
 
   for field in recordFields(recordDef):
+    if field.readPragma("hidden") != nil:
+      continue
+
     var
       setterName = ident($field.name & "Setter")
       fieldName = field.name
@@ -649,6 +652,9 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     fieldIdx = 0
 
   for field in recordFields(recordDef):
+    if field.readPragma("hidden") != nil:
+      continue
+
     let
       isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
       defaultValue = field.readPragma"defaultValue"

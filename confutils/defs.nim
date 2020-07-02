@@ -49,6 +49,7 @@ template defaultValue*(v: untyped) {.pragma.}
 template required* {.pragma.}
 template command* {.pragma.}
 template argument* {.pragma.}
+template hidden* {.pragma.}
 template inlineConfiguration* {.pragma.}
 
 template implicitlySelectable* {.pragma.}
