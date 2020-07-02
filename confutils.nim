@@ -41,8 +41,8 @@ type
   OptInfo = ref object
     name, abbr, desc, typename: string
     idx: int
-    hasDefault: bool
     isHidden: bool
+    defaultValue: string
     case kind: OptKind
     of Discriminator:
       isCommand: bool
@@ -126,6 +126,7 @@ else:
 
 const
   fgSection = fgYellow
+  fgDefault = fgWhite
   fgCommand = fgCyan
   fgOption = fgBlue
   fgArg = fgBlue
@@ -206,6 +207,9 @@ func hasAbbrs(cmd: CmdInfo): bool =
       for subCmd in opt.subCmds:
         if hasAbbrs(subCmd):
           return true
+
+template hasDefault(opt: OptInfo): bool =
+  opt.defaultValue.len > 0
 
 func humaneName(opt: OptInfo): string =
   if opt.name.len > 0: opt.name
@@ -315,6 +319,10 @@ proc describeOptions(help: var string,
 
           if i == opt.defaultSubCmd: helpOutput " (default)"
           help.describeOptions subCmd, cmdInvocation, appInfo, conditionalOpts
+      else:
+        if opt.hasDefault:
+          helpOutput spaces(7 + appInfo.namesWidth)
+          helpOutput fgDefault, "default value: ", fgWhite, styleBright, opt.defaultValue, "\p"
 
   let subCmdDiscriminator = cmd.getSubCmdDiscriminator
   if subCmdDiscriminator != nil:
@@ -674,7 +682,8 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
                       idx: fieldIdx,
                       name: $field.name,
                       isHidden: isHidden,
-                      hasDefault: defaultValue != nil,
+                      defaultValue: if defaultValue == nil: ""
+                                    else: repr(defaultValue),
                       typename: field.typ.repr)
 
     if desc != nil: opt.desc = desc.strVal
