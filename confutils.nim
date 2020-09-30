@@ -793,9 +793,6 @@ proc load*(Configuration: type,
   template required(opt: OptInfo): bool =
     fieldSetters[opt.idx][3] and not opt.hasDefault
 
-  template allowNextValue(opt: OptInfo): bool =
-    fieldSetters[opt.idx][4] or fieldCounters[opt.idx] == 0
-
   proc processMissingOpts(conf: var Configuration, cmd: CmdInfo) =
     for opt in cmd.opts:
       if fieldCounters[opt.idx] == 0:
@@ -934,10 +931,7 @@ proc load*(Configuration: type,
             discard
 
       if opt != nil:
-        if opt.allowNextValue:
-          applySetter(opt.idx, val)
-        else:
-          fail "The options '$1' should not be specified more than once" % [key]
+        applySetter(opt.idx, val)
       else:
         fail "Unrecognized option '$1'" % [key]
 
