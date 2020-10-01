@@ -2,6 +2,8 @@ import std/parseutils
 import stew/shims/net as stewNet
 export stewNet
 
+export ValidIpAddress
+
 func parseCmdArg*(T: type ValidIpAddress, s: TaintedString): T =
   ValidIpAddress.init(string s)
 
