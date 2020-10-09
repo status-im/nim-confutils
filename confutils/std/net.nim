@@ -14,13 +14,13 @@ proc completeCmdArg*(T: type ValidIpAddress, val: TaintedString): seq[string] =
 func parseCmdArg*(T: type Port, s: TaintedString): T =
   template fail =
     raise newException(ValueError,
-      "The supplied port must be an integer value in the range 0-65535")
+      "The supplied port must be an integer value in the range 1-65535")
 
   var intVal: int
   let parsedChars = try: parseInt(string s, intVal):
                     except CatchableError: fail()
 
-  if parsedChars != len(s) or intVal < 0 or intVal > 65535:
+  if parsedChars != len(s) or intVal < 1 or intVal > 65535:
     fail()
 
   return Port(intVal)
