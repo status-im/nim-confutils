@@ -150,3 +150,17 @@ template uTypeIsRecord*[N, T](_: type array[N, T]): bool =
     true
   else:
     false
+
+func constructPath*(root: string, keys: openArray[string]): string =
+  if keys.len <= 1:
+    return root
+  var size = root.len + 1
+  for i in 0..<keys.len-1:
+    inc(size, keys[i].len + 1)
+  result = newStringOfCap(size)
+  result.add root
+  result. add '\\'
+  for i in 0..<keys.len-1:
+    result.add keys[i]
+    if i < keys.len-2:
+      result. add '\\'

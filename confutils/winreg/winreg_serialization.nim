@@ -26,9 +26,9 @@ template decode*(_: type Winreg,
     reader.readValue(RecordType)
 
 template encode*(_: type Winreg,
-                 value: auto,
                  hKey: HKEY,
                  path: string,
+                 value: auto,
                  params: varargs[untyped]) =
   mixin init, WriterType, writeValue
 
@@ -42,6 +42,9 @@ template loadFile*(_: type Winreg,
                    params: varargs[untyped]): auto =
   mixin init, ReaderType, readValue
 
+  # filename should be a Windows Registry path
+  # such as "HKEY_CLASSES_ROOT\\SOFTWARE\\Nimbus"
+  # or "HKCU\\SOFTWARE\\Nimbus"
   let (hKey, path) = parseWinregPath(filename)
   var reader = unpackArgs(init, [WinregReader, hKey, path, params])
   reader.readValue(RecordType)
@@ -49,6 +52,7 @@ template loadFile*(_: type Winreg,
 template saveFile*(Format: type, filename: string, value: auto, params: varargs[untyped]) =
   mixin init, WriterType, writeValue
 
+  # filename should be a Windows Registry path
   let (hKey, path) = parseWinregPath(filename)
   var writer = unpackArgs(init, [WinregWriter, hKey, path, params])
   writer.writeValue(value)
