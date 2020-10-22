@@ -1,7 +1,7 @@
 import
-  tables, strutils, typetraits, options,
+  tables, typetraits, options,
   serialization/[object_serialization, errors],
-  ./utils
+  ./utils, ./types
 
 type
   WinregReader* = object
@@ -32,8 +32,7 @@ proc init*(T: type WinregReader,
 
 template getUnderlyingType*[T](_: Option[T]): untyped = T
 
-proc readValue*[T](r: var WinregReader, value: var T)
-                  {.raises: [SerializationError, IOError, Defect].} =
+proc readValue*[T](r: var WinregReader, value: var T) =
   mixin readValue
   # TODO: reduce allocation
 
@@ -65,8 +64,6 @@ proc readValue*[T](r: var WinregReader, value: var T)
       var expectedFieldPos = 0
       r.key.add ""
       value.enumInstanceSerializedFields(fieldName, field):
-        type FieldType = type field
-
         when T is tuple:
           r.key[^1] = $expectedFieldPos
           var reader = fields[][expectedFieldPos].reader

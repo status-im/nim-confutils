@@ -1,6 +1,7 @@
 import
   unittest, options,
-  ../confutils/winreg/winreg_serialization
+  ../confutils/winreg/winreg_serialization,
+  ../confutils/winreg/utils
 
 type
   Fruit = enum

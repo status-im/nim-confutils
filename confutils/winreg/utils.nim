@@ -1,24 +1,11 @@
 import
   strutils,
-  serialization/errors
+  ./types
 
 type
-  HKEY*    = distinct uint
-  RegType* = distinct int32
-  WinregError* = object of SerializationError
   SomePrimitives* = SomeInteger | enum | bool | SomeFloat | char
 
 const
-  HKEY_CLASSES_ROOT*  = HKEY(0x80000000'u)
-  HKEY_CURRENT_USER*  = HKEY(0x80000001'u)
-  HKEY_LOCAL_MACHINE* = HKEY(0x80000002'u)
-  HKEY_USERS*         = HKEY(0x80000003'u)
-
-  HKLM* = HKEY_LOCAL_MACHINE
-  HKCU* = HKEY_CURRENT_USER
-  HKCR* = HKEY_CLASSES_ROOT
-  HKU*  = HKEY_USERS
-
   REG_SZ*     = RegType(1)
   REG_BINARY* = RegType(3)
   REG_DWORD*  = RegType(4)
@@ -29,9 +16,6 @@ const
   RT_DWORD*  = 0x00000010
   RT_QWORD*  = 0x00000040
   RT_ANY*    = 0x0000ffff
-
-proc `==`*(a, b: HKEY): bool {.borrow.}
-proc `==`*(a, b: RegType): bool {.borrow.}
 
 proc regGetValue(hKey: HKEY, lpSubKey, lpValue: cstring,
                  dwFlags: int32, pdwType: ptr RegType,
