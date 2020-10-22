@@ -8,4 +8,5 @@
 {. warning[UnusedImport]:off .}
 
 import
-  test_config_file
+  test_config_file,
+  test_envvar
