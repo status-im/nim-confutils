@@ -1,7 +1,7 @@
 import
-  typetraits, options, strutils, tables,
+  typetraits, options, tables,
   serialization,
-  ./utils
+  ./utils, ./types
 
 type
   WinregWriter* = object

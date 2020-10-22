@@ -1,9 +1,9 @@
 import
   stew/shims/macros,
-  serialization, ./reader, ./writer, ./utils
+  serialization, ./reader, ./writer, ./utils, ./types
 
 export
-  serialization, reader, writer, utils
+  serialization, reader, writer, types
 
 serializationFormat Winreg,
                     Reader = WinregReader,
