@@ -8,12 +8,8 @@ license       = "Apache License 2.0"
 skipDirs      = @["tests"]
 
 requires "nim >= 1.0.0",
-         "stew",
-         "testutils"
+         "stew"
 
-task test, "run CPU tests":
-  when defined(windows):
-    exec "cmd.exe /C testrunner.cmd tests"
-  else:
-    exec "testrunner tests"
-
+task test, "Run all tests":
+  exec "nim c -r --threads:off -d:release tests/test_all"
+  exec "nim c -r --threads:on -d:release tests/test_all"
