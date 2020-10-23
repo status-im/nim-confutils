@@ -36,16 +36,24 @@ proc readValue*[T](r: var EnvvarReader, value: var T)
   mixin readValue
   # TODO: reduce allocation
 
-  when T is (SomePrimitives or range or string):
+  when T is string:
+    let key = constructKey(r.prefix, r.key)
+    value = os.getEnv(key)
+
+  elif T is (SomePrimitives or range):
     let key = constructKey(r.prefix, r.key)
     getValue(key, value)
 
   elif T is Option:
     let key = constructKey(r.prefix, r.key)
     if existsEnv(key):
-      var outVal: getUnderlyingType(value)
-      getValue(key, outVal)
-      value = some(outVal)
+      type uType = getUnderlyingType(value)
+      var outVal: uType
+      when uType is string:
+        value = some(os.getEnv(key))
+      else:
+        r.readValue(outVal)
+        value = some(outVal)
 
   elif T is (seq or array):
     when uTypeIsPrimitives(T):

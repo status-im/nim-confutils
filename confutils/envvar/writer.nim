@@ -1,7 +1,6 @@
 import
-  typetraits, options, tables,
-  serialization,
-  ./utils
+  typetraits, options, tables, os,
+  serialization, ./utils
 
 type
   EnvvarWriter* = object
@@ -15,10 +14,14 @@ proc writeValue*(w: var EnvvarWriter, value: auto) =
   mixin enumInstanceSerializedFields, writeValue, writeFieldIMPL
   # TODO: reduce allocation
 
-  when value is (SomePrimitives or range or string):
+  when value is string:
+    let key = constructKey(w.prefix, w.key)
+    os.putEnv(key, value)
+
+  elif value is (SomePrimitives or range):
     let key = constructKey(w.prefix, w.key)
     setValue(key, value)
-
+  
   elif value is Option:
     if value.isSome:
       w.writeValue value.get
