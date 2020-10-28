@@ -30,8 +30,6 @@ proc init*(T: type WinregReader,
   result.hKey = hKey
   result.path = path
 
-template getUnderlyingType*[T](_: Option[T]): untyped = T
-
 proc readValue*[T](r: var WinregReader, value: var T) =
   mixin readValue
   # TODO: reduce allocation
@@ -40,10 +38,11 @@ proc readValue*[T](r: var WinregReader, value: var T) =
     let path = constructPath(r.path, r.key)
     discard getValue(r.hKey, path, r.key[^1], value)
   elif T is Option:
+    template getUnderlyingType[T](_: Option[T]): untyped = T
+    type UT = getUnderlyingType(value)
     let path = constructPath(r.path, r.key)
-    var outVal: getUnderlyingType(value)
-    if getValue(r.hKey, path, r.key[^1], outVal):
-      value = some(outVal)
+    if pathExists(r.hKey, path, r.key[^1]):
+      value = some(r.readValue(UT))
   elif T is (seq or array):
     when uTypeIsPrimitives(T):
       let path = constructPath(r.path, r.key)
