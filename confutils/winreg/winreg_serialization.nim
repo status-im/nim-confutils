@@ -49,7 +49,7 @@ template loadFile*(_: type Winreg,
   var reader = unpackArgs(init, [WinregReader, hKey, path, params])
   reader.readValue(RecordType)
 
-template saveFile*(Format: type, filename: string, value: auto, params: varargs[untyped]) =
+template saveFile*(_: type Winreg, filename: string, value: auto, params: varargs[untyped]) =
   mixin init, WriterType, writeValue
 
   # filename should be a Windows Registry path

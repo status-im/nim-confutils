@@ -1,5 +1,5 @@
 import
-  strutils,
+  strutils, os,
   ./types
 
 type
@@ -16,6 +16,8 @@ const
   RT_DWORD*  = 0x00000010
   RT_QWORD*  = 0x00000040
   RT_ANY*    = 0x0000ffff
+
+  MAX_ELEM_SIZE = 16_383'i32
 
 proc regGetValue(hKey: HKEY, lpSubKey, lpValue: cstring,
                  dwFlags: int32, pdwType: ptr RegType,
@@ -76,6 +78,9 @@ proc getValue*(hKey: HKEY, path, key: string, outVal: var SomePrimitives): bool 
     var valSize = sizeof(outVal).int32
     call regGetValue(hKey, path, key, RT_QWORD, nil, outVal.addr, valSize.addr)
   result = true
+
+proc pathExists*(hKey: HKEY, path, key: string): bool {.inline.} =
+  result = regGetValue(hKey, path, key, RT_ANY, nil, nil, nil) == 0
 
 proc parseWinregPath*(input: string): (HKEY, string) =
   let pos = input.find('\\')

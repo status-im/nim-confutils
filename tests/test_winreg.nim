@@ -1,5 +1,5 @@
 import
-  unittest, options,
+  unittest, options, os,
   ../confutils/winreg/winreg_serialization,
   ../confutils/winreg/utils
 
@@ -95,5 +95,29 @@ proc testEncoder() =
       check x.antennae.isNone
       check x.bumper.get() == "Chromium"
 
+type
+  ValidIpAddress {.requiresInit.} = object
+    value: string
+
+  TestObject = object
+    address: Option[ValidIpAddress]
+
+proc readValue(r: var WinregReader, value: var ValidIpAddress) =
+  r.readValue(value.value)
+
+proc writeValue(w: var WinregWriter, value: ValidIpAddress) =
+  w.writeValue(value.value)
+
+proc testOptionalFields() =
+  suite "optional fields test suite":
+    test "optional field with requiresInit pragma":
+
+      var z = TestObject(address: some(ValidIpAddress(value: "1.2.3.4")))
+      Winreg.saveFile("HKCU" / commonPath, z)
+      var x = Winreg.loadFile("HKCU" / commonPath, TestObject)
+      check x.address.isSome
+      check x.address.get().value == "1.2.3.4"
+
 testUtils()
 testEncoder()
+testOptionalFields()
