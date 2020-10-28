@@ -43,7 +43,7 @@ template loadFile*(_: type Envvar,
   var reader = unpackArgs(init, [EnvvarReader, prefix, params])
   reader.readValue(RecordType)
 
-template saveFile*(Format: type, prefix: string, value: auto, params: varargs[untyped]) =
+template saveFile*(_: type Envvar, prefix: string, value: auto, params: varargs[untyped]) =
   mixin init, WriterType, writeValue
 
   var writer = unpackArgs(init, [EnvvarWriter, prefix, params])
