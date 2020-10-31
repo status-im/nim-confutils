@@ -29,8 +29,7 @@ proc handleReadException*(r: EnvvarReader,
 proc init*(T: type EnvvarReader, prefix: string): T =
   result.prefix = prefix
 
-proc readValue*[T](r: var EnvvarReader, value: var T)
-                  {.raises: [SerializationError, ValueError, Defect].} =
+proc readValue*[T](r: var EnvvarReader, value: var T) =
   mixin readValue
   # TODO: reduce allocation
 
@@ -46,10 +45,10 @@ proc readValue*[T](r: var EnvvarReader, value: var T)
     template getUnderlyingType[T](_: Option[T]): untyped = T
     let key = constructKey(r.prefix, r.key)
     if existsEnv(key):
-      type uType = getUnderlyingType(value)      
+      type uType = getUnderlyingType(value)
       when uType is string:
         value = some(os.getEnv(key))
-      else:        
+      else:
         value = some(r.readValue(uType))
 
   elif T is (seq or array):
@@ -57,15 +56,11 @@ proc readValue*[T](r: var EnvvarReader, value: var T)
       let key = constructKey(r.prefix, r.key)
       getValue(key, value)
 
-    elif uTypeIsRecord(T):
+    else:
       let key = r.key[^1]
       for i in 0..<value.len:
         r.key[^1] = key & $i
         r.readValue(value[i])
-
-    else:
-      const typeName = typetraits.name(T)
-      {.fatal: "Failed to convert from Envvar array an unsupported type: " & typeName.}
 
   elif T is (object or tuple):
     type T = type(value)

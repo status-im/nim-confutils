@@ -1,10 +1,10 @@
 import
   std/[options, strutils, wordwrap],
   stew/shims/macros,
-  confutils/[defs, cli_parser]
+  confutils/[defs, cli_parser, config_file]
 
 export
-  defs
+  defs, config_file
 
 const
   useBufferedOutput = defined(nimscript)
@@ -750,8 +750,15 @@ proc load*(Configuration: type,
   # This is an initial naive implementation that will be improved
   # over time.
 
+  # users can override default `appendConfigFileFormats`
+  # `appName`, and `vendorName`
+  mixin appendConfigFileFormats
+  mixin appName, vendorName
+  appendConfigFileFormats(Configuration)
+
   let (rootCmd, fieldSetters) = configurationRtti(Configuration)
   var fieldCounters: array[fieldSetters.len, int]
+  let configFile = configFile(Configuration)
 
   printCmdTree rootCmd
 
@@ -798,6 +805,10 @@ proc load*(Configuration: type,
       if fieldCounters[opt.idx] == 0:
         if opt.required:
           fail "The required option '$1' was not specified" % [opt.name]
+        elif configFile.setters[opt.idx](conf, configFile):
+          # all work is done in the config file setter,
+          # there is nothing left to do here.
+          discard
         elif opt.hasDefault:
           fieldSetters[opt.idx][1](conf, none[TaintedString]())
 

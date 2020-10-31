@@ -1,5 +1,5 @@
 import
-  strutils, os,
+  strutils,
   ./types
 
 type
@@ -16,8 +16,6 @@ const
   RT_DWORD*  = 0x00000010
   RT_QWORD*  = 0x00000040
   RT_ANY*    = 0x0000ffff
-
-  MAX_ELEM_SIZE = 16_383'i32
 
 proc regGetValue(hKey: HKEY, lpSubKey, lpValue: cstring,
                  dwFlags: int32, pdwType: ptr RegType,
