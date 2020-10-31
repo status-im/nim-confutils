@@ -10,3 +10,6 @@
 import
   test_config_file,
   test_envvar
+
+when defined(windows):
+  import test_winreg

@@ -1,9 +1,9 @@
 import
   stew/shims/macros,
-  serialization, ./reader, ./writer, ./utils
+  serialization, ./reader, ./writer
 
 export
-  serialization, reader, writer, utils
+  serialization, reader, writer
 
 serializationFormat Envvar,
                     Reader = EnvvarReader,

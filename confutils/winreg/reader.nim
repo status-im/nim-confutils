@@ -37,27 +37,27 @@ proc readValue*[T](r: var WinregReader, value: var T) =
   when T is (SomePrimitives or range or string):
     let path = constructPath(r.path, r.key)
     discard getValue(r.hKey, path, r.key[^1], value)
+
   elif T is Option:
     template getUnderlyingType[T](_: Option[T]): untyped = T
     type UT = getUnderlyingType(value)
     let path = constructPath(r.path, r.key)
     if pathExists(r.hKey, path, r.key[^1]):
       value = some(r.readValue(UT))
+
   elif T is (seq or array):
     when uTypeIsPrimitives(T):
       let path = constructPath(r.path, r.key)
       discard getValue(r.hKey, path, r.key[^1], value)
-    elif uTypeIsRecord(T):
+
+    else:
       let key = r.key[^1]
       for i in 0..<value.len:
         r.key[^1] = key & $i
         r.readValue(value[i])
-    else:
-      const typeName = typetraits.name(T)
-      {.fatal: "Failed to convert from Winreg array an unsupported type: " & typeName.}
+
   elif T is (object or tuple):
     type T = type(value)
-
     when T.totalSerializedFields > 0:
       let fields = T.fieldReadersTable(WinregReader)
       var expectedFieldPos = 0
@@ -67,6 +67,7 @@ proc readValue*[T](r: var WinregReader, value: var T) =
           r.key[^1] = $expectedFieldPos
           var reader = fields[][expectedFieldPos].reader
           expectedFieldPos += 1
+
         else:
           r.key[^1] = fieldName
           var reader = findFieldReader(fields[], fieldName, expectedFieldPos)
@@ -74,6 +75,7 @@ proc readValue*[T](r: var WinregReader, value: var T) =
         if reader != nil:
           reader(value, r)
       discard r.key.pop()
+
   else:
     const typeName = typetraits.name(T)
     {.fatal: "Failed to convert from Winreg an unsupported type: " & typeName.}
