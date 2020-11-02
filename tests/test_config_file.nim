@@ -196,7 +196,20 @@ proc readValue(r: var WinregReader, value: var GraffitiBytes) =
 
 proc testConfigFile() =
   suite "config file test suite":
+    putEnv("prefixdataDir", "ENV VAR DATADIR")
+
     test "basic config file":
       let conf = TestConf.load()
+
+      # dataDir is in env var
+      check conf.dataDir.string == "ENV VAR DATADIR"
+
+      # logFile is in current user config file
+      check conf.logFile.isSome()
+      check conf.logFile.get().string == "TOML CU LOGFILE"
+
+      # logLevel and rpcPort are in system wide config file
+      check conf.logLevel == "TOML SW DEBUG"
+      check conf.rpcPort.int == 1235
 
 testConfigFile()
