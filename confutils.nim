@@ -4,7 +4,7 @@ import
   confutils/[defs, cli_parser, config_file]
 
 export
-  defs, config_file
+  defs, config_file, options
 
 const
   useBufferedOutput = defined(nimscript)
