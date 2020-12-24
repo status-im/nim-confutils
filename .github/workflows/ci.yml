@@ -183,4 +183,5 @@ jobs:
         working-directory: nim-confutils
         run: |
           nimble install -y --depsOnly
+          nimble install -y toml_serialization json_serialization
           env TEST_LANG="${{ matrix.target.TEST_LANG }}" nimble test
