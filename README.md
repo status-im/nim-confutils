@@ -4,7 +4,7 @@ nim-confutils
 [![Build Status](https://travis-ci.org/status-im/nim-confutils.svg?branch=master)](https://travis-ci.org/status-im/nim-confutils)
 [![License: Apache](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
+![Github action](https://github.com/status-im/nim-confutils/workflows/nim-confutils%20CI/badge.svg)
 
 ## Introduction
 
@@ -39,7 +39,7 @@ type
     logLevel* {.
       defaultValue: LogLevel.INFO
       desc: "Sets the log level" }: LogLevel
-    
+
     #
     # This program uses a CLI interface with sub-commands (similar to git).
     #
@@ -88,7 +88,7 @@ type
       stateSnapshot* {.
         desc: "Json file specifying a recent state snapshot"
         abbr: "s" }: Option[BeaconState]
-    
+
     of createChain:
       chainStartupData* {.
         desc: ""
@@ -102,7 +102,7 @@ type
   StartUpCommand* = enum
     noCommand
     createChain
-  
+
   #
   # The configuration can use user-defined types that feature custom
   # command-line parsing and serialization routines.
@@ -172,7 +172,7 @@ cli do (validators {.
 
         startupDelay {.
           desc: "delay in seconds before starting the simulation" } = 0):
-  
+
   if validators < 64:
     echo "The number of validators must be greater than EPOCH_LENGTH (64)"
     quit(1)
@@ -352,7 +352,7 @@ Please note that the choice of `CmdParser` will also affect the formatting
 of the help messages. Please see the definition of the standard [Windows][WIN_CMD]
 or [Posix][POSIX_CMD] command-line help syntax for mode details.
 
-[WIN_CMD]: https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/command-line-syntax-key 
+[WIN_CMD]: https://docs.microsoft.com/en-us/windows-server/administration/windows-commands/command-line-syntax-key
 [POSIX_CMD]: http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap12.html
 
 ### Using sub-commands
