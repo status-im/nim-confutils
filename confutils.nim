@@ -30,6 +30,7 @@ type
   CmdInfo = ref object
     name: string
     desc: string
+    isHidden: bool
     opts: seq[OptInfo]
 
   OptKind = enum
@@ -41,6 +42,7 @@ type
     name, abbr, desc, typename: string
     idx: int
     hasDefault: bool
+    isHidden: bool
     case kind: OptKind
     of Discriminator:
       isCommand: bool
@@ -141,7 +143,11 @@ func isCliSwitch(opt: OptInfo): bool =
   (opt.kind == Discriminator and opt.isCommand == false)
 
 func hasOpts(cmd: CmdInfo): bool =
-  cmd.opts.len > 0 and cmd.opts[0].isCliSwitch
+  for opt in cmd.opts:
+    if opt.isCliSwitch and not opt.isHidden:
+      return true
+
+  return false
 
 func hasArgs(cmd: CmdInfo): bool =
   cmd.opts.len > 0 and cmd.opts[^1].kind == Arg
@@ -276,9 +282,9 @@ proc describeOptions(help: var string,
       discard
 
     for opt in cmd.opts:
-      if opt.kind == Arg: continue
-      if opt.kind == Discriminator:
-        if opt.isCommand: continue
+      if opt.kind == Arg or
+         opt.kind == Discriminator or
+         opt.isHidden: continue
 
       # Indent all command-line switches
       helpOutput " "
@@ -588,9 +594,6 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
   var settersArray = newTree(nnkBracket)
 
   for field in recordFields(recordDef):
-    if field.readPragma("hidden") != nil:
-      continue
-
     var
       setterName = ident($field.name & "Setter")
       fieldName = field.name
@@ -652,12 +655,10 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     fieldIdx = 0
 
   for field in recordFields(recordDef):
-    if field.readPragma("hidden") != nil:
-      continue
-
     let
       isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
       defaultValue = field.readPragma"defaultValue"
+      isHidden = field.readPragma("hidden") != nil
       abbr = field.readPragma"abbr"
       name = field.readPragma"name"
       desc = field.readPragma"desc"
@@ -668,6 +669,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     var opt = OptInfo(kind: optKind,
                       idx: fieldIdx,
                       name: $field.name,
+                      isHidden: isHidden,
                       hasDefault: defaultValue != nil,
                       typename: field.typ.repr)
 
