@@ -5,10 +5,10 @@ import
 export
   serialization, reader, writer, types
 
-serializationFormat Winreg,
-                    Reader = WinregReader,
-                    Writer = WinregWriter,
-                    PreferedOutput = void
+serializationFormat Winreg
+
+Winreg.setReader WinregReader
+Winreg.setWriter WinregWriter, PreferredOutput = void
 
 template supports*(_: type Winreg, T: type): bool =
   # The Winreg format should support every type

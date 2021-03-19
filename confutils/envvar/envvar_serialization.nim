@@ -5,10 +5,10 @@ import
 export
   serialization, reader, writer
 
-serializationFormat Envvar,
-                    Reader = EnvvarReader,
-                    Writer = EnvvarWriter,
-                    PreferedOutput = void
+serializationFormat Envvar
+
+Envvar.setReader EnvvarReader
+Envvar.setWriter EnvvarWriter, PreferredOutput = void
 
 template supports*(_: type Envvar, T: type): bool =
   # The Envvar format should support every type
