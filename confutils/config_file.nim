@@ -48,8 +48,7 @@ proc optionalizeFields(CF, confType: NimNode): NimNode =
 
   var recordDef = getImpl(confType)
   for field in recordFields(recordDef):
-    if field.readPragma"hidden" != nil or
-       field.readPragma"command" != nil or
+    if field.readPragma"command" != nil or
        field.readPragma"argument" != nil:
       continue
 
@@ -95,9 +94,6 @@ proc generateSetters(optType, confType, CF: NimNode): (NimNode, NimNode, int) =
         a = b.get()
 
   for field in recordFields(recordDef):
-    if field.readPragma"hidden" != nil:
-      continue
-
     if field.readPragma"command" != nil or
        field.readPragma"argument" != nil:
 
