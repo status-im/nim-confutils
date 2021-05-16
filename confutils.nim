@@ -570,7 +570,11 @@ template setField[T](loc: var T, val: Option[TaintedString], defaultVal: untyped
         else: FieldType(defaultVal)
 
 template setField[T](loc: var seq[T], val: Option[TaintedString], defaultVal: untyped) =
-  loc.add parseCmdArgAux(type(loc[0]), val.get)
+  if val.isSome:
+    loc.add parseCmdArgAux(type(loc[0]), val.get)
+  else:
+    type FieldType = type(loc)
+    loc = FieldType(defaultVal)
 
 proc makeDefaultValue*(T: type): T =
   discard
