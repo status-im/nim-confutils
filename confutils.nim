@@ -218,18 +218,23 @@ func humaneName(opt: OptInfo): string =
 template padding(output: string, desiredWidth: int): string =
   spaces(max(desiredWidth - output.len, 0))
 
-proc writeDesc(help: var string, appInfo: HelpAppInfo, desc: string) =
+proc writeDesc(help: var string,
+               appInfo: HelpAppInfo,
+               desc, defaultValue: string) =
   const descSpacing = "  "
   let
     descIndent = (5 + appInfo.namesWidth + descSpacing.len)
     remainingColumns = appInfo.terminalWidth - descIndent
+    defaultValSuffix = if defaultValue.len == 0: ""
+                       else: " [default: " & defaultValue & "]"
+    fullDesc = desc & defaultValSuffix & "."
 
   if remainingColumns < confutils_narrow_terminal_width:
-    helpOutput "\p ", wrapWords(desc, appInfo.terminalWidth - 2,
+    helpOutput "\p ", wrapWords(fullDesc, appInfo.terminalWidth - 2,
                                 newLine = "\p ")
   else:
     let wrappingWidth = min(remainingColumns, confutils_description_width)
-    helpOutput descSpacing, wrapWords(desc & ".", wrappingWidth,
+    helpOutput descSpacing, wrapWords(fullDesc, wrappingWidth,
                                       newLine = "\p" & spaces(descIndent))
 
 proc describeInvocation(help: var string,
@@ -264,7 +269,7 @@ proc describeInvocation(help: var string,
       let cliArg = " <" & arg.humaneName & ">"
       helpOutput fgArg, styleBright, cliArg
       helpOutput padding(cliArg, 6 + appInfo.namesWidth)
-      help.writeDesc appInfo, arg.desc
+      help.writeDesc appInfo, arg.desc, arg.defaultValue
       helpOutput "\p"
 
 type
@@ -307,7 +312,9 @@ proc describeOptions(help: var string,
         helpOutput spaces(2 + appInfo.namesWidth)
 
       if opt.desc.len > 0:
-        help.writeDesc appInfo, opt.desc.replace("%t", opt.typename)
+        help.writeDesc appInfo,
+                       opt.desc.replace("%t", opt.typename),
+                       opt.defaultValue
 
       helpOutput "\p"
 
@@ -319,10 +326,6 @@ proc describeOptions(help: var string,
 
           if i == opt.defaultSubCmd: helpOutput " (default)"
           help.describeOptions subCmd, cmdInvocation, appInfo, conditionalOpts
-      else:
-        if opt.hasDefault:
-          helpOutput spaces(7 + appInfo.namesWidth)
-          helpOutput fgDefault, "default value: ", fgWhite, styleBright, opt.defaultValue, "\p"
 
   let subCmdDiscriminator = cmd.getSubCmdDiscriminator
   if subCmdDiscriminator != nil:
@@ -670,6 +673,9 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     let
       isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
       defaultValue = field.readPragma"defaultValue"
+      defaultValueDesc = field.readPragma"defaultValueDesc"
+      defaultValueOnScreen = if defaultValueDesc != nil: defaultValueDesc
+                             else: defaultValue
       isHidden = field.readPragma("hidden") != nil
       abbr = field.readPragma"abbr"
       name = field.readPragma"name"
@@ -678,12 +684,15 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
                 elif field.readPragma("argument") != nil: Arg
                 else: CliSwitch
 
+    if defaultValueDesc != nil and defaultValue == nil:
+      error "The `defaultValueDesc` pragma cannot be specified without also specifying `defaultValue`", defaultValueDesc
+
     var opt = OptInfo(kind: optKind,
                       idx: fieldIdx,
                       name: $field.name,
                       isHidden: isHidden,
-                      defaultValue: if defaultValue == nil: ""
-                                    else: repr(defaultValue),
+                      defaultValue: if defaultValueOnScreen == nil: ""
+                                    else: repr(defaultValueOnScreen),
                       typename: field.typ.repr)
 
     if desc != nil: opt.desc = desc.strVal
