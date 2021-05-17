@@ -812,9 +812,9 @@ proc load*(Configuration: type,
       fieldSetters[setterIdx][1](confAddr[], some(cmdLineVal))
       inc fieldCounters[setterIdx]
     except:
-      fail("Error while processing the '",
-           fgOption, fieldSetters[setterIdx][0], resetStyle,
-           "' parameter: " &
+      fail("Error while processing the ",
+           fgOption, fieldSetters[setterIdx][0],
+           "=", cmdLineVal.string, resetStyle, " parameter: ",
            getCurrentExceptionMsg())
 
   when hasCompletions:
