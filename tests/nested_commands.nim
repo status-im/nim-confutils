@@ -5,14 +5,16 @@ type
   OuterCmd = enum
     outerCmd1
     outerCmd2
+    outerCmd3
 
   InnerCmd = enum
     innerCmd1 = "Inner cmd 1"
     innerCmd2
 
   OuterOpt = enum
-    outerOpt1 = "Outer option 1"
-    outerOpt2 = "Outer option 2"
+    outerOpt1 = "Option1"
+    outerOpt2 = "Option2"
+    outerOpt3 = "Option3"
 
   InnerOpt = enum
     innerOpt1
@@ -37,6 +39,8 @@ type
       ooOptiona {.
         defaultValue: "test"
         desc: "Outer option optional" .}: string
+    of outerOpt3:
+      discard
 
     case cmd {.command.}: OuterCmd
     of outerCmd1:
@@ -50,6 +54,10 @@ type
         innerArg {.argument.}: string
     of outerCmd2:
       oc2Mandatory: int
+    of outerCmd3:
+      x {.argument.}: string
+      y {.argument.}: string
+      z {.argument.}: string
 
 let conf = load Conf
 
@@ -65,4 +73,6 @@ of outerCmd1:
     echo "ic1Optional     = ", conf.ic1Optional
   of innerCmd2:
     discard
+of outerCmd3:
+  echo "outer cmd3 ", conf.x, " ", conf.y, " ", conf.z
 

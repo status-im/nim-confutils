@@ -369,8 +369,8 @@ proc showHelp(help: var string,
   flushOutputAndQuit QuitSuccess
 
 func getNextArgIdx(cmd: CmdInfo, consumedArgIdx: int): int =
-  for i in consumedArgIdx + 1 ..< cmd.opts.len:
-    if cmd.opts[i].kind == Arg:
+  for i in 0 ..< cmd.opts.len:
+    if cmd.opts[i].kind == Arg and cmd.opts[i].idx > consumedArgIdx:
       return cmd.opts[i].idx
 
   return -1
