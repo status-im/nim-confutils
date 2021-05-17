@@ -226,7 +226,7 @@ proc writeDesc(help: var string,
     descIndent = (5 + appInfo.namesWidth + descSpacing.len)
     remainingColumns = appInfo.terminalWidth - descIndent
     defaultValSuffix = if defaultValue.len == 0: ""
-                       else: " [default: " & defaultValue & "]"
+                       else: " [=" & defaultValue & "]"
     fullDesc = desc & defaultValSuffix & "."
 
   if remainingColumns < confutils_narrow_terminal_width:
@@ -684,14 +684,12 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
                 elif field.readPragma("argument") != nil: Arg
                 else: CliSwitch
 
-    if defaultValueDesc != nil and defaultValue == nil:
-      error "The `defaultValueDesc` pragma cannot be specified without also specifying `defaultValue`", defaultValueDesc
-
     var opt = OptInfo(kind: optKind,
                       idx: fieldIdx,
                       name: $field.name,
                       isHidden: isHidden,
                       defaultValue: if defaultValueOnScreen == nil: ""
+                                    elif defaultValueOnScreen.kind in {nnkStrLit..nnkTripleStrLit}: defaultValueOnScreen.strVal
                                     else: repr(defaultValueOnScreen),
                       typename: field.typ.repr)
 
