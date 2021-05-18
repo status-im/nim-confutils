@@ -42,7 +42,8 @@ type
     name, abbr, desc, typename: string
     idx: int
     isHidden: bool
-    defaultValue: string
+    hasDefault: bool
+    defaultInHelpText: string
     case kind: OptKind
     of Discriminator:
       isCommand: bool
@@ -208,9 +209,6 @@ func hasAbbrs(cmd: CmdInfo): bool =
         if hasAbbrs(subCmd):
           return true
 
-template hasDefault(opt: OptInfo): bool =
-  opt.defaultValue.len > 0
-
 func humaneName(opt: OptInfo): string =
   if opt.name.len > 0: opt.name
   else: opt.abbr
@@ -269,7 +267,7 @@ proc describeInvocation(help: var string,
       let cliArg = " <" & arg.humaneName & ">"
       helpOutput fgArg, styleBright, cliArg
       helpOutput padding(cliArg, 6 + appInfo.namesWidth)
-      help.writeDesc appInfo, arg.desc, arg.defaultValue
+      help.writeDesc appInfo, arg.desc, arg.defaultInHelpText
       helpOutput "\p"
 
 type
@@ -314,7 +312,7 @@ proc describeOptions(help: var string,
       if opt.desc.len > 0:
         help.writeDesc appInfo,
                        opt.desc.replace("%t", opt.typename),
-                       opt.defaultValue
+                       opt.defaultInHelpText
 
       helpOutput "\p"
 
@@ -674,8 +672,11 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
       isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
       defaultValue = field.readPragma"defaultValue"
       defaultValueDesc = field.readPragma"defaultValueDesc"
-      defaultValueOnScreen = if defaultValueDesc != nil: defaultValueDesc
-                             else: defaultValue
+      defaultInHelp = if defaultValueDesc != nil: defaultValueDesc
+                      else: defaultValue
+      defaultInHelpText = if defaultInHelp == nil: ""
+                          elif defaultInHelp.kind in {nnkStrLit..nnkTripleStrLit}: defaultInHelp.strVal
+                          else: repr(defaultInHelp)
       isHidden = field.readPragma("hidden") != nil
       abbr = field.readPragma"abbr"
       name = field.readPragma"name"
@@ -688,9 +689,8 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
                       idx: fieldIdx,
                       name: $field.name,
                       isHidden: isHidden,
-                      defaultValue: if defaultValueOnScreen == nil: ""
-                                    elif defaultValueOnScreen.kind in {nnkStrLit..nnkTripleStrLit}: defaultValueOnScreen.strVal
-                                    else: repr(defaultValueOnScreen),
+                      hasDefault: defaultValue != nil,
+                      defaultInHelpText: defaultInHelpText,
                       typename: field.typ.repr)
 
     if desc != nil: opt.desc = desc.strVal
