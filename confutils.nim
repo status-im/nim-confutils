@@ -40,6 +40,7 @@ type
 
   OptInfo = ref object
     name, abbr, desc, typename: string
+    separator: string
     idx: int
     isHidden: bool
     hasDefault: bool
@@ -292,6 +293,10 @@ proc describeOptions(help: var string,
       if opt.kind == Arg or
          opt.kind == Discriminator or
          opt.isHidden: continue
+
+      if opt.separator.len > 0:
+        helpOutput opt.separator
+        helpOutput "\p"
 
       # Indent all command-line switches
       helpOutput " "
@@ -684,6 +689,11 @@ proc findPath(parent, node: CmdInfo): seq[CmdInfo] =
   doAssert validPath(result, parent, node)
   result.add parent
 
+func toText(n: NimNode): string =
+  if n == nil: ""
+  elif n.kind in {nnkStrLit..nnkTripleStrLit}: n.strVal
+  else: repr(n)
+
 proc cmdInfoFromType(T: NimNode): CmdInfo =
   result = CmdInfo()
 
@@ -699,9 +709,10 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
       defaultValueDesc = field.readPragma"defaultValueDesc"
       defaultInHelp = if defaultValueDesc != nil: defaultValueDesc
                       else: defaultValue
-      defaultInHelpText = if defaultInHelp == nil: ""
-                          elif defaultInHelp.kind in {nnkStrLit..nnkTripleStrLit}: defaultInHelp.strVal
-                          else: repr(defaultInHelp)
+      defaultInHelpText = toText(defaultInHelp)
+      separator = field.readPragma"separator"
+      separatorText = toText(separator)
+
       isHidden = field.readPragma("hidden") != nil
       abbr = field.readPragma"abbr"
       name = field.readPragma"name"
@@ -713,6 +724,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     var opt = OptInfo(kind: optKind,
                       idx: fieldIdx,
                       name: $field.name,
+                      separator: separatorText,
                       isHidden: isHidden,
                       hasDefault: defaultValue != nil,
                       defaultInHelpText: defaultInHelpText,

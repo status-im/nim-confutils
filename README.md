@@ -280,6 +280,24 @@ This field represents an argument to the program. If the program expects
 multiple arguments, this pragma can be applied to multiple fields or to
 a single `seq[T]` field depending on the desired behavior.
 
+-----------------
+
+```nim
+template separator(v: string)* {.pragma.}
+```
+
+Using this pragma, a customizable separator text will be displayed just before
+this field. E.g.:
+
+```text
+Network Options:     # this is a separator
+  -a, --opt1 desc
+  -b, --opt2 desc
+
+----------------     # this is a separator too
+  -c, --opt3 desc
+```
+
 ## Configuration field types
 
 The `confutils/defs` module provides a number of types frequently used
