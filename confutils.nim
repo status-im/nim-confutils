@@ -659,6 +659,31 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
   result.add settersArray
   debugMacroResult "Field Setters"
 
+proc checkDuplicate(cmd: CmdInfo, opt: OptInfo, fieldName: NimNode) =
+  for x in cmd.opts:
+    if opt.name == x.name:
+      error "duplicate name detected: " & opt.name, fieldName
+    if opt.abbr.len > 0 and opt.abbr == x.abbr:
+      error "duplicate abbr detected: " & opt.abbr, fieldName
+
+proc validPath(path: var seq[CmdInfo], parent, node: CmdInfo): bool =
+  for x in parent.opts:
+    if x.kind != Discriminator: continue
+    for y in x.subCmds:
+      if y == node:
+        path.add y
+        return true
+      if validPath(path, y, node):
+        path.add y
+        return true
+  false
+
+proc findPath(parent, node: CmdInfo): seq[CmdInfo] =
+  # find valid path from parent to node
+  result = newSeq[CmdInfo]()
+  doAssert validPath(result, parent, node)
+  result.add parent
+
 proc cmdInfoFromType(T: NimNode): CmdInfo =
   result = CmdInfo()
 
@@ -741,9 +766,14 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
       if branchEnumVal.kind == nnkDotExpr:
         branchEnumVal = branchEnumVal[1]
       var cmd = findCmd(discriminator.subCmds, $branchEnumVal)
+      # we respect subcommand hierarchy when looking for duplicate
+      let path = findPath(result, cmd)
+      for n in path:
+        checkDuplicate(n, opt, field.name)
       cmd.opts.add opt
 
     else:
+      checkDuplicate(result, opt, field.name)
       result.opts.add opt
 
 macro configurationRtti(RecordType: type): untyped =
