@@ -43,6 +43,7 @@ template `$`*(x: SomeDistinctString): string =
   string(x)
 
 template desc*(v: string) {.pragma.}
+template longDesc*(v: string) {.pragma.}
 template name*(v: string) {.pragma.}
 template abbr*(v: string) {.pragma.}
 template separator*(v: string) {.pragma.}
