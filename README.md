@@ -210,6 +210,20 @@ template desc*(v: string) {.pragma.}
 A description of the configuration option that will appear in the produced
 help messages.
 
+```nim
+template longDesc*(v: string) {.pragma.}
+```
+
+A long description text that will appear below regular desc. You can use
+one of {'\n', '\r'} to break it into multiple lines. But you can't use
+'\p' as line break.
+
+```text
+ -x, --name   regular description [=defVal].
+              longdesc line one.
+              longdesc line two.
+              longdesc line three.
+```
 -----------------
 
 ```nim

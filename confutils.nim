@@ -41,6 +41,7 @@ type
   OptInfo = ref object
     name, abbr, desc, typename: string
     separator: string
+    longDesc: string
     idx: int
     isHidden: bool
     hasDefault: bool
@@ -236,6 +237,16 @@ proc writeDesc(help: var string,
     helpOutput descSpacing, wrapWords(fullDesc, wrappingWidth,
                                       newLine = "\p" & spaces(descIndent))
 
+proc writeLongDesc(help: var string,
+               appInfo: HelpAppInfo,
+               desc: string) =
+  let lines = split(desc, {'\n', '\r'})
+  for line in lines:
+    if line.len > 0:
+      helpOutput "\p"
+      helpOutput padding("", 5 + appInfo.namesWidth)
+      help.writeDesc appInfo, line, ""
+
 proc describeInvocation(help: var string,
                         cmd: CmdInfo, cmdInvocation: string,
                         appInfo: HelpAppInfo) =
@@ -269,6 +280,7 @@ proc describeInvocation(help: var string,
       helpOutput fgArg, styleBright, cliArg
       helpOutput padding(cliArg, 6 + appInfo.namesWidth)
       help.writeDesc appInfo, arg.desc, arg.defaultInHelpText
+      help.writeLongDesc appInfo, arg.longDesc
       helpOutput "\p"
 
 type
@@ -318,6 +330,7 @@ proc describeOptions(help: var string,
         help.writeDesc appInfo,
                        opt.desc.replace("%t", opt.typename),
                        opt.defaultInHelpText
+        help.writeLongDesc appInfo, opt.longDesc
 
       helpOutput "\p"
 
@@ -711,7 +724,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
                       else: defaultValue
       defaultInHelpText = toText(defaultInHelp)
       separator = field.readPragma"separator"
-      separatorText = toText(separator)
+      longDesc = field.readPragma"longDesc"
 
       isHidden = field.readPragma("hidden") != nil
       abbr = field.readPragma"abbr"
@@ -724,7 +737,6 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     var opt = OptInfo(kind: optKind,
                       idx: fieldIdx,
                       name: $field.name,
-                      separator: separatorText,
                       isHidden: isHidden,
                       hasDefault: defaultValue != nil,
                       defaultInHelpText: defaultInHelpText,
@@ -733,6 +745,8 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     if desc != nil: opt.desc = desc.strVal
     if name != nil: opt.name = name.strVal
     if abbr != nil: opt.abbr = abbr.strVal
+    if separator != nil: opt.separator = separator.strVal
+    if longDesc != nil: opt.longDesc = longDesc.strVal
 
     inc fieldIdx
 
