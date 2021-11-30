@@ -8,6 +8,7 @@
 {. warning[UnusedImport]:off .}
 
 import
+  test_ignore,
   test_config_file,
   test_envvar
 
