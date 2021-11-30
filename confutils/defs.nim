@@ -53,6 +53,7 @@ template required* {.pragma.}
 template command* {.pragma.}
 template argument* {.pragma.}
 template hidden* {.pragma.}
+template ignore* {.pragma.}
 template inlineConfiguration* {.pragma.}
 
 template implicitlySelectable* {.pragma.}

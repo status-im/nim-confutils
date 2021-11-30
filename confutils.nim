@@ -796,11 +796,17 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
       let path = findPath(result, cmd)
       for n in path:
         checkDuplicate(n, opt, field.name)
-      cmd.opts.add opt
+
+      # the reason we check for `ignore` pragma here and not using `continue` statement
+      # is we do respect option hierarchy of subcommands
+      if field.readPragma("ignore") == nil:
+        cmd.opts.add opt
 
     else:
       checkDuplicate(result, opt, field.name)
-      result.opts.add opt
+
+      if field.readPragma("ignore") == nil:
+        result.opts.add opt
 
 macro configurationRtti(RecordType: type): untyped =
   let
