@@ -11,16 +11,16 @@ skipDirs      = @["tests"]
 requires "nim >= 1.0.0",
          "stew"
 
-proc buildAndRun(args, path: string) =
+proc run(args, path: string) =
   exec "nim " & getEnv("TEST_LANG", "c") & " " & getEnv("NIMFLAGS") & " " & args &
-    " -r --hints:off --warnings:on --skipParentCfg --skipUserCfg " & path
+    " --hints:off --warnings:on --skipParentCfg --skipUserCfg " & path
 
 task test, "Run all tests":
-  buildAndRun("--threads:off -d:release", "tests/test_all")
-  buildAndRun("--threads:on -d:release", "tests/test_all")
+  run("--threads:off -d:release -r", "tests/test_all")
+  run("--threads:on -d:release -r", "tests/test_all")
 
-  buildAndRun("--threads:off -d:release", "tests/test_duplicates")
-  buildAndRun("--threads:on -d:release", "tests/test_duplicates")
+  run("--threads:off -d:release", "tests/test_duplicates")
+  run("--threads:on -d:release", "tests/test_duplicates")
 
   #Also iterate over every test in tests/fail, and verify they fail to compile.
   echo "\r\nTest Fail to Compile:"
@@ -32,4 +32,4 @@ task test, "Run all tests":
       echo "  [OK] ", path.split(DirSep)[^1]
     else:
       echo "  [FAILED] ", path.split(DirSep)[^1]
-      exec "exit 1"
+      quit(QuitFailure)
