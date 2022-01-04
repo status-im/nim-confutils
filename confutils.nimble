@@ -1,4 +1,4 @@
-import os
+import os, strutils
 mode = ScriptMode.Verbose
 
 packageName   = "confutils"
@@ -11,12 +11,16 @@ skipDirs      = @["tests"]
 requires "nim >= 1.0.0",
          "stew"
 
-task test, "Run all tests":
-  exec "nim c -r --threads:off -d:release tests/test_all"
-  exec "nim c -r --threads:on -d:release tests/test_all"
+proc run(args, path: string) =
+  exec "nim " & getEnv("TEST_LANG", "c") & " " & getEnv("NIMFLAGS") & " " & args &
+    " --hints:off --warnings:on --skipParentCfg --skipUserCfg " & path
 
-  exec "nim c --threads:off -d:release tests/test_duplicates"
-  exec "nim c --threads:on -d:release tests/test_duplicates"
+task test, "Run all tests":
+  run("--threads:off -d:release -r", "tests/test_all")
+  run("--threads:on -d:release -r", "tests/test_all")
+
+  run("--threads:off -d:release", "tests/test_duplicates")
+  run("--threads:on -d:release", "tests/test_duplicates")
 
   #Also iterate over every test in tests/fail, and verify they fail to compile.
   echo "\r\nTest Fail to Compile:"
@@ -28,4 +32,4 @@ task test, "Run all tests":
       echo "  [OK] ", path.split(DirSep)[^1]
     else:
       echo "  [FAILED] ", path.split(DirSep)[^1]
-      exec "exit 1"
+      quit(QuitFailure)
