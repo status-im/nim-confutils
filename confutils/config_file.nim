@@ -28,13 +28,13 @@ func makeOption(n: NimNode): NimNode =
 template objectDecl(a): untyped =
   type a = object
 
-proc putReclist(n: NimNode, recList: NimNode) =
+proc putRecList(n: NimNode, recList: NimNode) =
   recList.expectKind nnkRecList
   if n.kind == nnkObjectTy:
     n[2] = recList
     return
   for z in n:
-    putReclist(z, recList)
+    putRecList(z, recList)
 
 proc generateOptionalField(fieldName: NimNode, fieldType: NimNode): NimNode =
   let right = if isOption(fieldType): fieldType else: makeOption(fieldType)

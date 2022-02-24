@@ -13,7 +13,8 @@ requires "nim >= 1.0.0",
 
 proc run(args, path: string) =
   exec "nim " & getEnv("TEST_LANG", "c") & " " & getEnv("NIMFLAGS") & " " & args &
-    " --hints:off --warnings:on --skipParentCfg --skipUserCfg " & path
+    " --hints:off --warnings:on --skipParentCfg --skipUserCfg" &
+    " --styleCheck:usages --styleCheck:error " & path
 
 task test, "Run all tests":
   run("--threads:off -d:release -r", "tests/test_all")
