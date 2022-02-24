@@ -360,7 +360,7 @@ proc describeOptions(help: var string,
 
 proc showHelp(help: var string,
               appInfo: HelpAppInfo,
-              activeCmds: openarray[CmdInfo]) =
+              activeCmds: openArray[CmdInfo]) =
   if appInfo.copyrightBanner.len > 0:
     helpOutput appInfo.copyrightBanner, "\p\p"
 
@@ -398,18 +398,18 @@ proc noMoreArgsError(cmd: CmdInfo): string =
   if cmd.hasArgs: result.add " additional"
   result.add " arguments"
 
-proc findOpt(opts: openarray[OptInfo], name: string): OptInfo =
+proc findOpt(opts: openArray[OptInfo], name: string): OptInfo =
   for opt in opts:
     if cmpIgnoreStyle(opt.name, name) == 0 or
        cmpIgnoreStyle(opt.abbr, name) == 0:
       return opt
 
-proc findOpt(activeCmds: openarray[CmdInfo], name: string): OptInfo =
+proc findOpt(activeCmds: openArray[CmdInfo], name: string): OptInfo =
   for i in countdown(activeCmds.len - 1, 0):
     let found = findOpt(activeCmds[i].opts, name)
     if found != nil: return found
 
-proc findCmd(cmds: openarray[CmdInfo], name: string): CmdInfo =
+proc findCmd(cmds: openArray[CmdInfo], name: string): CmdInfo =
   for cmd in cmds:
     if cmpIgnoreStyle(cmd.name, name) == 0:
       return cmd
