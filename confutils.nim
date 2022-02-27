@@ -1,10 +1,11 @@
 import
   std/[options, strutils, wordwrap],
   stew/shims/macros,
+  serialization,
   confutils/[defs, cli_parser, config_file]
 
 export
-  defs, config_file, options
+  options, serialization, defs, config_file
 
 const
   useBufferedOutput = defined(nimscript)
@@ -816,12 +817,22 @@ macro configurationRtti(RecordType: type): untyped =
 
   result = newTree(nnkPar, newLitFixed cmdInfo, fieldSetters)
 
-proc load*(Configuration: type,
-           cmdLine = commandLineParams(),
-           version = "",
-           copyrightBanner = "",
-           printUsage = true,
-           quitOnFailure = true): Configuration =
+proc addConfigFile*(secondarySources: auto,
+                    Format: type,
+                    path: InputFile) =
+  secondarySources.data.add loadFile(Format, string path,
+                                     type(secondarySources.data[0]))
+
+proc loadImpl[C, SecondarySources](
+    Configuration: typedesc[C],
+    cmdLine = commandLineParams(),
+    version = "",
+    copyrightBanner = "",
+    printUsage = true,
+    quitOnFailure = true,
+    secondarySourcesRef: ref SecondarySources,
+    secondarySources: proc (config: Configuration,
+                            sources: ref SecondarySources) = nil): Configuration =
   ## Loads a program configuration by parsing command-line arguments
   ## and a standard set of config files that can specify:
   ##
@@ -842,11 +853,9 @@ proc load*(Configuration: type,
 
   let (rootCmd, fieldSetters) = configurationRtti(Configuration)
   var fieldCounters: array[fieldSetters.len, int]
-  let configFile = configFile(Configuration)
 
   printCmdTree rootCmd
 
-  let confAddr = addr result
   var activeCmds = @[rootCmd]
   template lastCmd: auto = activeCmds[^1]
   var nextArgIdx = lastCmd.getNextArgIdx(-1)
@@ -867,6 +876,8 @@ proc load*(Configuration: type,
       # TODO: populate this string
       raise newException(ConfigurationError, "")
 
+  let confAddr = addr result
+
   template applySetter(setterIdx: int, cmdLineVal: TaintedString) =
     try:
       fieldSetters[setterIdx][1](confAddr[], some(cmdLineVal))
@@ -883,18 +894,6 @@ proc load*(Configuration: type,
 
   template required(opt: OptInfo): bool =
     fieldSetters[opt.idx][3] and not opt.hasDefault
-
-  proc processMissingOpts(conf: var Configuration, cmd: CmdInfo) =
-    for opt in cmd.opts:
-      if fieldCounters[opt.idx] == 0:
-        if opt.required:
-          fail "The required option '$1' was not specified" % [opt.name]
-        elif configFile.setters[opt.idx](conf, configFile):
-          # all work is done in the config file setter,
-          # there is nothing left to do here.
-          discard
-        elif opt.hasDefault:
-          fieldSetters[opt.idx][1](conf, none[TaintedString]())
 
   template activateCmd(discriminator: OptInfo, activatedCmd: CmdInfo) =
     let cmd = activatedCmd
@@ -1060,8 +1059,38 @@ proc load*(Configuration: type,
     let defaultCmd = subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
     activateCmd(subCmdDiscriminator, defaultCmd)
 
+  if secondarySources != nil:
+    secondarySources(result, secondarySourcesRef)
+
+  proc processMissingOpts(conf: var Configuration, cmd: CmdInfo) =
+    for opt in cmd.opts:
+      if fieldCounters[opt.idx] == 0:
+        if secondarySourcesRef.setters[opt.idx](conf, secondarySourcesRef):
+          # all work is done in the config file setter,
+          # there is nothing left to do here.
+          discard
+        elif opt.hasDefault:
+          fieldSetters[opt.idx][1](conf, none[TaintedString]())
+        elif opt.required:
+          fail "The required option '$1' was not specified" % [opt.name]
+
   for cmd in activeCmds:
     result.processMissingOpts(cmd)
+
+template load*(
+    Configuration: type,
+    cmdLine = commandLineParams(),
+    version = "",
+    copyrightBanner = "",
+    printUsage = true,
+    quitOnFailure = true,
+    secondarySources: untyped = nil): untyped =
+
+  block:
+    var secondarySourcesRef = generateSecondarySources(Configuration)
+    loadImpl(Configuration, cmdLine, version,
+             copyrightBanner, printUsage, quitOnFailure,
+             secondarySourcesRef, secondarySources)
 
 proc defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)

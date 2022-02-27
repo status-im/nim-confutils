@@ -1,25 +1,25 @@
 # curent user config file
 
-# logLevel = "TOML CU DEBUG"
+# log-level = "TOML CU DEBUG"
 
-logFile  = "TOML CU LOGFILE"
+log-file  = "TOML CU LOGFILE"
 
-dataDir  = "TOML CU DATADIR"
+data-dir  = "TOML CU DATADIR"
 
-nonInteractive = true
+non-interactive = true
 
-validators = ["TOML CU VALIDATORS 0"]
+validator = ["TOML CU VALIDATORS 0"]
 
-validatorsDirFlag = "TOML CU VALIDATOR DIR"
+validators-dir = "TOML CU VALIDATOR DIR"
 
-secretsDirFlag = "TOML CU SECRET DIR"
+secrets-dir= "TOML CU SECRET DIR"
 
 graffiti = "0x00112233445566778899AABBCCDDEEFF"
 
-stopAtEpoch = 3
+stop-at-epoch = 3
 
-# rpcPort = 1234
+# rpc-port = 1234
 
-rpcAddress = "1.1.1.1"
+rpc-address = "1.1.1.1"
 
-retryDelay = 3
+retry-delay = 3

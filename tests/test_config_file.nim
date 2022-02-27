@@ -31,6 +31,10 @@ type
   ValidatorKeyPath = TypedInputFile[ValidatorPrivKey, Txt, "privkey"]
 
   TestConf* = object
+    configFile* {.
+      desc: "Loads the configuration from a config file"
+      name: "config-file" }: Option[InputFile]
+
     logLevel* {.
       defaultValue: "DEBUG"
       desc: "Sets the log level."
@@ -134,19 +138,6 @@ func appendConfigFileFormats(_: type TestConf) =
     appendConfigFileFormat(Winreg, ""):
       "HKLM" / "SOFTWARE"
 
-    appendConfigFileFormat(Toml, "toml"):
-      confPathCurrUser
-
-    appendConfigFileFormat(Toml, "toml"):
-      confPathSystemWide
-
-  elif defined(posix):
-    appendConfigFileFormat(Toml, "toml"):
-      confPathCurrUser
-
-    appendConfigFileFormat(Toml, "toml"):
-      confPathSystemWide
-
 # User might also need to extend the serializer capability
 # for each of the registered formats.
 # This is especially true for distinct types and some special types
@@ -155,7 +146,7 @@ func appendConfigFileFormats(_: type TestConf) =
 proc readValue(r: var TomlReader,
   value: var (InputFile | InputDir | OutFile | OutDir | ValidatorKeyPath)) =
   type T = type value
-  value = r.parseAsString().T
+  value = T r.parseAsString()
 
 proc readValue(r: var TomlReader, value: var ValidIpAddress) =
   value = ValidIpAddress.init(r.parseAsString())
@@ -196,10 +187,16 @@ proc readValue(r: var WinregReader, value: var GraffitiBytes) =
 
 proc testConfigFile() =
   suite "config file test suite":
-    putEnv("prefixdataDir", "ENV VAR DATADIR")
+    putEnv("prefixdata-dir", "ENV VAR DATADIR")
 
     test "basic config file":
-      let conf = TestConf.load()
+      let conf = TestConf.load(secondarySources = proc (config: TestConf, sources: auto) =
+        if config.configFile.isSome:
+          sources.addConfigFile(Toml, config.configFile.get)
+        else:
+          sources.addConfigFile(Toml, InputFile(confPathCurrUser & ".toml"))
+          sources.addConfigFile(Toml, InputFile(confPathSystemWide & ".toml"))
+      )
 
       # dataDir is in env var
       check conf.dataDir.string == "ENV VAR DATADIR"
