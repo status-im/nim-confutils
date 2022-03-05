@@ -119,25 +119,6 @@ const
   confPathCurrUser = "tests" / "config_files" / "current_user"
   confPathSystemWide = "tests" / "config_files" / "system_wide"
 
-# appName, vendorName, and appendConfigFileFormats
-# are overrideables proc related to config-file
-func appName(_: type TestConf): string =
-  "testApp"
-
-func vendorName(_: type TestConf): string =
-  "testVendor"
-
-func appendConfigFileFormats(_: type TestConf) =
-  appendConfigFileFormat(Envvar, ""):
-    "prefix"
-
-  when defined(windows):
-    appendConfigFileFormat(Winreg, ""):
-      "HKCU" / "SOFTWARE"
-
-    appendConfigFileFormat(Winreg, ""):
-      "HKLM" / "SOFTWARE"
-
 # User might also need to extend the serializer capability
 # for each of the registered formats.
 # This is especially true for distinct types and some special types
@@ -191,11 +172,13 @@ proc testConfigFile() =
 
     test "basic config file":
       let conf = TestConf.load(secondarySources = proc (config: TestConf, sources: auto) =
+        sources.addConfigFile(Envvar, InputFile "prefix")
+
         if config.configFile.isSome:
           sources.addConfigFile(Toml, config.configFile.get)
         else:
-          sources.addConfigFile(Toml, InputFile(confPathCurrUser & ".toml"))
-          sources.addConfigFile(Toml, InputFile(confPathSystemWide & ".toml"))
+          sources.addConfigFile(Toml, InputFile(confPathCurrUser / "testVendor" / "testApp.toml"))
+          sources.addConfigFile(Toml, InputFile(confPathSystemWide / "testVendor" / "testApp.toml"))
       )
 
       # dataDir is in env var

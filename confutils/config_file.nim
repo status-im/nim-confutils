@@ -15,9 +15,6 @@ Overview of this module:
   from `defaultValue` pragma.
 ]#
 
-const
-  configFileRegs = CacheSeq"confutils"
-
 type
   ConfFileSection = ref object
     children: seq[ConfFileSection]
@@ -271,7 +268,6 @@ proc generateConfigFileSetters(confType, optType: NimNode,
   let
     CF = ident "SecondarySources"
     T = confType.getType[1]
-    arrayLen = configFileRegs.len
     optT = optType[0][0]
     SetterProcType = genSym(nskType, "SetterProcType")
     (setterProcs, assignments, numSetters) = generateSetters(T, CF, fieldsPaths)
@@ -306,44 +302,3 @@ macro generateSecondarySources*(ConfType: type): untyped =
 
   let settersPaths = model.generateSettersPaths
   result.add generateConfigFileSetters(ConfType, result[^1], settersPaths)
-
-macro appendConfigFileFormat*(ConfigFileFormat: type, configExt: string, configPath: untyped): untyped =
-  configFileRegs.add newPar(ConfigFileFormat, configExt, configPath)
-
-func appName*(_: type): string =
-  # this proc is overrideable
-  when false:
-    splitFile(os.getAppFilename()).name
-  "confutils"
-
-func vendorName*(_: type): string =
-  # this proc is overrideable
-  "confutils"
-
-func appendConfigFileFormats*(_: type) =
-  # this proc is overrideable
-  when false:
-    # this is a typical example of
-    # config file format registration
-    appendConfigFileFormat(Envvar, ""):
-      "prefix"
-
-    when defined(windows):
-      appendConfigFileFormat(Winreg, ""):
-        "HKCU" / "SOFTWARE"
-
-      appendConfigFileFormat(Winreg, ""):
-        "HKLM" / "SOFTWARE"
-
-      appendConfigFileFormat(Toml, "toml"):
-        os.getHomeDir() & ".config"
-
-      appendConfigFileFormat(Toml, "toml"):
-        splitFile(os.getAppFilename()).dir
-
-    elif defined(posix):
-      appendConfigFileFormat(Toml, "toml"):
-        os.getHomeDir() & ".config"
-
-      appendConfigFileFormat(Toml, "toml"):
-        "/etc"

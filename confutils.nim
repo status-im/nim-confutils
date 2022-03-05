@@ -845,12 +845,6 @@ proc loadImpl[C, SecondarySources](
   # This is an initial naive implementation that will be improved
   # over time.
 
-  # users can override default `appendConfigFileFormats`
-  # `appName`, and `vendorName`
-  mixin appendConfigFileFormats
-  mixin appName, vendorName
-  appendConfigFileFormats(Configuration)
-
   let (rootCmd, fieldSetters) = configurationRtti(Configuration)
   var fieldCounters: array[fieldSetters.len, int]
 

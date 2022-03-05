@@ -429,16 +429,6 @@ The names of the environment variables are prefixed by the name of the
 program by default. They are matched in case-insensitive fashion and
 certain characters such as `-` and `_` are ignored.
 
-#### `appName`
-
-By default, this is obtained by calling Nim's `os.getAppFilename`.
-The specified value is used to determine the default config file location.
-
-#### `vendorName`
-
-This is equal to `appName` unless overridden.
-The specified value is used to determine the default config file location.
-
 #### `configFileEnumerator`
 
 A function responsible for returning a sequence of `ConfigFilePath` objects.
