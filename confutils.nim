@@ -820,8 +820,14 @@ macro configurationRtti(RecordType: type): untyped =
 proc addConfigFile*(secondarySources: auto,
                     Format: type,
                     path: InputFile) =
-  secondarySources.data.add loadFile(Format, string path,
-                                     type(secondarySources.data[0]))
+  try:
+    secondarySources.data.add loadFile(Format, string path,
+                                       type(secondarySources.data[0]))
+  except SerializationError as err:
+    raise newException(ConfigurationError, err.formatMsg(string path), err)
+  except IOError as err:
+    raise newException(ConfigurationError,
+      "Failed to read config file at '" & string(path) & "': " & err.msg)
 
 proc loadImpl[C, SecondarySources](
     Configuration: typedesc[C],
