@@ -69,6 +69,12 @@ proc traversePostfix(postfix: NimNode, typ: NimNode, isDiscriminator: bool,
   traverseIdent(postfix[1], typ, isDiscriminator, isCommandOrArgument,
                 defaultValue, namePragma)
 
+proc shortEnumName(n: NimNode): NimNode =
+  if n.kind == nnkDotExpr:
+    n[1]
+  else:
+    n
+
 proc traversePragma(pragma: NimNode):
     tuple[isCommandOrArgument: bool, defaultValue, namePragma: string] =
   pragma.expectKind nnkPragma
@@ -81,7 +87,7 @@ proc traversePragma(pragma: NimNode):
     of nnkExprColonExpr:
       let pragma = $child[0]
       if pragma == "defaultValue":
-        result.defaultValue = child[1].repr
+        result.defaultValue = repr(shortEnumName(child[1]))
       elif pragma == "name":
         result.namePragma = $child[1]
     else:
@@ -124,7 +130,7 @@ proc traverseRecList(recList: NimNode, parent: ConfFileSection): seq[ConfFileSec
 
 proc traverseOfBranch(ofBranch: NimNode, parent: ConfFileSection): ConfFileSection =
   ofBranch.expectKind nnkOfBranch
-  result = ConfFileSection(fieldName: repr(ofBranch[0]), isCaseBranch: true)
+  result = ConfFileSection(fieldName: repr(shortEnumName(ofBranch[0])), isCaseBranch: true)
   for child in ofBranch:
     case child.kind:
     of nnkIdent, nnkDotExpr:
