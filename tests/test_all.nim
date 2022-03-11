@@ -10,7 +10,8 @@
 import
   test_ignore,
   test_config_file,
-  test_envvar
+  test_envvar,
+  test_pragma
 
 when defined(windows):
   import test_winreg
