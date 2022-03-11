@@ -78,7 +78,20 @@ proc shortEnumName(n: NimNode): NimNode =
 proc traversePragma(pragma: NimNode):
     tuple[isCommandOrArgument: bool, defaultValue, namePragma: string] =
   pragma.expectKind nnkPragma
-  for child in pragma:
+  var child: NimNode
+
+  for childNode in pragma:
+    child = childNode
+
+    if child.kind == nnkCall:
+      # A custom pragma was used more than once (e.g.: {.pragma: posixOnly, hidden.}) and the
+      # AST is now:
+      # ```
+      # Call
+      #   Sym "hidden"
+      # ```
+      child = child[0]
+
     case child.kind
     of nnkSym:
       let sym = $child
