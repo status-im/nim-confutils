@@ -1,3 +1,10 @@
+# nim-confutils
+# Copyright (c) 2022 Status Research & Development GmbH
+# Licensed and distributed under either of
+#   * MIT license: [LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT
+#   * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+# at your option. This file may not be copied, modified, or distributed except according to those terms.
+
 import
   std/[sequtils, unittest],
   ../confutils
@@ -11,6 +18,7 @@ func testInvalidValues[T](lo, hi: int64): bool =
     lo .. hi,
     try:
       when T is SomeUnsignedInt:
+        # TODO https://github.com/status-im/nim-confutils/issues/45
         it != T.parseCmdArg($it).int64
       else:
         discard it != T.parseCmdArg($it).int64
