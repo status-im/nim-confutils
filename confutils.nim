@@ -510,10 +510,10 @@ template parseCmdArg*(T: type string, s: TaintedString): string =
   string s
 
 proc parseCmdArg*(T: type SomeSignedInt, s: TaintedString): T =
-  T parseInt(string s)
+  T parseBiggestInt(string s)
 
 proc parseCmdArg*(T: type SomeUnsignedInt, s: TaintedString): T =
-  T parseUInt(string s)
+  T parseBiggestUInt(string s)
 
 proc parseCmdArg*(T: type SomeFloat, p: TaintedString): T =
   result = parseFloat(p)
