@@ -66,8 +66,16 @@ proc traversePostfix(postfix: NimNode, typ: NimNode, isDiscriminator: bool,
                      isCommandOrArgument = false, defaultValue = "",
                      namePragma = ""): ConfFileSection =
   postfix.expectKind nnkPostfix
-  traverseIdent(postfix[1], typ, isDiscriminator, isCommandOrArgument,
-                defaultValue, namePragma)
+
+  case postfix[1].kind
+  of nnkIdent:
+    traverseIdent(postfix[1], typ, isDiscriminator, isCommandOrArgument,
+                  defaultValue, namePragma)
+  of nnkAccQuoted:
+    traverseIdent(postfix[1][0], typ, isDiscriminator, isCommandOrArgument,
+                  defaultValue, namePragma)
+  else:
+    raiseAssert "[Postfix] Unsupported child node:\n" & postfix[1].treeRepr
 
 proc shortEnumName(n: NimNode): NimNode =
   if n.kind == nnkDotExpr:
@@ -111,9 +119,13 @@ proc traversePragmaExpr(pragmaExpr: NimNode, typ: NimNode,
   pragmaExpr.expectKind nnkPragmaExpr
   let (isCommandOrArgument, defaultValue, namePragma) =
     traversePragma(pragmaExpr[1])
+
   case pragmaExpr[0].kind
   of nnkIdent:
     traverseIdent(pragmaExpr[0], typ, isDiscriminator, isCommandOrArgument,
+                  defaultValue, namePragma)
+  of nnkAccQuoted:
+    traverseIdent(pragmaExpr[0][0], typ, isDiscriminator, isCommandOrArgument,
                   defaultValue, namePragma)
   of nnkPostfix:
     traversePostfix(pragmaExpr[0], typ, isDiscriminator, isCommandOrArgument,
@@ -130,6 +142,8 @@ proc traverseIdentDefs(identDefs: NimNode, parent: ConfFileSection,
     case child.kind
     of nnkIdent:
       result.add traverseIdent(child, typ, isDiscriminator)
+    of nnkAccQuoted:
+      result.add traverseIdent(child[0], typ, isDiscriminator)
     of nnkPostfix:
       result.add traversePostfix(child, typ, isDiscriminator)
     of nnkPragmaExpr:
@@ -146,7 +160,7 @@ proc traverseOfBranch(ofBranch: NimNode, parent: ConfFileSection): ConfFileSecti
   result = ConfFileSection(fieldName: repr(shortEnumName(ofBranch[0])), isCaseBranch: true)
   for child in ofBranch:
     case child.kind:
-    of nnkIdent, nnkDotExpr:
+    of nnkIdent, nnkDotExpr, nnkAccQuoted:
       discard
     of nnkRecList:
       result.children.add traverseRecList(child, result)

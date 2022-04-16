@@ -27,6 +27,7 @@ type
 
   VCStartUpCmd = enum
     VCNoCommand
+    `import`
 
   ValidatorKeyPath = TypedInputFile[ValidatorPrivKey, Txt, "privkey"]
 
@@ -97,6 +98,24 @@ type
         defaultValue: 10
         desc: "Delay in seconds between retries after unsuccessful attempts to connect to a beacon node"
         name: "retry-delay" }: int
+
+    of `import`:
+
+      blocksFile* {.
+        argument
+        desc: "Import RLP encoded block(s) from a file, validate, write to database and quit"
+        defaultValue: ""
+        name: "blocks-file" }: InputFile
+
+      `type`* {.
+        desc: "Test nnkAccQuoted of public sub command entry"
+        defaultValue: ""
+        name: "import-type" }: string
+
+      `seq` {.
+        desc: "Test nnkAccQuoted of private sub command entry"
+        defaultValue: ""
+        name: "import-seq" }: string
 
 func defaultDataDir(conf: TestConf): string =
   discard
