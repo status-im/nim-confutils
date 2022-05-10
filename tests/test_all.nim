@@ -12,7 +12,8 @@ import
   test_config_file,
   test_envvar,
   test_parsecmdarg,
-  test_pragma
+  test_pragma,
+  test_qualified_ident
 
 when defined(windows):
   import test_winreg

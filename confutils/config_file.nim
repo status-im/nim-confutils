@@ -148,7 +148,7 @@ proc traverseIdentDefs(identDefs: NimNode, parent: ConfFileSection,
       result.add traversePostfix(child, typ, isDiscriminator)
     of nnkPragmaExpr:
       result.add traversePragmaExpr(child, typ, isDiscriminator)
-    of nnkBracketExpr, nnkSym, nnkEmpty, nnkInfix, nnkCall:
+    of nnkBracketExpr, nnkSym, nnkEmpty, nnkInfix, nnkCall, nnkDotExpr:
       discard
     else:
       raiseAssert "[IdentDefs] Unsupported child node:\n" & child.treeRepr

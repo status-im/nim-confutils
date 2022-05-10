@@ -1,0 +1,2 @@
+type
+  SInt* = distinct int
