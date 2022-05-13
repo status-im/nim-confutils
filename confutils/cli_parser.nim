@@ -8,6 +8,11 @@ type
     cmdLongOption,            ## A long option such as --option
     cmdShortOption            ## A short option such as -c
 
+  TriBool* = enum
+    Yes,
+    No,
+    Maybe
+
   OptParser* = object of RootObj ## Implementation of the command line parser.
     pos*: int
     inShortState: bool
@@ -20,6 +25,59 @@ type
     key*, val*: TaintedString ## Key and value pair; the key is the option
                               ## or the argument, and the value is not "" if
                               ## the option was given a value
+
+type
+  FieldReader*[ConfigType] = proc (conf: var ConfigType, val: TaintedString)
+                                  {.gcsafe, raises: [Defect, CatchableError].}
+
+  Transition = object
+    nextState: uint16
+    fieldReaderState: FieldReaderState
+
+  CliDFA*[ConfigType] = object
+    flagNames: Table[string, int] # TODO replace this with perfect hashing
+    
+    fieldReaders: seq[FieldReader[configType]]
+      ## 
+
+    FieldReaderState = distinct uint16
+      # 15 bits for the field reader index
+      # 1 bits to determine the type of the field reader (optional or not)
+      # The special value `noFieldReader` indicates that there is no
+      # current field Reader
+
+    numStates: int
+
+    stateTransitions: seq[Transition]
+      ## You can think of this as a two dimentional array where we specify
+      ## how each flag index is handled in each state.
+      ##
+      ## The flags that are invalid in a particular state are marked with
+      ## the `invalidTransition` value. Otherwise, the transition indicates
+      ## how the state
+    
+  CliParserState = object
+    currentState: uint16
+    fieldReaderState: FieldReaderState
+
+const 
+  fieldNotExpected* = FieldReaderState max(uint16)
+  invalidTransition* = Transition(nextState: -1, fieldReaderState: fieldNotExpected)
+  
+template isFieldExpected(stateParam: FieldReaderState): TriBool =
+  let state = uint16(stateParam)
+  if state == uint16(fieldNotExpected):
+    No
+  elif (state and 1) != 0:
+    Yes:
+  else:
+    Maybe
+
+template readerIdx(state: FieldReaderState) =
+  uint16(state) shr 1
+
+template init(T: type FieldReaderState, idx: uint16, valueOptional: bool): T =
+  T((idx shl 1) or uint16(valueOptional))
 
 proc parseWord(s: string, i: int, w: var string,
                delim: set[char] = {'\t', ' '}): int =
