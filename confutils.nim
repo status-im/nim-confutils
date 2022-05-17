@@ -1,5 +1,5 @@
 import
-  std/[options, strutils, wordwrap],
+  std/[options, strutils, wordwrap, editdistance],
   stew/shims/macros,
   serialization,
   confutils/[defs, cli_parser, config_file]
@@ -422,6 +422,36 @@ proc findSubCmd(cmd: CmdInfo, name: string): CmdInfo =
     if cmd != nil: return cmd
 
   return nil
+
+proc distanceOpt(opts: openarray[OptInfo], name: string): (OptInfo, int) =
+  # find nearest match using `editDistance`
+  if opts.len == 0:
+    return
+
+  var
+    currOpt  = opts[0]
+    currDist = editDistance(currOpt.name, name)
+
+  for i in 1..<opts.len:
+    let distance = editDistance(opts[i].name, name)
+    if distance < currDist:
+      currOpt  = opts[i]
+      currDist = distance
+
+  (currOpt, currDist)
+
+proc distanceOpt(cmds: openarray[CmdInfo], name: string): OptInfo =
+  if cmds.len == 0:
+    return
+
+  var (currOpt, currDist) = distanceOpt(cmds[0].opts, name)
+  for i in 1..<cmds.len:
+    let (opt, distance) = distanceOpt(cmds[i].opts, name)
+    if distance < currDist:
+      currOpt  = opt
+      currDist = distance
+
+  currOpt
 
 proc startsWithIgnoreStyle(s: string, prefix: string): bool =
   # Similar in spirit to cmpIgnoreStyle, but compare only the prefix.
@@ -1021,13 +1051,20 @@ proc loadImpl[C, SecondarySources](
             opt = findOpt(defaultCmd.opts, key)
             if opt != nil:
               activateCmd(subCmdDiscriminator, defaultCmd)
+            else:
+              # we will fail, but before that, suggest nearest match from defaultCmd too.
+              activeCmds.add defaultCmd
           else:
             discard
 
       if opt != nil:
         applySetter(opt.idx, val)
       else:
-        fail "Unrecognized option '$1'" % [key]
+        let opt = distanceOpt(activeCmds, key) # suggest nearest match
+        if opt != nil:
+          fail "Unrecognized option '$1'. Did you mean '$2'?" % [key, opt.name]
+        else:
+          fail "Unrecognized option '$1'" % [key]
 
     of cmdArgument:
       if lastCmd.hasSubCommands:
