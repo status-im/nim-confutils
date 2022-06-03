@@ -120,11 +120,11 @@ type
 func defaultDataDir(conf: TestConf): string =
   discard
 
-func parseCmdArg*(T: type GraffitiBytes, input: TaintedString): T
+func parseCmdArg*(T: type GraffitiBytes, input: string): T
                  {.raises: [ValueError, Defect].} =
   discard
 
-func completeCmdArg*(T: type GraffitiBytes, input: TaintedString): seq[string] =
+func completeCmdArg*(T: type GraffitiBytes, input: string): seq[string] =
   @[]
 
 func defaultAdminListenAddress*(conf: TestConf): ValidIpAddress =

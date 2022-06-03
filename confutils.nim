@@ -60,7 +60,7 @@ const
   confutils_description_width {.intdefine.} = 80
   confutils_narrow_terminal_width {.intdefine.} = 36
 
-proc getFieldName(caseField: NimNode): NimNode =
+func getFieldName(caseField: NimNode): NimNode =
   result = caseField
   if result.kind == nnkIdentDefs: result = result[0]
   if result.kind == nnkPragmaExpr: result = result[0]
@@ -390,7 +390,7 @@ func getNextArgIdx(cmd: CmdInfo, consumedArgIdx: int): int =
     if cmd.opts[i].kind == Arg and cmd.opts[i].idx > consumedArgIdx:
       return cmd.opts[i].idx
 
-  return -1
+  -1
 
 proc noMoreArgsError(cmd: CmdInfo): string =
   result = if cmd.isSubCommand: "The command '$1'" % [cmd.name]
@@ -399,23 +399,23 @@ proc noMoreArgsError(cmd: CmdInfo): string =
   if cmd.hasArgs: result.add " additional"
   result.add " arguments"
 
-proc findOpt(opts: openArray[OptInfo], name: string): OptInfo =
+func findOpt(opts: openArray[OptInfo], name: string): OptInfo =
   for opt in opts:
     if cmpIgnoreStyle(opt.name, name) == 0 or
        cmpIgnoreStyle(opt.abbr, name) == 0:
       return opt
 
-proc findOpt(activeCmds: openArray[CmdInfo], name: string): OptInfo =
+func findOpt(activeCmds: openArray[CmdInfo], name: string): OptInfo =
   for i in countdown(activeCmds.len - 1, 0):
     let found = findOpt(activeCmds[i].opts, name)
     if found != nil: return found
 
-proc findCmd(cmds: openArray[CmdInfo], name: string): CmdInfo =
+func findCmd(cmds: openArray[CmdInfo], name: string): CmdInfo =
   for cmd in cmds:
     if cmpIgnoreStyle(cmd.name, name) == 0:
       return cmd
 
-proc findSubCmd(cmd: CmdInfo, name: string): CmdInfo =
+func findSubCmd(cmd: CmdInfo, name: string): CmdInfo =
   let subCmdDiscriminator = cmd.getSubCmdDiscriminator
   if subCmdDiscriminator != nil:
     let cmd = findCmd(subCmdDiscriminator.subCmds, name)
@@ -423,7 +423,7 @@ proc findSubCmd(cmd: CmdInfo, name: string): CmdInfo =
 
   return nil
 
-proc startsWithIgnoreStyle(s: string, prefix: string): bool =
+func startsWithIgnoreStyle(s: string, prefix: string): bool =
   # Similar in spirit to cmpIgnoreStyle, but compare only the prefix.
   var i = 0
   var j = 0
@@ -461,13 +461,13 @@ else:
   template printCmdTree(cmd: CmdInfo) = discard
 
 # TODO remove the overloads here to get better "missing overload" error message
-proc parseCmdArg*(T: type InputDir, p: TaintedString): T =
+proc parseCmdArg*(T: type InputDir, p: string): T =
   if not dirExists(p.string):
     raise newException(ValueError, "Directory doesn't exist")
 
-  result = T(p)
+  T(p)
 
-proc parseCmdArg*(T: type InputFile, p: TaintedString): T =
+proc parseCmdArg*(T: type InputFile, p: string): T =
   # TODO this is needed only because InputFile cannot be made
   # an alias of TypedInputFile at the moment, because of a generics
   # caching issue
@@ -481,10 +481,10 @@ proc parseCmdArg*(T: type InputFile, p: TaintedString): T =
     except IOError:
       raise newException(ValueError, "File not accessible")
 
-  result = T(p.string)
+  T(p.string)
 
-proc parseCmdArg*(T: type TypedInputFile, p: TaintedString): T =
-  var path = p.string
+proc parseCmdArg*(T: type TypedInputFile, p: string): T =
+  var path = p
   when T.defaultExt.len > 0:
     path = path.addFileExt(T.defaultExt)
 
@@ -498,59 +498,59 @@ proc parseCmdArg*(T: type TypedInputFile, p: TaintedString): T =
     except IOError:
       raise newException(ValueError, "File not accessible")
 
-  result = T(path)
+  T(path)
 
-proc parseCmdArg*(T: type[OutDir|OutFile|OutPath], p: TaintedString): T =
-  result = T(p)
+func parseCmdArg*(T: type[OutDir|OutFile|OutPath], p: string): T =
+  T(p)
 
-proc parseCmdArg*[T](_: type Option[T], s: TaintedString): Option[T] =
-  return some(parseCmdArg(T, s))
+proc parseCmdArg*[T](_: type Option[T], s: string): Option[T] =
+  some(parseCmdArg(T, s))
 
-template parseCmdArg*(T: type string, s: TaintedString): string =
-  string s
+template parseCmdArg*(T: type string, s: string): string =
+  s
 
-proc parseCmdArg*(T: type SomeSignedInt, s: TaintedString): T =
+func parseCmdArg*(T: type SomeSignedInt, s: string): T =
   T parseBiggestInt(string s)
 
-proc parseCmdArg*(T: type SomeUnsignedInt, s: TaintedString): T =
+func parseCmdArg*(T: type SomeUnsignedInt, s: string): T =
   T parseBiggestUInt(string s)
 
-proc parseCmdArg*(T: type SomeFloat, p: TaintedString): T =
-  result = parseFloat(p)
+func parseCmdArg*(T: type SomeFloat, p: string): T =
+  parseFloat(p)
 
-proc parseCmdArg*(T: type bool, p: TaintedString): T =
+func parseCmdArg*(T: type bool, p: string): T =
   try:
-    result = p.len == 0 or parseBool(p)
+    p.len == 0 or parseBool(p)
   except CatchableError:
     raise newException(ValueError, "'" & p.string & "' is not a valid boolean value. Supported values are on/off, yes/no, true/false or 1/0")
 
-proc parseCmdArg*(T: type enum, s: TaintedString): T =
+func parseCmdArg*(T: type enum, s: string): T =
   parseEnum[T](string(s))
 
-proc parseCmdArgAux(T: type, s: TaintedString): T = # {.raises: [ValueError].} =
+proc parseCmdArgAux(T: type, s: string): T = # {.raises: [ValueError].} =
   # The parseCmdArg procs are allowed to raise only `ValueError`.
   # If you have provided your own specializations, please handle
   # all other exception types.
   mixin parseCmdArg
   parseCmdArg(T, s)
 
-proc completeCmdArg*(T: type enum, val: TaintedString): seq[string] =
+func completeCmdArg*(T: type enum, val: string): seq[string] =
   for e in low(T)..high(T):
     let as_str = $e
     if startsWithIgnoreStyle(as_str, val):
       result.add($e)
 
-proc completeCmdArg*(T: type SomeNumber, val: TaintedString): seq[string] =
-  return @[]
+func completeCmdArg*(T: type SomeNumber, val: string): seq[string] =
+  @[]
 
-proc completeCmdArg*(T: type bool, val: TaintedString): seq[string] =
-  return @[]
+func completeCmdArg*(T: type bool, val: string): seq[string] =
+  @[]
 
-proc completeCmdArg*(T: type string, val: TaintedString): seq[string] =
-  return @[]
+func completeCmdArg*(T: type string, val: string): seq[string] =
+  @[]
 
 proc completeCmdArg*(T: type[InputFile|TypedInputFile|InputDir|OutFile|OutDir|OutPath],
-                     val: TaintedString): seq[string] =
+                     val: string): seq[string] =
   when not defined(nimscript):
     let (dir, name, ext) = splitFile(val)
     let tail = name & ext
@@ -581,36 +581,36 @@ proc completeCmdArg*(T: type[InputFile|TypedInputFile|InputDir|OutFile|OutDir|Ou
     except OSError:
       discard
 
-proc completeCmdArg*[T](_: type seq[T], val: TaintedString): seq[string] =
-  return @[]
+func completeCmdArg*[T](_: type seq[T], val: string): seq[string] =
+  @[]
 
-proc completeCmdArg*[T](_: type Option[T], val: TaintedString): seq[string] =
+proc completeCmdArg*[T](_: type Option[T], val: string): seq[string] =
   mixin completeCmdArg
   return completeCmdArg(type(T), val)
 
-proc completeCmdArgAux(T: type, val: TaintedString): seq[string] =
+proc completeCmdArgAux(T: type, val: string): seq[string] =
   mixin completeCmdArg
   return completeCmdArg(T, val)
 
-template setField[T](loc: var T, val: Option[TaintedString], defaultVal: untyped) =
+template setField[T](loc: var T, val: Option[string], defaultVal: untyped) =
   type FieldType = type(loc)
   loc = if isSome(val): parseCmdArgAux(FieldType, val.get)
         else: FieldType(defaultVal)
 
-template setField[T](loc: var seq[T], val: Option[TaintedString], defaultVal: untyped) =
+template setField[T](loc: var seq[T], val: Option[string], defaultVal: untyped) =
   if val.isSome:
     loc.add parseCmdArgAux(type(loc[0]), val.get)
   else:
     type FieldType = type(loc)
     loc = FieldType(defaultVal)
 
-proc makeDefaultValue*(T: type): T =
+func makeDefaultValue*(T: type): T =
   discard
 
-proc requiresInput*(T: type): bool =
+func requiresInput*(T: type): bool =
   not ((T is seq) or (T is Option) or (T is bool))
 
-proc acceptsMultipleValues*(T: type): bool =
+func acceptsMultipleValues*(T: type): bool =
   T is seq
 
 template debugMacroResult(macroName: string) {.dirty.} =
@@ -651,7 +651,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
                              newCall(bindSym"acceptsMultipleValues", fixedFieldType))
 
     result.add quote do:
-      proc `completerName`(val: TaintedString): seq[string] {.
+      proc `completerName`(val: string): seq[string] {.
         nimcall
         gcsafe
         sideEffect
@@ -659,7 +659,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
       .} =
         return completeCmdArgAux(`fixedFieldType`, val)
 
-      proc `setterName`(`configVar`: var `RecordType`, val: Option[TaintedString]) {.
+      proc `setterName`(`configVar`: var `RecordType`, val: Option[string]) {.
         nimcall
         gcsafe
         sideEffect
@@ -678,14 +678,14 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
   result.add settersArray
   debugMacroResult "Field Setters"
 
-proc checkDuplicate(cmd: CmdInfo, opt: OptInfo, fieldName: NimNode) =
+func checkDuplicate(cmd: CmdInfo, opt: OptInfo, fieldName: NimNode) =
   for x in cmd.opts:
     if opt.name == x.name:
       error "duplicate name detected: " & opt.name, fieldName
     if opt.abbr.len > 0 and opt.abbr == x.abbr:
       error "duplicate abbr detected: " & opt.abbr, fieldName
 
-proc validPath(path: var seq[CmdInfo], parent, node: CmdInfo): bool =
+func validPath(path: var seq[CmdInfo], parent, node: CmdInfo): bool =
   for x in parent.opts:
     if x.kind != Discriminator: continue
     for y in x.subCmds:
@@ -697,7 +697,7 @@ proc validPath(path: var seq[CmdInfo], parent, node: CmdInfo): bool =
         return true
   false
 
-proc findPath(parent, node: CmdInfo): seq[CmdInfo] =
+func findPath(parent, node: CmdInfo): seq[CmdInfo] =
   # find valid path from parent to node
   result = newSeq[CmdInfo]()
   doAssert validPath(result, parent, node)
@@ -878,7 +878,7 @@ proc loadImpl[C, SecondarySources](
 
   let confAddr = addr result
 
-  template applySetter(setterIdx: int, cmdLineVal: TaintedString) =
+  template applySetter(setterIdx: int, cmdLineVal: string) =
     try:
       fieldSetters[setterIdx][1](confAddr[], some(cmdLineVal))
       inc fieldCounters[setterIdx]
@@ -889,7 +889,7 @@ proc loadImpl[C, SecondarySources](
            getCurrentExceptionMsg())
 
   when hasCompletions:
-    template getArgCompletions(opt: OptInfo, prefix: TaintedString): seq[string] =
+    template getArgCompletions(opt: OptInfo, prefix: string): seq[string] =
       fieldSetters[opt.idx][2](prefix)
 
   template required(opt: OptInfo): bool =
@@ -897,8 +897,8 @@ proc loadImpl[C, SecondarySources](
 
   template activateCmd(discriminator: OptInfo, activatedCmd: CmdInfo) =
     let cmd = activatedCmd
-    applySetter(discriminator.idx, if cmd.desc.len > 0: TaintedString(cmd.desc)
-                                   else: TaintedString(cmd.name))
+    applySetter(discriminator.idx, if cmd.desc.len > 0: cmd.desc
+                                   else: cmd.name)
     activeCmds.add cmd
     nextArgIdx = cmd.getNextArgIdx(-1)
 
@@ -1070,7 +1070,7 @@ proc loadImpl[C, SecondarySources](
           # there is nothing left to do here.
           discard
         elif opt.hasDefault:
-          fieldSetters[opt.idx][1](conf, none[TaintedString]())
+          fieldSetters[opt.idx][1](conf, none[string]())
         elif opt.required:
           fail "The required option '$1' was not specified" % [opt.name]
 
@@ -1092,7 +1092,7 @@ template load*(
              copyrightBanner, printUsage, quitOnFailure,
              secondarySourcesRef, secondarySources)
 
-proc defaults*(Configuration: type): Configuration =
+func defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
 
 proc dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
@@ -1175,7 +1175,7 @@ macro cli*(args: varargs[untyped]): untyped =
 
   debugMacroResult "CLI Code"
 
-proc load*(f: TypedInputFile): f.ContentType =
+func load*(f: TypedInputFile): f.ContentType =
   when f.Format is Unspecified or f.ContentType is Unspecified:
     {.fatal: "To use `InputFile.load`, please specify the Format and ContentType of the file".}
 

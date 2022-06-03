@@ -1,4 +1,4 @@
-# Copyright 2018 Status Research & Development GmbH
+# Copyright 2018-2022 Status Research & Development GmbH
 # Parts taken from Nim's Runtime Library (c) Copyright 2015 Andreas Rumpf
 
 type
@@ -17,11 +17,11 @@ type
     cmds: seq[string]
     idx: int
     kind*: CmdLineKind        ## The detected command line token
-    key*, val*: TaintedString ## Key and value pair; the key is the option
+    key*, val*: string        ## Key and value pair; the key is the option
                               ## or the argument, and the value is not "" if
                               ## the option was given a value
 
-proc parseWord(s: string, i: int, w: var string,
+func parseWord(s: string, i: int, w: var string,
                delim: set[char] = {'\t', ' '}): int =
   result = i
   if result < s.len and s[result] == '\"':
@@ -37,7 +37,7 @@ proc parseWord(s: string, i: int, w: var string,
       add(w, s[result])
       inc(result)
 
-proc initOptParser*(cmds: seq[string], shortNoVal: set[char]={},
+func initOptParser*(cmds: seq[string], shortNoVal: set[char]={},
                     longNoVal: seq[string] = @[];
                     allowWhitespaceAfterColon = true): OptParser =
   result.pos = 0
@@ -48,10 +48,10 @@ proc initOptParser*(cmds: seq[string], shortNoVal: set[char]={},
   result.allowWhitespaceAfterColon = allowWhitespaceAfterColon
   result.cmds = cmds
   result.kind = cmdEnd
-  result.key = TaintedString""
-  result.val = TaintedString""
+  result.key = ""
+  result.val = ""
 
-proc handleShortOption(p: var OptParser; cmd: string) =
+func handleShortOption(p: var OptParser; cmd: string) =
   var i = p.pos
   p.kind = cmdShortOption
   if i < cmd.len:
@@ -67,7 +67,7 @@ proc handleShortOption(p: var OptParser; cmd: string) =
       inc(i)
     p.inShortState = false
     while i < cmd.len and cmd[i] in {'\t', ' '}: inc(i)
-    p.val = TaintedString substr(cmd, i)
+    p.val = substr(cmd, i)
     p.pos = 0
     inc p.idx
   else:
@@ -77,7 +77,7 @@ proc handleShortOption(p: var OptParser; cmd: string) =
     p.pos = 0
     inc p.idx
 
-proc next*(p: var OptParser) =
+func next*(p: var OptParser) =
   ## Parses the next token.
   ##
   ## ``p.kind`` describes what kind of token has been parsed. ``p.key`` and
@@ -119,12 +119,12 @@ proc next*(p: var OptParser) =
           inc p.idx
           i = 0
         if p.idx < p.cmds.len:
-          p.val = TaintedString p.cmds[p.idx].substr(i)
-      elif len(p.longNoVal) > 0 and p.key.string notin p.longNoVal and p.idx+1 < p.cmds.len:
-        p.val = TaintedString p.cmds[p.idx+1]
+          p.val = p.cmds[p.idx].substr(i)
+      elif len(p.longNoVal) > 0 and p.key notin p.longNoVal and p.idx+1 < p.cmds.len:
+        p.val = p.cmds[p.idx+1]
         inc p.idx
       else:
-        p.val = TaintedString""
+        p.val = ""
       inc p.idx
       p.pos = 0
     else:
@@ -132,11 +132,11 @@ proc next*(p: var OptParser) =
       handleShortOption(p, p.cmds[p.idx])
   else:
     p.kind = cmdArgument
-    p.key = TaintedString p.cmds[p.idx]
+    p.key = p.cmds[p.idx]
     inc p.idx
     p.pos = 0
 
-iterator getopt*(p: var OptParser): tuple[kind: CmdLineKind, key, val: TaintedString] =
+iterator getopt*(p: var OptParser): tuple[kind: CmdLineKind, key, val: string] =
   p.pos = 0
   p.idx = 0
   while true:
@@ -146,7 +146,7 @@ iterator getopt*(p: var OptParser): tuple[kind: CmdLineKind, key, val: TaintedSt
 
 iterator getopt*(cmds: seq[string],
                  shortNoVal: set[char]={}, longNoVal: seq[string] = @[]):
-           tuple[kind: CmdLineKind, key, val: TaintedString] =
+           tuple[kind: CmdLineKind, key, val: string] =
   var p = initOptParser(cmds, shortNoVal=shortNoVal, longNoVal=longNoVal)
   while true:
     next(p)

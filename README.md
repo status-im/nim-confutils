@@ -338,7 +338,7 @@ Furthermore, you can extend the behavior of the library by providing
 overloads such as:
 
 ```nim
-proc parseCmdArg*(T: type Foo, p: TaintedString): T =
+proc parseCmdArg*(T: type Foo, p: string): T =
   ## This provides parsing and validation for fields having the `Foo` type.
   ## You should raise `ConfigurationError` in case of detected problems.
   ...

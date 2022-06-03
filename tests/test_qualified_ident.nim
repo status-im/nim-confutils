@@ -13,11 +13,11 @@ type
       desc: "La2"
       name: "la2" }: specialint.SInt
 
-proc parseCmdArg(T: type specialint.SInt, p: TaintedString): T =
+func parseCmdArg(T: type specialint.SInt, p: string): T =
   parseInt(string p).T
 
-proc completeCmdArg(T: type specialint.SInt, val: TaintedString): seq[string] =
-  return @[]
+func completeCmdArg(T: type specialint.SInt, val: string): seq[string] =
+  @[]
 
 suite "Qualified Ident":
   test "Qualified Ident":
