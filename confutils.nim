@@ -618,7 +618,7 @@ template debugMacroResult(macroName: string) {.dirty.} =
     echo "\n-------- ", macroName, " ----------------------"
     echo result.repr
 
-func generateFieldSetters(RecordType: NimNode): NimNode =
+proc generateFieldSetters(RecordType: NimNode): NimNode =
   var recordDef = getImpl(RecordType)
   let makeDefaultValue = bindSym"makeDefaultValue"
 
@@ -708,7 +708,7 @@ func toText(n: NimNode): string =
   elif n.kind in {nnkStrLit..nnkTripleStrLit}: n.strVal
   else: repr(n)
 
-func cmdInfoFromType(T: NimNode): CmdInfo =
+proc cmdInfoFromType(T: NimNode): CmdInfo =
   result = CmdInfo()
 
   var
@@ -1095,7 +1095,7 @@ template load*(
 func defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
 
-func dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
+proc dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
   # Here, we'll create a configuration object with fields matching
   # the CLI proc params. We'll also generate a call to the designated proc
   let configType = genSym(nskType, "CliConfig")
