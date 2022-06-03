@@ -4,14 +4,14 @@ export stewNet
 
 export ValidIpAddress
 
-func parseCmdArg*(T: type ValidIpAddress, s: TaintedString): T =
+func parseCmdArg*(T: type ValidIpAddress, s: string): T =
   ValidIpAddress.init(string s)
 
-proc completeCmdArg*(T: type ValidIpAddress, val: TaintedString): seq[string] =
+func completeCmdArg*(T: type ValidIpAddress, val: string): seq[string] =
   # TODO: Maybe complete the local IP address?
-  return @[]
+  @[]
 
-func parseCmdArg*(T: type Port, s: TaintedString): T =
+func parseCmdArg*(T: type Port, s: string): T =
   template fail =
     raise newException(ValueError,
       "The supplied port must be an integer value in the range 1-65535")
@@ -25,6 +25,5 @@ func parseCmdArg*(T: type Port, s: TaintedString): T =
 
   return Port(intVal)
 
-proc completeCmdArg*(T: type Port, val: TaintedString): seq[string] =
-  return @[]
-
+func completeCmdArg*(T: type Port, val: string): seq[string] =
+  @[]

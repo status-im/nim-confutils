@@ -1,5 +1,5 @@
 import
-  options
+  std/options
 
 type
   ConfigurationError* = object of CatchableError
@@ -21,15 +21,15 @@ type
   SubCommandArgs* = distinct string
 
   Flag* = object
-    name*: TaintedString
+    name*: string
 
   FlagWithValue* = object
-    name*: TaintedString
-    value*: TaintedString
+    name*: string
+    value*: string
 
   FlagWithOptionalValue* = object
-    name*: TaintedString
-    value*: Option[TaintedString]
+    name*: string
+    value*: Option[string]
 
   Unspecified* = object
   Txt* = object
@@ -61,4 +61,3 @@ template implicitlySelectable* {.pragma.}
   ## to allow the value of the discriminator to be determined
   ## implicitly when the user specifies any of the sub-options
   ## that depend on the disciminator value.
-
