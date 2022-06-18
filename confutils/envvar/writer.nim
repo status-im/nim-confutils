@@ -45,9 +45,8 @@ proc writeValue*(w: var EnvvarWriter, value: auto) =
     type RecordType = type value
     w.key.add ""
     value.enumInstanceSerializedFields(fieldName, field):
-      type FieldType = type field
       w.key[^1] = fieldName
-      w.writeFieldIMPL(FieldTag[RecordType, fieldName, FieldType], field, value)
+      w.writeFieldIMPL(FieldTag[RecordType, fieldName], field, value)
     discard w.key.pop()
 
   else:
