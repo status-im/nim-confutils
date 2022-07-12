@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "packages": {
+    "stew": {
+      "version": "0.1.0",
+      "vcsRevision": "6ad35b876fb6ebe0dfee0f697af173acc47906ee",
+      "url": "https://github.com/status-im/nim-stew.git",
+      "downloadMethod": "git",
+      "dependencies": [],
+      "checksums": {
+        "sha1": "46d58c4feb457f3241e3347778334e325dce5268"
+      }
+    }
+  }
+}
