@@ -9,7 +9,8 @@ license       = "Apache License 2.0"
 skipDirs      = @["tests"]
 
 requires "nim >= 1.0.0",
-         "stew"
+         "stew",
+         "serialization"
 
 proc run(args, path: string) =
   exec "nim " & getEnv("TEST_LANG", "c") & " " & getEnv("NIMFLAGS") & " " & args &
