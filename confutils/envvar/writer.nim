@@ -21,7 +21,7 @@ proc writeValue*(w: var EnvvarWriter, value: auto) =
   elif value is (SomePrimitives or range):
     let key = constructKey(w.prefix, w.key)
     setValue(key, value)
-  
+
   elif value is Option:
     if value.isSome:
       w.writeValue value.get
