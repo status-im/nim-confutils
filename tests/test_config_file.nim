@@ -149,13 +149,19 @@ proc readValue(r: var TomlReader,
   value = T r.parseAsString()
 
 proc readValue(r: var TomlReader, value: var ValidIpAddress) =
-  value = ValidIpAddress.init(r.parseAsString())
+  try:
+    value = ValidIpAddress.init(r.parseAsString())
+  except ValueError as ex:
+    raise newException(SerializationError, ex.msg)
 
 proc readValue(r: var TomlReader, value: var Port) =
   value = r.parseInt(int).Port
 
 proc readValue(r: var TomlReader, value: var GraffitiBytes) =
-  value = hexToByteArray[value.len](r.parseAsString())
+  try:
+    value = hexToByteArray[value.len](r.parseAsString())
+  except ValueError as ex:
+    raise newException(SerializationError, ex.msg)
 
 proc readValue(r: var EnvvarReader,
   value: var (InputFile | InputDir | OutFile | OutDir | ValidatorKeyPath)) =
