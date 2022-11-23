@@ -1,12 +1,12 @@
 import
   os,
-  stew/byteutils, stew/ranges/ptr_arith
+  stew/byteutils, stew/ptrops
 
 type
   SomePrimitives* = SomeInteger | enum | bool | SomeFloat | char
 
 proc setValue*[T: SomePrimitives](key: string, val: openArray[T]) =
-  os.putEnv(key, byteutils.toHex(makeOpenArray(val[0].unsafeAddr, byte, val.len*sizeof(T))))
+  os.putEnv(key, byteutils.toHex(makeOpenArray(baseAddr val, byte, val.len*sizeof(T))))
 
 proc setValue*(key: string, val: SomePrimitives) =
   os.putEnv(key, byteutils.toHex(makeOpenArray(val.unsafeAddr, byte, sizeof(val))))
