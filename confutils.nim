@@ -4,6 +4,9 @@ import
   serialization,
   confutils/[defs, cli_parser, config_file]
 
+when (NimMajor, NimMinor) > (1, 4):
+  import std/enumutils
+
 export
   options, serialization, defs, config_file
 
@@ -618,6 +621,15 @@ template debugMacroResult(macroName: string) {.dirty.} =
     echo "\n-------- ", macroName, " ----------------------"
     echo result.repr
 
+func parseEnumNormalized[T: enum](s: string): T =
+  # Note: In Nim 1.6 `parseEnum` normalizes the string except for the first
+  # character. Nim 1.2 would normalize for all characters. In config options
+  # the latter behaviour is required so this custom function is needed.
+  when (NimMajor, NimMinor) > (1, 4):
+    genEnumCaseStmt(T, s, default = nil, ord(low(T)), ord(high(T)), normalize)
+  else:
+    parseEnum[T](s)
+
 proc generateFieldSetters(RecordType: NimNode): NimNode =
   var recordDef = getImpl(RecordType)
   let makeDefaultValue = bindSym"makeDefaultValue"
@@ -669,7 +681,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
           # TODO: For some reason, the normal `setField` rejects enum fields
           # when they are used as case discriminators. File this as a bug.
           if isSome(val):
-            `configField` = parseEnum[type(`configField`)](string(val.get))
+            `configField` = parseEnumNormalized[type(`configField`)](string(val.get))
           else:
             `configField` = `defaultValue`
         else:
