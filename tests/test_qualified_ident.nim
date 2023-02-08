@@ -1,5 +1,6 @@
 import
-  std/[strutils, unittest],
+  std/[strutils],
+  unittest2,
   ../confutils,
   ./specialint
 

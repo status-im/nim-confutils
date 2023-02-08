@@ -1,5 +1,6 @@
 import
-  unittest, options,
+  std/options,
+  unittest2,
   ../confutils/envvar/envvar_serialization,
   ../confutils/envvar/utils
 
@@ -110,7 +111,7 @@ proc testOptionalFields() =
       var x = Envvar.loadFile(commonPrefix, TestObject)
       check x.address.isSome
       check x.address.get().value == "1.2.3.4"
-      
+
 testUtils()
 testEncoder()
 testOptionalFields()

@@ -6,7 +6,8 @@
 # at your option. This file may not be copied, modified, or distributed except according to those terms.
 
 import
-  options, unittest, os,
+  std/[options, os],
+  unittest2,
   stew/byteutils, ../confutils,
   ../confutils/[std/net]
 

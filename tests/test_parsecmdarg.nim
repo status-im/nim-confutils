@@ -6,7 +6,8 @@
 # at your option. This file may not be copied, modified, or distributed except according to those terms.
 
 import
-  std/[sequtils, unittest],
+  std/[sequtils],
+  unittest2,
   ../confutils
 
 func testValidValues[T](lo: T = low(T), hi: T = high(T)): bool =
