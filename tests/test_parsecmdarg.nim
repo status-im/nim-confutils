@@ -9,6 +9,9 @@ import
   std/[sequtils],
   unittest2,
   ../confutils
+  
+{.warning[UnusedImport]:off.}
+import stew/shims/stddefects
 
 func testValidValues[T](lo: T = low(T), hi: T = high(T)): bool =
   allIt(lo .. hi, T.parseCmdArg($it) == it)
@@ -24,7 +27,7 @@ func testInvalidValues[T](lo, hi: int64): bool =
       else:
         discard it != T.parseCmdArg($it).int64
         false
-    except RangeError:
+    except RangeDefect:
       true)
 
 const span = 300000

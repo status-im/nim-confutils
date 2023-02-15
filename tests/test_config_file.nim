@@ -183,13 +183,13 @@ proc readValue(r: var WinregReader,
   type T = type value
   value = r.readValue(string).T
 
-proc readValue(r: var WinregReader, value: var ValidIpAddress) =
+proc readValue(r: var WinregReader, value: var ValidIpAddress) {.used.} =
   value = ValidIpAddress.init(r.readValue(string))
 
-proc readValue(r: var WinregReader, value: var Port) =
+proc readValue(r: var WinregReader, value: var Port) {.used.} =
   value = r.readValue(int).Port
 
-proc readValue(r: var WinregReader, value: var GraffitiBytes) =
+proc readValue(r: var WinregReader, value: var GraffitiBytes) {.used.} =
   value = hexToByteArray[value.len](r.readValue(string))
 
 proc testConfigFile() =

@@ -465,7 +465,7 @@ else:
 
 # TODO remove the overloads here to get better "missing overload" error message
 proc parseCmdArg*(T: type InputDir, p: string): T =
-  if not dirExists(p.string):
+  if not dirExists(p):
     raise newException(ValueError, "Directory doesn't exist")
 
   T(p)
@@ -474,17 +474,17 @@ proc parseCmdArg*(T: type InputFile, p: string): T =
   # TODO this is needed only because InputFile cannot be made
   # an alias of TypedInputFile at the moment, because of a generics
   # caching issue
-  if not fileExists(p.string):
+  if not fileExists(p):
     raise newException(ValueError, "File doesn't exist")
 
   when not defined(nimscript):
     try:
-      let f = system.open(p.string, fmRead)
+      let f = system.open(p, fmRead)
       close f
     except IOError:
       raise newException(ValueError, "File not accessible")
 
-  T(p.string)
+  T(p)
 
 proc parseCmdArg*(T: type TypedInputFile, p: string): T =
   var path = p
@@ -513,10 +513,10 @@ template parseCmdArg*(T: type string, s: string): string =
   s
 
 func parseCmdArg*(T: type SomeSignedInt, s: string): T =
-  T parseBiggestInt(string s)
+  T parseBiggestInt(s)
 
 func parseCmdArg*(T: type SomeUnsignedInt, s: string): T =
-  T parseBiggestUInt(string s)
+  T parseBiggestUInt(s)
 
 func parseCmdArg*(T: type SomeFloat, p: string): T =
   parseFloat(p)
@@ -525,10 +525,10 @@ func parseCmdArg*(T: type bool, p: string): T =
   try:
     p.len == 0 or parseBool(p)
   except CatchableError:
-    raise newException(ValueError, "'" & p.string & "' is not a valid boolean value. Supported values are on/off, yes/no, true/false or 1/0")
+    raise newException(ValueError, "'" & p & "' is not a valid boolean value. Supported values are on/off, yes/no, true/false or 1/0")
 
 func parseCmdArg*(T: type enum, s: string): T =
-  parseEnum[T](string(s))
+  parseEnum[T](s)
 
 proc parseCmdArgAux(T: type, s: string): T = # {.raises: [ValueError].} =
   # The parseCmdArg procs are allowed to raise only `ValueError`.
@@ -662,6 +662,13 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
                              newCall(bindSym"requiresInput", fixedFieldType),
                              newCall(bindSym"acceptsMultipleValues", fixedFieldType))
 
+    when (NimMajor, NimMinor) >= (1, 6):
+      result.add quote do:
+        {.push hint[XCannotRaiseY]: off.}
+    else:
+      result.add quote do:
+        {.push hint[XDeclaredButNotUsed]: off.}
+
     result.add quote do:
       proc `completerName`(val: string): seq[string] {.
         nimcall
@@ -681,11 +688,14 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
           # TODO: For some reason, the normal `setField` rejects enum fields
           # when they are used as case discriminators. File this as a bug.
           if isSome(val):
-            `configField` = parseEnumNormalized[type(`configField`)](string(val.get))
+            `configField` = parseEnumNormalized[type(`configField`)](val.get)
           else:
             `configField` = `defaultValue`
         else:
           setField(`configField`, val, `defaultValue`)
+
+    result.add quote do:
+      {.pop.}
 
   result.add settersArray
   debugMacroResult "Field Setters"
@@ -891,14 +901,20 @@ proc loadImpl[C, SecondarySources](
   let confAddr = addr result
 
   template applySetter(setterIdx: int, cmdLineVal: string) =
+    when (NimMajor, NimMinor) >= (1, 6):
+      {.warning[BareExcept]:off.}
+
     try:
       fieldSetters[setterIdx][1](confAddr[], some(cmdLineVal))
       inc fieldCounters[setterIdx]
     except:
       fail("Error while processing the ",
            fgOption, fieldSetters[setterIdx][0],
-           "=", cmdLineVal.string, resetStyle, " parameter: ",
+           "=", cmdLineVal, resetStyle, " parameter: ",
            getCurrentExceptionMsg())
+
+    when (NimMajor, NimMinor) >= (1, 6):
+      {.warning[BareExcept]:on.}
 
   when hasCompletions:
     template getArgCompletions(opt: OptInfo, prefix: string): seq[string] =
@@ -1017,7 +1033,8 @@ proc loadImpl[C, SecondarySources](
       flushOutputAndQuit QuitSuccess
 
   for kind, key, val in getopt(cmdLine):
-    let key = string(key)
+    when key isnot string:
+      let key = string(key)
     case kind
     of cmdLongOption, cmdShortOption:
       processHelpAndVersionOptions key

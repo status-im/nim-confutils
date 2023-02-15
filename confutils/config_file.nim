@@ -1,6 +1,10 @@
 import
-  std/[tables, macrocache, typetraits],
-  stew/shims/macros,
+  std/[tables, macrocache],
+  stew/shims/macros
+  
+{.warning[UnusedImport]:off.}
+import
+  std/typetraits,
   ./defs
 
 #[
@@ -312,7 +316,7 @@ proc generateConfigFileSetters(confType, optType: NimNode,
            data*: seq[`optT`]
            setters: array[`numSetters`, `SetterProcType`]
 
-      proc defaultConfigFileSetter(s: var `T`, cf: ref `CF`): bool {.nimcall, gcsafe.} =
+      proc defaultConfigFileSetter(s: var `T`, cf: ref `CF`): bool {.nimcall, gcsafe, used.} =
         discard
 
       `setterProcs`

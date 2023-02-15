@@ -55,14 +55,14 @@ func handleShortOption(p: var OptParser; cmd: string) =
   var i = p.pos
   p.kind = cmdShortOption
   if i < cmd.len:
-    add(p.key.string, cmd[i])
+    add(p.key, cmd[i])
     inc(i)
   p.inShortState = true
   while i < cmd.len and cmd[i] in {'\t', ' '}:
     inc(i)
     p.inShortState = false
   if i < cmd.len and cmd[i] in {':', '='} or
-      card(p.shortNoVal) > 0 and p.key.string[0] notin p.shortNoVal:
+      card(p.shortNoVal) > 0 and p.key[0] notin p.shortNoVal:
     if i < cmd.len and cmd[i] in {':', '='}:
       inc(i)
     p.inShortState = false

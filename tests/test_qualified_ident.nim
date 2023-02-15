@@ -15,7 +15,7 @@ type
       name: "la2" }: specialint.SInt
 
 func parseCmdArg(T: type specialint.SInt, p: string): T =
-  parseInt(string p).T
+  parseInt(p).T
 
 func completeCmdArg(T: type specialint.SInt, val: string): seq[string] =
   @[]

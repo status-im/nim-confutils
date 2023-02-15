@@ -1,6 +1,6 @@
 import
   tables, typetraits, options,
-  serialization/[object_serialization, errors],
+  serialization/[object_serialization],
   ./utils, ./types
 
 type
