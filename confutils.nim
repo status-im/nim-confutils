@@ -901,20 +901,14 @@ proc loadImpl[C, SecondarySources](
   let confAddr = addr result
 
   template applySetter(setterIdx: int, cmdLineVal: string) =
-    when (NimMajor, NimMinor) >= (1, 6):
-      {.warning[BareExcept]:off.}
-
     try:
       fieldSetters[setterIdx][1](confAddr[], some(cmdLineVal))
       inc fieldCounters[setterIdx]
-    except:
+    except CatchableError:
       fail("Error while processing the ",
            fgOption, fieldSetters[setterIdx][0],
            "=", cmdLineVal, resetStyle, " parameter: ",
            getCurrentExceptionMsg())
-
-    when (NimMajor, NimMinor) >= (1, 6):
-      {.warning[BareExcept]:on.}
 
   when hasCompletions:
     template getArgCompletions(opt: OptInfo, prefix: string): seq[string] =
