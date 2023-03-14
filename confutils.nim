@@ -851,6 +851,17 @@ proc addConfigFile*(secondarySources: auto,
     raise newException(ConfigurationError,
       "Failed to read config file at '" & string(path) & "': " & err.msg)
 
+proc addConfigFileContent*(secondarySources: auto,
+                           Format: type,
+                           content: string) =
+  try:
+    secondarySources.data.add decode(Format, content,
+                                     type(secondarySources.data[0]))
+  except SerializationError as err:
+    raise newException(ConfigurationError, err.formatMsg("<content>"), err)
+  except IOError:
+    raiseAssert "This should not be possible"
+
 proc loadImpl[C, SecondarySources](
     Configuration: typedesc[C],
     cmdLine = commandLineParams(),
