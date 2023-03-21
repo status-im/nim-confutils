@@ -1,5 +1,6 @@
 import
   os,
+  strutils,
   stew/byteutils, stew/ptrops
 
 type
@@ -84,10 +85,13 @@ template uTypeIsRecord*[N, T](_: type array[N, T]): bool =
     false
 
 func constructKey*(prefix: string, keys: openArray[string]): string =
-  var size = prefix.len
+  var size = prefix.len + 1
   for i in 0..<keys.len:
     inc(size, keys[i].len)
   result = newStringOfCap(size)
   result.add prefix
+  result.add "_"
   for x in keys:
     result.add x
+
+  return result.toUpperAscii.multiReplace(("-", "_"), (" ", "_"))

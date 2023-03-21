@@ -1,4 +1,5 @@
 import
+  os,
   std/options,
   unittest2,
   ../confutils/envvar/envvar_serialization,
@@ -7,7 +8,7 @@ import
 const
   commonPrefix = "Nimbus"
 
-template readWrite(key: string, val: typed) =
+template readWriteTest(key: string, val: typed) =
   test key:
     setValue(key, val)
     var outVal: type val
@@ -20,16 +21,16 @@ proc testUtils() =
       Apple
 
   suite "envvar utils test suite":
-    readWrite("some number", 123'u32)
-    readWrite("some number 64", 123'u64)
-    readWrite("some bytes", @[1.byte, 2.byte])
-    readWrite("some int list", @[4,5,6])
-    readWrite("some array", [1.byte, 2.byte, 4.byte])
-    readWrite("some string", "hello world")
-    readWrite("some enum", Apple)
-    readWrite("some boolean", true)
-    readWrite("some float32", 1.234'f32)
-    readWrite("some float64", 1.234'f64)
+    readWriteTest("some number", 123'u32)
+    readWriteTest("some number 64", 123'u64)
+    readWriteTest("some bytes", @[1.byte, 2.byte])
+    readWriteTest("some int list", @[4,5,6])
+    readWriteTest("some array", [1.byte, 2.byte, 4.byte])
+    readWriteTest("some string", "hello world")
+    readWriteTest("some enum", Apple)
+    readWriteTest("some boolean", true)
+    readWriteTest("some float32", 1.234'f32)
+    readWriteTest("some float64", 1.234'f64)
 
 proc testEncoder() =
   type
