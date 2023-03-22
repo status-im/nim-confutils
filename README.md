@@ -18,6 +18,8 @@ Windows registry.
 The library focuses on providing a lot of compile-time configurability
 and extensibility with a strong adherence to the DRY principle.
 
+Items marked with `TODO` are envisioned for future incorporation but are currently not implemented.
+
 Let's illustrate the API with a highly annotated example. Our configuration
 might be described in a separate module looking like this:
 
@@ -405,31 +407,83 @@ provide a `help` command and the following additional switches:
 
 ## Handling of environment variables and config files
 
-After parsing the command line options, the default behavior of Confutils is
-to try to fill any missing options by examining the contents of the environment
-variables plus two per-user and system-wide configuration locations derived from
-the program name. If you want to use Confutils only as a command-line processor
-or a config file parser for example, you can supply an empty/nil value to the
-`cmdLine`, `envTable` or `configFileEnumerator` parameters of the `load` call.
+If you want your application to use also as parameter env. variables or config files you have to specify configure
+the `confutils` for it using the `load` parameter `secondarySources` where you define fallback sources. 
 
-More specifically, the `load` call supports the following parameters:
+Currently, you can use:
+ - `Envvar` (`confutils/envvar/envvar_serialization`) for environment variables. The `InputFile` defines prefix of the env. variable names 
+ - `Toml` (`toml_serialization`) for Toml config
+ - `Winreg` (`confutils/envvar/winreg_serialization`) for Window's registries.
 
-#### `cmdLine`, `envTable`
+Example how such configuration could look like:
 
-The command-line parameters and the environment table of the program.
+```nim
+import confutils/envvar/envvar_serialization
+import toml_serialization
+import 
+  confutils/toml/defs as confTomlDefs,
+  confutils/toml/std/net as confTomlNet,
+  confutils/toml/std/uri as confTomlUri
+  
+
+type 
+  Nested = object 
+    field: string
+    
+  YourConf* = object
+    configFile* {.
+      desc: "Loads the configuration from a TOML file"
+      defaultValueDesc: "none"
+      defaultValue: InputFile.none
+      name: "config-file" }: Option[InputFile]
+
+    logLevel* {.
+      defaultValue: "INFO"
+      desc: "Sets the log level",
+      name: "log-level" }: string
+    
+    nested* {.
+      name: "nested" }: Nested
+
+let config = YourConf.load(
+  secondarySources = proc (config: YourConf, sources: auto) =
+          sources.addConfigFile(Envvar, InputFile "codex")
+
+          # The YourConf type has configFile attribute of type Option[InputFile], which the user can use
+          # to configure its own custom configuration file that will be loaded
+          if config.configFile.isSome:
+            sources.addConfigFile(Toml, config.configFile.get)
+)
+ ```
+
+### Env. variable names
+
+When using the env. variables, `confutils` transform the configuration parameters name in following matter:
+ 
+ - The specified prefix is applied
+ - The parameter name are transformed to uppercase
+ - All spaces or dashes are replaced with underscore
+
+In the above example the parameter `logLevel` with name `log-level` will be possible to specify under 
+env. variable named `CODEX_LOG_LEVEL`. Moreover, if the configuration type contains nested objects
+then the key names are joined with `_` as well. In the above example the `YourConf.nested.field` would be
+accessible using `CODEX_NESTED_FIELD`.
+
+> **Warning!** Conflicts of env. variable names are not detected! If you had field in the above example called 
+> `nested-field` it would also resolve to env. variable named `CODEX_NESTED_FIELD`!
+
+#### `cmdLine`
+
+The command-line parameters of the program.
 By default, these will be obtained through Nim's `os` module.
 
-#### `EnvValuesFormat`, `envVarsPrefix`
+#### TODO `EnvValuesFormat`, `envVarsPrefix`
 
 A nim-serialization format used to deserialize the values of environment
 variables. The default format is called `CmdLineFormat` and it uses the
 same `parseCmdArg` calls responsible for parsing the command-line.
 
-The names of the environment variables are prefixed by the name of the
-program by default. They are matched in case-insensitive fashion and
-certain characters such as `-` and `_` are ignored.
-
-#### `configFileEnumerator`
+#### TODO `configFileEnumerator`
 
 A function responsible for returning a sequence of `ConfigFilePath` objects.
 To support heterogenous config file types, you can also return a tuple of
@@ -449,7 +503,7 @@ from the following files:
 /etc/{appName}.{ConfigFileForamt.extension}
 ```
 
-#### `ConfigFileFormat`
+#### TODO `ConfigFileFormat`
 
 A [nim-serialization](https://github.com/status-im/nim-serialization) format
 that will be used by default by Confutils.
