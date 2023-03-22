@@ -13,8 +13,7 @@ import
 
 import
   toml_serialization, json_serialization,
-  ../confutils/winreg/winreg_serialization,
-  ../confutils/envvar/envvar_serialization
+  ../confutils/winreg/winreg_serialization
 
 type
   ValidatorPrivKey = object
@@ -164,20 +163,6 @@ proc readValue(r: var TomlReader, value: var GraffitiBytes) =
   except ValueError as ex:
     raise newException(SerializationError, ex.msg)
 
-proc readValue(r: var EnvvarReader,
-  value: var (InputFile | InputDir | OutFile | OutDir | ValidatorKeyPath)) =
-  type T = type value
-  value = r.readValue(string).T
-
-proc readValue(r: var EnvvarReader, value: var ValidIpAddress) =
-  value = ValidIpAddress.init(r.readValue(string))
-
-proc readValue(r: var EnvvarReader, value: var Port) =
-  value = r.readValue(int).Port
-
-proc readValue(r: var EnvvarReader, value: var GraffitiBytes) =
-  value = hexToByteArray[value.len](r.readValue(string))
-
 proc readValue(r: var WinregReader,
   value: var (InputFile | InputDir | OutFile | OutDir | ValidatorKeyPath)) =
   type T = type value
@@ -194,12 +179,10 @@ proc readValue(r: var WinregReader, value: var GraffitiBytes) {.used.} =
 
 proc testConfigFile() =
   suite "config file test suite":
-    putEnv("prefixdata-dir", "ENV VAR DATADIR")
+    putEnv("PREFIX_DATA_DIR", "ENV VAR DATADIR")
 
     test "basic config file":
-      let conf = TestConf.load(secondarySources = proc (config: TestConf, sources: auto) =
-        sources.addConfigFile(Envvar, InputFile "prefix")
-
+      let conf = TestConf.load(envVarsPrefix="prefix", secondarySources = proc (config: TestConf, sources: auto) =
         if config.configFile.isSome:
           sources.addConfigFile(Toml, config.configFile.get)
         else:

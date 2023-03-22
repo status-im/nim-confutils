@@ -1,5 +1,6 @@
 import
-  std/[options, strutils, wordwrap],
+  os,
+  std/[options, strutils, wordwrap, strformat],
   stew/shims/macros,
   serialization,
   confutils/[defs, cli_parser, config_file]
@@ -862,6 +863,12 @@ proc addConfigFileContent*(secondarySources: auto,
   except IOError:
     raiseAssert "This should not be possible"
 
+func constructEnvKey*(prefix: string, key: string): string =
+  ## Generates env. variable names from keys and prefix following the
+  ## IEEE Open Group env. variable spec: https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
+
+  return (&"{prefix}_{key}").toUpperAscii.multiReplace(("-", "_"), (" ", "_"))
+
 proc loadImpl[C, SecondarySources](
     Configuration: typedesc[C],
     cmdLine = commandLineParams(),
@@ -871,7 +878,8 @@ proc loadImpl[C, SecondarySources](
     quitOnFailure = true,
     secondarySourcesRef: ref SecondarySources,
     secondarySources: proc (config: Configuration,
-                            sources: ref SecondarySources) = nil): Configuration =
+                            sources: ref SecondarySources) = nil,
+    envVarsPrefix = getAppFilename()): Configuration =
   ## Loads a program configuration by parsing command-line arguments
   ## and a standard set of config files that can specify:
   ##
@@ -1105,7 +1113,12 @@ proc loadImpl[C, SecondarySources](
   proc processMissingOpts(conf: var Configuration, cmd: CmdInfo) =
     for opt in cmd.opts:
       if fieldCounters[opt.idx] == 0:
-        if secondarySourcesRef.setters[opt.idx](conf, secondarySourcesRef):
+        let envKey = constructEnvKey(envVarsPrefix, opt.name)
+
+        if existsEnv(envKey):
+          let envContent = getEnv(envKey)
+          applySetter(opt.idx, envContent)
+        elif secondarySourcesRef.setters[opt.idx](conf, secondarySourcesRef):
           # all work is done in the config file setter,
           # there is nothing left to do here.
           discard
@@ -1124,13 +1137,14 @@ template load*(
     copyrightBanner = "",
     printUsage = true,
     quitOnFailure = true,
-    secondarySources: untyped = nil): untyped =
+    secondarySources: untyped = nil,
+    envVarsPrefix = getAppFilename()): untyped =
 
   block:
     var secondarySourcesRef = generateSecondarySources(Configuration)
     loadImpl(Configuration, cmdLine, version,
              copyrightBanner, printUsage, quitOnFailure,
-             secondarySourcesRef, secondarySources)
+             secondarySourcesRef, secondarySources, envVarsPrefix)
 
 func defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
