@@ -32,6 +32,20 @@ proc testUtils() =
     readWriteTest("some float32", 1.234'f32)
     readWriteTest("some float64", 1.234'f64)
 
+    test "nested structure is read correctly":
+      type
+        NestedObject = object
+          someInt: uint32
+
+        TestedObject = object
+          nested: NestedObject
+
+      os.putEnv("NIMBUS_NESTED_SOMEINT", "7b000000")
+
+      let x = Envvar.decode(commonPrefix, TestedObject)
+      check x.nested.someInt == 123
+
+
 proc testEncoder() =
   type
     Class = enum

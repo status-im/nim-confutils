@@ -85,13 +85,18 @@ template uTypeIsRecord*[N, T](_: type array[N, T]): bool =
     false
 
 func constructKey*(prefix: string, keys: openArray[string]): string =
-  var size = prefix.len + 1
+  ## Generates env. variable names from keys and prefix following the
+  ## IEEE Open Group env. variable spec: https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
+
+  var size = prefix.len
   for i in 0..<keys.len:
-    inc(size, keys[i].len)
+    inc(size, keys[i].len + 1)
+
   result = newStringOfCap(size)
   result.add prefix
-  result.add "_"
+
   for x in keys:
+    result.add "_"
     result.add x
 
   return result.toUpperAscii.multiReplace(("-", "_"), (" ", "_"))
