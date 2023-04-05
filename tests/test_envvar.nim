@@ -23,7 +23,7 @@ proc testUtils() =
     readWrite("some number", 123'u32)
     readWrite("some number 64", 123'u64)
     readWrite("some bytes", @[1.byte, 2.byte])
-    readWrite("some int list", @[4,5,6])
+    readWrite("some int list", @[4, 5, 6])
     readWrite("some array", [1.byte, 2.byte, 4.byte])
     readWrite("some string", "hello world")
     readWrite("some enum", Apple)
@@ -74,7 +74,7 @@ proc testEncoder() =
           fuel: Diesel
         ),
         wheel: 6,
-        door: [1,2,3,4],
+        door: [1, 2, 3, 4],
         suspension: [
           Suspension(dist: 1, length: 5),
           Suspension(dist: 2, length: 6),
