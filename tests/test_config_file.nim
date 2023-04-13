@@ -194,7 +194,7 @@ proc readValue(r: var WinregReader, value: var GraffitiBytes) {.used.} =
 
 proc testConfigFile() =
   suite "config file test suite":
-    putEnv("prefixdata-dir", "ENV VAR DATADIR")
+    putEnv("PREFIX_DATA_DIR", "ENV VAR DATADIR")
 
     test "basic config file":
       let conf = TestConf.load(secondarySources = proc (config: TestConf, sources: auto) =
