@@ -1,7 +1,6 @@
 nim-confutils
 =============
 
-[![Build Status](https://travis-ci.org/status-im/nim-confutils.svg?branch=master)](https://travis-ci.org/status-im/nim-confutils)
 [![License: Apache](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ![Github action](https://github.com/status-im/nim-confutils/workflows/CI/badge.svg)
