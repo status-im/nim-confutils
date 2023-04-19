@@ -425,8 +425,12 @@ variables. The default format is called `CmdLineFormat` and it uses the
 same `parseCmdArg` calls responsible for parsing the command-line.
 
 The names of the environment variables are prefixed by the name of the
-program by default. They are matched in case-insensitive fashion and
-certain characters such as `-` and `_` are ignored.
+program by default and joined with the name of command line option, which is 
+uppercased and characters `-` and spaces are replaced with underscore:
+
+```nim
+let env_variable_name = &"{prefix}_{key}".toUpperAscii.multiReplace(("-", "_"), (" ", "_"))
+```
 
 #### `configFileEnumerator`
 
