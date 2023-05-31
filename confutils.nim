@@ -1,12 +1,9 @@
 import
   os,
-  std/[options, strutils, wordwrap, strformat],
+  std/[enumutils, options, strutils, wordwrap, strformat],
   stew/shims/macros,
   serialization,
   confutils/[defs, cli_parser, config_file]
-
-when (NimMajor, NimMinor) > (1, 4):
-  import std/enumutils
 
 export
   options, serialization, defs, config_file
@@ -630,10 +627,7 @@ func parseEnumNormalized[T: enum](s: string): T =
   # Note: In Nim 1.6 `parseEnum` normalizes the string except for the first
   # character. Nim 1.2 would normalize for all characters. In config options
   # the latter behaviour is required so this custom function is needed.
-  when (NimMajor, NimMinor) > (1, 4):
-    genEnumCaseStmt(T, s, default = nil, ord(low(T)), ord(high(T)), normalize)
-  else:
-    parseEnum[T](s)
+  genEnumCaseStmt(T, s, default = nil, ord(low(T)), ord(high(T)), normalize)
 
 proc generateFieldSetters(RecordType: NimNode): NimNode =
   var recordDef = getImpl(RecordType)
@@ -667,12 +661,8 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
                              newCall(bindSym"requiresInput", fixedFieldType),
                              newCall(bindSym"acceptsMultipleValues", fixedFieldType))
 
-    when (NimMajor, NimMinor) >= (1, 6):
-      result.add quote do:
-        {.push hint[XCannotRaiseY]: off.}
-    else:
-      result.add quote do:
-        {.push hint[XDeclaredButNotUsed]: off.}
+    result.add quote do:
+      {.push hint[XCannotRaiseY]: off.}
 
     result.add quote do:
       proc `completerName`(val: string): seq[string] {.
