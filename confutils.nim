@@ -124,10 +124,16 @@ when useBufferedOutput:
 
 else:
   template errorOutput(args: varargs[untyped]) =
-    styledWrite stderr, args
+    try:
+      styledWrite stderr, args
+    except IOError, ValueError:
+      discard
 
   template helpOutput(args: varargs[untyped]) =
-    styledWrite stdout, args
+    try:
+      styledWrite stdout, args
+    except IOError, ValueError:
+      discard
 
   template flushOutput =
     discard
@@ -975,9 +981,15 @@ proc loadImpl[C, SecondarySources](
         let trailing = if opt.typename != "bool": "=" else: ""
 
         if argName in filterKind and len(opt.name) > 0:
-          stdout.writeLine("--", opt.name, trailing)
+          try:
+            stdout.writeLine("--", opt.name, trailing)
+          except IOError:
+            discard
         if argAbbr in filterKind and len(opt.abbr) > 0:
-          stdout.writeLine('-', opt.abbr, trailing)
+          try:
+            stdout.writeLine('-', opt.abbr, trailing)
+          except IOError:
+            discard
 
     let completion = splitCompletionLine()
     # If we're not asked to complete a command line the result is an empty list
@@ -1023,12 +1035,18 @@ proc loadImpl[C, SecondarySources](
         let opt = findOpt(cmdStack, option_word)
         if opt != nil:
           for arg in getArgCompletions(opt, cur_word):
-            stdout.writeLine(arg)
+            try:
+              stdout.writeLine(arg)
+            except IOError:
+              discard
       elif cmdStack[^1].hasSubCommands:
         # Show all the available subcommands
         for subCmd in subCmds(cmdStack[^1]):
           if startsWithIgnoreStyle(subCmd.name, cur_word):
-            stdout.writeLine(subCmd.name)
+            try:
+              stdout.writeLine(subCmd.name)
+            except IOError:
+              discard
       else:
         # Full options listing
         for i in countdown(cmdStack.len - 1, 0):
@@ -1240,4 +1258,3 @@ func load*(f: TypedInputFile): f.ContentType =
   else:
     mixin loadFile
     loadFile(f.Format, f.string, f.ContentType)
-
