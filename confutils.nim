@@ -373,7 +373,11 @@ proc showHelp(help: var string,
 
   appInfo.maxNameLen = cmd.maxNameLen
   appInfo.hasAbbrs = cmd.hasAbbrs
-  appInfo.terminalWidth = terminalWidth()
+  appInfo.terminalWidth =
+    try:
+      terminalWidth()
+    except ValueError:
+      int.high  # https://github.com/nim-lang/Nim/pull/21968
   appInfo.namesWidth = min(minNameWidth, appInfo.maxNameLen) + descPadding
 
   var cmdInvocation = appInfo.appInvocation
