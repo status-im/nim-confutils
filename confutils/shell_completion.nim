@@ -133,12 +133,15 @@ proc splitCompletionLine*(): seq[string] =
 
   # Split the resulting string
   var l: ShellLexer
-  l.open(strm)
-  while true:
-    let token = l.getTok()
-    if token.isNone():
-      break
-    result.add(token.get())
+  try:
+    l.open(strm)
+    while true:
+      let token = l.getTok()
+      if token.isNone():
+        break
+      result.add(token.get())
+  except IOError, OSError:
+    return @[]
 
 proc shellQuote*(word: string): string =
   if len(word) == 0:
