@@ -96,7 +96,10 @@ when defined(nimscript):
 
 else:
   template appInvocation: string =
-    getAppFilename().splitFile.name
+    try:
+      getAppFilename().splitFile.name
+    except OSError:
+      ""
 
 when noColors:
   const
