@@ -462,13 +462,13 @@ else:
   template printCmdTree(cmd: CmdInfo) = discard
 
 # TODO remove the overloads here to get better "missing overload" error message
-proc parseCmdArg*(T: type InputDir, p: string): T =
+proc parseCmdArg*(T: type InputDir, p: string): T {.raises: [ValueError].} =
   if not dirExists(p):
     raise newException(ValueError, "Directory doesn't exist")
 
   T(p)
 
-proc parseCmdArg*(T: type InputFile, p: string): T =
+proc parseCmdArg*(T: type InputFile, p: string): T {.raises: [ValueError].} =
   # TODO this is needed only because InputFile cannot be made
   # an alias of TypedInputFile at the moment, because of a generics
   # caching issue
@@ -484,7 +484,8 @@ proc parseCmdArg*(T: type InputFile, p: string): T =
 
   T(p)
 
-proc parseCmdArg*(T: type TypedInputFile, p: string): T =
+proc parseCmdArg*(
+    T: type TypedInputFile, p: string): T {.raises: [ValueError].} =
   var path = p
   when T.defaultExt.len > 0:
     path = path.addFileExt(T.defaultExt)
@@ -504,31 +505,34 @@ proc parseCmdArg*(T: type TypedInputFile, p: string): T =
 func parseCmdArg*(T: type[OutDir|OutFile|OutPath], p: string): T =
   T(p)
 
-proc parseCmdArg*[T](_: type Option[T], s: string): Option[T] =
+proc parseCmdArg*[T](
+    _: type Option[T], s: string): Option[T] {.raises: [ValueError].} =
   some(parseCmdArg(T, s))
 
 template parseCmdArg*(T: type string, s: string): string =
   s
 
-func parseCmdArg*(T: type SomeSignedInt, s: string): T =
+func parseCmdArg*(
+    T: type SomeSignedInt, s: string): T {.raises: [ValueError].} =
   T parseBiggestInt(s)
 
-func parseCmdArg*(T: type SomeUnsignedInt, s: string): T =
+func parseCmdArg*(
+    T: type SomeUnsignedInt, s: string): T {.raises: [ValueError].} =
   T parseBiggestUInt(s)
 
-func parseCmdArg*(T: type SomeFloat, p: string): T =
+func parseCmdArg*(T: type SomeFloat, p: string): T {.raises: [ValueError].} =
   parseFloat(p)
 
-func parseCmdArg*(T: type bool, p: string): T =
+func parseCmdArg*(T: type bool, p: string): T {.raises: [ValueError].} =
   try:
     p.len == 0 or parseBool(p)
   except CatchableError:
     raise newException(ValueError, "'" & p & "' is not a valid boolean value. Supported values are on/off, yes/no, true/false or 1/0")
 
-func parseCmdArg*(T: type enum, s: string): T =
+func parseCmdArg*(T: type enum, s: string): T {.raises: [ValueError].} =
   parseEnum[T](s)
 
-proc parseCmdArgAux(T: type, s: string): T = # {.raises: [ValueError].} =
+proc parseCmdArgAux(T: type, s: string): T {.raises: [ValueError].} =
   # The parseCmdArg procs are allowed to raise only `ValueError`.
   # If you have provided your own specializations, please handle
   # all other exception types.
@@ -619,7 +623,7 @@ template debugMacroResult(macroName: string) {.dirty.} =
     echo "\n-------- ", macroName, " ----------------------"
     echo result.repr
 
-func parseEnumNormalized[T: enum](s: string): T =
+func parseEnumNormalized[T: enum](s: string): T {.raises: [ValueError].} =
   # Note: In Nim 1.6 `parseEnum` normalizes the string except for the first
   # character. Nim 1.2 would normalize for all characters. In config options
   # the latter behaviour is required so this custom function is needed.
