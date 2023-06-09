@@ -158,12 +158,12 @@ jobs:
           nimble install -y --depsOnly
           nimble install -y toml_serialization json_serialization unittest2
           rm -f nimble.lock
-          env NIMFLAGS="${NIMFLAGS} --gc:refc" nimble test
+          env NIMFLAGS="${NIMFLAGS} --mm:refc" nimble test
           let "linux32= "${{ matrix.target.os }}" == "linux" && "${{ matrix.target.cpu }}" == "i386""
           if [[ "${{ matrix.branch }}" == "devel" && "$linux32" == 0 ]]; then
-            echo -e "\nTesting with '--gc:orc':\n"
-            if env NIMFLAGS="${NIMFLAGS} --gc:orc" nimble test; then
-              echo "Nim devel with --gc:orc works again! Please remove this check in ci.yml"
+            echo -e "\nTesting with '--mm:orc':\n"
+            if env NIMFLAGS="${NIMFLAGS} --mm:orc" nimble test; then
+              echo "Nim devel with --mm:orc works again! Please remove this check in ci.yml"
               false
             fi
           fi
