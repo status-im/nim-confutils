@@ -17,7 +17,7 @@ func parseCmdArg*(T: type Port, s: string): T =
       "The supplied port must be an integer value in the range 1-65535")
 
   var intVal: int
-  let parsedChars = try: parseInt(s, intVal):
+  let parsedChars = try: parseInt(s, intVal)
                     except CatchableError: fail()
 
   if parsedChars != len(s) or intVal < 1 or intVal > 65535:
