@@ -96,7 +96,10 @@ when defined(nimscript):
 
 else:
   template appInvocation: string =
-    getAppFilename().splitFile.name
+    try:
+      getAppFilename().splitFile.name
+    except OSError:
+      ""
 
 when noColors:
   const
@@ -121,10 +124,16 @@ when useBufferedOutput:
 
 else:
   template errorOutput(args: varargs[untyped]) =
-    styledWrite stderr, args
+    try:
+      styledWrite stderr, args
+    except IOError, ValueError:
+      discard
 
   template helpOutput(args: varargs[untyped]) =
-    styledWrite stdout, args
+    try:
+      styledWrite stdout, args
+    except IOError, ValueError:
+      discard
 
   template flushOutput =
     discard
@@ -370,7 +379,11 @@ proc showHelp(help: var string,
 
   appInfo.maxNameLen = cmd.maxNameLen
   appInfo.hasAbbrs = cmd.hasAbbrs
-  appInfo.terminalWidth = terminalWidth()
+  appInfo.terminalWidth =
+    try:
+      terminalWidth()
+    except ValueError:
+      int.high  # https://github.com/nim-lang/Nim/pull/21968
   appInfo.namesWidth = min(minNameWidth, appInfo.maxNameLen) + descPadding
 
   var cmdInvocation = appInfo.appInvocation
@@ -462,13 +475,13 @@ else:
   template printCmdTree(cmd: CmdInfo) = discard
 
 # TODO remove the overloads here to get better "missing overload" error message
-proc parseCmdArg*(T: type InputDir, p: string): T =
+proc parseCmdArg*(T: type InputDir, p: string): T {.raises: [ValueError].} =
   if not dirExists(p):
     raise newException(ValueError, "Directory doesn't exist")
 
   T(p)
 
-proc parseCmdArg*(T: type InputFile, p: string): T =
+proc parseCmdArg*(T: type InputFile, p: string): T {.raises: [ValueError].} =
   # TODO this is needed only because InputFile cannot be made
   # an alias of TypedInputFile at the moment, because of a generics
   # caching issue
@@ -484,7 +497,8 @@ proc parseCmdArg*(T: type InputFile, p: string): T =
 
   T(p)
 
-proc parseCmdArg*(T: type TypedInputFile, p: string): T =
+proc parseCmdArg*(
+    T: type TypedInputFile, p: string): T {.raises: [ValueError].} =
   var path = p
   when T.defaultExt.len > 0:
     path = path.addFileExt(T.defaultExt)
@@ -504,31 +518,34 @@ proc parseCmdArg*(T: type TypedInputFile, p: string): T =
 func parseCmdArg*(T: type[OutDir|OutFile|OutPath], p: string): T =
   T(p)
 
-proc parseCmdArg*[T](_: type Option[T], s: string): Option[T] =
+proc parseCmdArg*[T](
+    _: type Option[T], s: string): Option[T] {.raises: [ValueError].} =
   some(parseCmdArg(T, s))
 
 template parseCmdArg*(T: type string, s: string): string =
   s
 
-func parseCmdArg*(T: type SomeSignedInt, s: string): T =
+func parseCmdArg*(
+    T: type SomeSignedInt, s: string): T {.raises: [ValueError].} =
   T parseBiggestInt(s)
 
-func parseCmdArg*(T: type SomeUnsignedInt, s: string): T =
+func parseCmdArg*(
+    T: type SomeUnsignedInt, s: string): T {.raises: [ValueError].} =
   T parseBiggestUInt(s)
 
-func parseCmdArg*(T: type SomeFloat, p: string): T =
+func parseCmdArg*(T: type SomeFloat, p: string): T {.raises: [ValueError].} =
   parseFloat(p)
 
-func parseCmdArg*(T: type bool, p: string): T =
+func parseCmdArg*(T: type bool, p: string): T {.raises: [ValueError].} =
   try:
     p.len == 0 or parseBool(p)
   except CatchableError:
     raise newException(ValueError, "'" & p & "' is not a valid boolean value. Supported values are on/off, yes/no, true/false or 1/0")
 
-func parseCmdArg*(T: type enum, s: string): T =
+func parseCmdArg*(T: type enum, s: string): T {.raises: [ValueError].} =
   parseEnum[T](s)
 
-proc parseCmdArgAux(T: type, s: string): T = # {.raises: [ValueError].} =
+proc parseCmdArgAux(T: type, s: string): T {.raises: [ValueError].} =
   # The parseCmdArg procs are allowed to raise only `ValueError`.
   # If you have provided your own specializations, please handle
   # all other exception types.
@@ -619,7 +636,7 @@ template debugMacroResult(macroName: string) {.dirty.} =
     echo "\n-------- ", macroName, " ----------------------"
     echo result.repr
 
-func parseEnumNormalized[T: enum](s: string): T =
+func parseEnumNormalized[T: enum](s: string): T {.raises: [ValueError].} =
   # Note: In Nim 1.6 `parseEnum` normalizes the string except for the first
   # character. Nim 1.2 would normalize for all characters. In config options
   # the latter behaviour is required so this custom function is needed.
@@ -965,9 +982,15 @@ proc loadImpl[C, SecondarySources](
         let trailing = if opt.typename != "bool": "=" else: ""
 
         if argName in filterKind and len(opt.name) > 0:
-          stdout.writeLine("--", opt.name, trailing)
+          try:
+            stdout.writeLine("--", opt.name, trailing)
+          except IOError:
+            discard
         if argAbbr in filterKind and len(opt.abbr) > 0:
-          stdout.writeLine('-', opt.abbr, trailing)
+          try:
+            stdout.writeLine('-', opt.abbr, trailing)
+          except IOError:
+            discard
 
     let completion = splitCompletionLine()
     # If we're not asked to complete a command line the result is an empty list
@@ -1013,12 +1036,18 @@ proc loadImpl[C, SecondarySources](
         let opt = findOpt(cmdStack, option_word)
         if opt != nil:
           for arg in getArgCompletions(opt, cur_word):
-            stdout.writeLine(arg)
+            try:
+              stdout.writeLine(arg)
+            except IOError:
+              discard
       elif cmdStack[^1].hasSubCommands:
         # Show all the available subcommands
         for subCmd in subCmds(cmdStack[^1]):
           if startsWithIgnoreStyle(subCmd.name, cur_word):
-            stdout.writeLine(subCmd.name)
+            try:
+              stdout.writeLine(subCmd.name)
+            except IOError:
+              discard
       else:
         # Full options listing
         for i in countdown(cmdStack.len - 1, 0):
@@ -1230,4 +1259,3 @@ func load*(f: TypedInputFile): f.ContentType =
   else:
     mixin loadFile
     loadFile(f.Format, f.string, f.ContentType)
-
