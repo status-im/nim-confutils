@@ -393,7 +393,7 @@ func getNextArgIdx(cmd: CmdInfo, consumedArgIdx: int): int =
 
   -1
 
-proc noMoreArgsError(cmd: CmdInfo): string =
+proc noMoreArgsError(cmd: CmdInfo): string {.raises: [].} =
   result =
     if cmd.isSubCommand:
       try:
@@ -859,7 +859,7 @@ proc addConfigFileContent*(secondarySources: auto,
   except IOError:
     raiseAssert "This should not be possible"
 
-func constructEnvKey*(prefix: string, key: string): string =
+func constructEnvKey*(prefix: string, key: string): string {.raises: [].} =
   ## Generates env. variable names from keys and prefix following the
   ## IEEE Open Group env. variable spec: https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
   try:
