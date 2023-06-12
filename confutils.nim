@@ -406,9 +406,15 @@ func getNextArgIdx(cmd: CmdInfo, consumedArgIdx: int): int =
 
   -1
 
-proc noMoreArgsError(cmd: CmdInfo): string =
-  result = if cmd.isSubCommand: "The command '$1'" % [cmd.name]
-           else: appInvocation()
+proc noMoreArgsError(cmd: CmdInfo): string {.raises: [].} =
+  result =
+    if cmd.isSubCommand:
+      try:
+        "The command '$1'" % [cmd.name]
+      except ValueError as err:
+        raiseAssert "strutils.`%` failed: " & err.msg
+    else:
+      appInvocation()
   result.add " does not accept"
   if cmd.hasArgs: result.add " additional"
   result.add " arguments"
@@ -870,11 +876,13 @@ proc addConfigFileContent*(secondarySources: auto,
   except IOError:
     raiseAssert "This should not be possible"
 
-func constructEnvKey*(prefix: string, key: string): string =
+func constructEnvKey*(prefix: string, key: string): string {.raises: [].} =
   ## Generates env. variable names from keys and prefix following the
   ## IEEE Open Group env. variable spec: https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
-
-  return (&"{prefix}_{key}").toUpperAscii.multiReplace(("-", "_"), (" ", "_"))
+  try:
+    (&"{prefix}_{key}").toUpperAscii.multiReplace(("-", "_"), (" ", "_"))
+  except ValueError as err:
+    raiseAssert "strformat.`&` failed: " & err.msg
 
 proc loadImpl[C, SecondarySources](
     Configuration: typedesc[C],
