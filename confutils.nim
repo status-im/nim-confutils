@@ -688,7 +688,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
         nimcall
         gcsafe
         sideEffect
-        raises: [Defect]
+        raises: []
       .} =
         return completeCmdArgAux(`fixedFieldType`, val)
 
@@ -696,7 +696,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
         nimcall
         gcsafe
         sideEffect
-        raises: [Defect, CatchableError]
+        raises: [ValueError]
       .} =
         when `configField` is enum:
           # TODO: For some reason, the normal `setField` rejects enum fields
@@ -1137,22 +1137,26 @@ proc loadImpl[C, SecondarySources](
   if secondarySources != nil:
     secondarySources(result, secondarySourcesRef)
 
-  proc processMissingOpts(conf: var Configuration, cmd: CmdInfo) =
+  proc processMissingOpts(
+      conf: var Configuration, cmd: CmdInfo) {.raises: [ConfigurationError].} =
     for opt in cmd.opts:
       if fieldCounters[opt.idx] == 0:
         let envKey = constructEnvKey(envVarsPrefix, opt.name)
 
-        if existsEnv(envKey):
-          let envContent = getEnv(envKey)
-          applySetter(opt.idx, envContent)
-        elif secondarySourcesRef.setters[opt.idx](conf, secondarySourcesRef):
-          # all work is done in the config file setter,
-          # there is nothing left to do here.
-          discard
-        elif opt.hasDefault:
-          fieldSetters[opt.idx][1](conf, none[string]())
-        elif opt.required:
-          fail "The required option '$1' was not specified" % [opt.name]
+        try:
+          if existsEnv(envKey):
+            let envContent = getEnv(envKey)
+            applySetter(opt.idx, envContent)
+          elif secondarySourcesRef.setters[opt.idx](conf, secondarySourcesRef):
+            # all work is done in the config file setter,
+            # there is nothing left to do here.
+            discard
+          elif opt.hasDefault:
+            fieldSetters[opt.idx][1](conf, none[string]())
+          elif opt.required:
+            fail "The required option '$1' was not specified" % [opt.name]
+        except ValueError as err:
+          fail "Option '$1' failed to parse: '$2'" % [opt.name, err.msg]
 
   for cmd in activeCmds:
     result.processMissingOpts(cmd)
