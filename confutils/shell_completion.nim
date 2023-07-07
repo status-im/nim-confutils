@@ -31,7 +31,7 @@ proc parseQuoted(l: var ShellLexer, pos: int, isSingle: bool, output: var string
       of '\\':
         # Consume the backslash and the following character
         inc(pos)
-        if (isSingle and l.buf[pos] in {'\''}) or 
+        if (isSingle and l.buf[pos] in {'\''}) or
           (not isSingle and l.buf[pos] in {'$', '`', '\\', '"'}):
           # Escape the character
           output.add(l.buf[pos])
@@ -120,7 +120,11 @@ proc getTok(l: var ShellLexer): Option[string] =
 
 proc splitCompletionLine*(): seq[string] =
   let comp_line = os.getEnv("COMP_LINE")
-  var comp_point = parseInt(os.getEnv("COMP_POINT", "0"))
+  var comp_point =
+    try:
+      parseInt(os.getEnv("COMP_POINT", "0"))
+    except ValueError:
+      return @[]
 
   if comp_point == len(comp_line):
     comp_point -= 1
