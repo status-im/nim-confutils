@@ -182,7 +182,11 @@ proc testConfigFile() =
     putEnv("PREFIX_DATA_DIR", "ENV VAR DATADIR")
 
     test "basic config file":
-      let conf = TestConf.load(envVarsPrefix="prefix", secondarySources = proc (config: TestConf, sources: auto) =
+      let conf = TestConf.load(
+          envVarsPrefix="prefix",
+          secondarySources = proc (
+            config: TestConf, sources: ref SecondarySources
+      ) {.raises: [ConfigurationError].} =
         if config.configFile.isSome:
           sources.addConfigFile(Toml, config.configFile.get)
         else:
