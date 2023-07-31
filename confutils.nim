@@ -893,7 +893,7 @@ proc loadImpl[C, SecondarySources](
     quitOnFailure = true,
     secondarySourcesRef: ref SecondarySources,
     secondarySources: proc (config: Configuration,
-                            sources: ref SecondarySources) = nil,
+                            sources: ref SecondarySources) {.gcsafe.} = nil,
     envVarsPrefix = getAppFilename()): Configuration =
   ## Loads a program configuration by parsing command-line arguments
   ## and a standard set of config files that can specify:
