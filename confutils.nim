@@ -894,7 +894,7 @@ proc loadImpl[C, SecondarySources](
     secondarySourcesRef: ref SecondarySources,
     secondarySources: proc (
         config: Configuration, sources: ref SecondarySources
-    ) {.raises: [ConfigurationError].} = nil,
+    ) {.gcsafe, raises: [ConfigurationError].} = nil,
     envVarsPrefix = getAppFilename()
 ): Configuration {.raises: [ConfigurationError].} =
   ## Loads a program configuration by parsing command-line arguments
