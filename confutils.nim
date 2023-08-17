@@ -855,7 +855,7 @@ macro configurationRtti(RecordType: type): untyped =
 
 proc addConfigFile*(secondarySources: auto,
                     Format: type,
-                    path: InputFile) =
+                    path: InputFile) {.raises: [ConfigurationError].} =
   try:
     secondarySources.data.add loadFile(Format, string path,
                                        type(secondarySources.data[0]))
@@ -892,9 +892,11 @@ proc loadImpl[C, SecondarySources](
     printUsage = true,
     quitOnFailure = true,
     secondarySourcesRef: ref SecondarySources,
-    secondarySources: proc (config: Configuration,
-                            sources: ref SecondarySources) {.gcsafe.} = nil,
-    envVarsPrefix = getAppFilename()): Configuration =
+    secondarySources: proc (
+        config: Configuration, sources: ref SecondarySources
+    ) {.gcsafe, raises: [ConfigurationError].} = nil,
+    envVarsPrefix = getAppFilename()
+): Configuration {.raises: [ConfigurationError].} =
   ## Loads a program configuration by parsing command-line arguments
   ## and a standard set of config files that can specify:
   ##
@@ -1135,7 +1137,10 @@ proc loadImpl[C, SecondarySources](
     activateCmd(subCmdDiscriminator, defaultCmd)
 
   if secondarySources != nil:
-    secondarySources(result, secondarySourcesRef)
+    try:
+      secondarySources(result, secondarySourcesRef)
+    except ConfigurationError as err:
+      fail "Failed to load secondary sources: '$1'" % [err.msg]
 
   proc processMissingOpts(
       conf: var Configuration, cmd: CmdInfo) {.raises: [ConfigurationError].} =
