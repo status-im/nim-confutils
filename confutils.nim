@@ -629,7 +629,7 @@ template setField[T](loc: var seq[T], val: Option[string], defaultVal: untyped) 
     loc = FieldType(defaultVal)
 
 func makeDefaultValue*(T: type): T =
-  discard
+  default(T)
 
 func requiresInput*(T: type): bool =
   not ((T is seq) or (T is Option) or (T is bool))
