@@ -47,7 +47,8 @@ type
 proc readValue(r: var WinregReader, value: var ValidIpAddress) =
   r.readValue(value.value)
 
-proc writeValue(w: var WinregWriter, value: ValidIpAddress) =
+proc writeValue(
+    w: var WinregWriter, value: ValidIpAddress) {.raises: [IOError].} =
   w.writeValue(value.value)
 
 suite "optional fields test suite":

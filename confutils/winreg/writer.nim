@@ -14,7 +14,7 @@ proc init*(T: type WinregWriter,
   result.hKey = hKey
   result.path = path
 
-proc writeValue*(w: var WinregWriter, value: auto) =
+proc writeValue*(w: var WinregWriter, value: auto) {.raises: [IOError].} =
   mixin enumInstanceSerializedFields, writeValue, writeFieldIMPL
   # TODO: reduce allocation
 
