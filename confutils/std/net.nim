@@ -11,6 +11,13 @@ func completeCmdArg*(T: type ValidIpAddress, val: string): seq[string] =
   # TODO: Maybe complete the local IP address?
   @[]
 
+func parseCmdArg*(T: type IpAddress, s: string): T =
+  parseIpAddress(s)
+
+func completeCmdArg*(T: type IpAddress, val: string): seq[string] =
+  # TODO: Maybe complete the local IP address?
+  @[]
+
 func parseCmdArg*(T: type Port, s: string): T =
   template fail =
     raise newException(ValueError,
