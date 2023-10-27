@@ -5,6 +5,12 @@ import
 export
   net, toml_serialization
 
+proc readValue*(r: var TomlReader, val: var IpAddress)
+               {.raises: [SerializationError, IOError, Defect].} =
+  val =  try: parseIpAddress(r.readValue(string))
+         except ValueError as err:
+           r.lex.raiseUnexpectedValue("IP address")
+
 proc readValue*(r: var TomlReader, val: var ValidIpAddress)
                {.raises: [SerializationError, IOError, Defect].} =
   val =  try: ValidIpAddress.init(r.readValue(string))

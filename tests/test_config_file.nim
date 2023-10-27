@@ -90,9 +90,14 @@ type
         name: "rpc-port" }: Port
 
       rpcAddress* {.
-        defaultValue: defaultAdminListenAddress(config)
+        defaultValue: ValidIpAddress.init(defaultAdminListenAddress(config))
         desc: "Address of the server to connect to for RPC - for the validator duties in the pull model"
         name: "rpc-address" }: ValidIpAddress
+
+      restAddress* {.
+        defaultValue: defaultAdminListenAddress(config)
+        desc: "Address of the server to connect to for RPC - for the validator duties in the pull model"
+        name: "rest-address" }: IpAddress
 
       retryDelay* {.
         defaultValue: 10
@@ -127,8 +132,8 @@ func parseCmdArg*(T: type GraffitiBytes, input: string): T
 func completeCmdArg*(T: type GraffitiBytes, input: string): seq[string] =
   @[]
 
-func defaultAdminListenAddress*(conf: TestConf): ValidIpAddress =
-  (static ValidIpAddress.init("127.0.0.1"))
+func defaultAdminListenAddress*(conf: TestConf): IpAddress =
+  (static parseIpAddress("127.0.0.1"))
 
 const
   defaultEth2TcpPort* = 9000
@@ -147,6 +152,12 @@ proc readValue(r: var TomlReader,
   value: var (InputFile | InputDir | OutFile | OutDir | ValidatorKeyPath)) =
   type T = type value
   value = T r.parseAsString()
+
+proc readValue(r: var TomlReader, value: var IpAddress) =
+  try:
+    value = parseIpAddress(r.parseAsString())
+  except ValueError as ex:
+    raise newException(SerializationError, ex.msg)
 
 proc readValue(r: var TomlReader, value: var ValidIpAddress) =
   try:
@@ -167,6 +178,9 @@ proc readValue(r: var WinregReader,
   value: var (InputFile | InputDir | OutFile | OutDir | ValidatorKeyPath)) =
   type T = type value
   value = r.readValue(string).T
+
+proc readValue(r: var WinregReader, value: var IpAddress) {.used.} =
+  value = parseIpAddress(r.readValue(string))
 
 proc readValue(r: var WinregReader, value: var ValidIpAddress) {.used.} =
   value = ValidIpAddress.init(r.readValue(string))
