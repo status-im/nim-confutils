@@ -884,6 +884,12 @@ func constructEnvKey*(prefix: string, key: string): string {.raises: [].} =
   except ValueError as err:
     raiseAssert "strformat.`&` failed: " & err.msg
 
+# On Posix there is no portable way to get the command
+# line from a DLL and thus the proc isn't defined in this environment.
+# See https://nim-lang.org/docs/os.html#commandLineParams
+when not declared(commandLineParams):
+  proc commandLineParams(): seq[string] = discard
+ 
 proc loadImpl[C, SecondarySources](
     Configuration: typedesc[C],
     cmdLine = commandLineParams(),
