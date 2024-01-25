@@ -1,5 +1,5 @@
 # nim-confutils
-# Copyright (c) 2020 Status Research & Development GmbH
+# Copyright (c) 2020-2024 Status Research & Development GmbH
 # Licensed and distributed under either of
 #   * MIT license: [LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT
 #   * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
@@ -90,9 +90,9 @@ type
         name: "rpc-port" }: Port
 
       rpcAddress* {.
-        defaultValue: ValidIpAddress.init(defaultAdminListenAddress(config))
+        defaultValue: defaultAdminListenAddress(config)
         desc: "Address of the server to connect to for RPC - for the validator duties in the pull model"
-        name: "rpc-address" }: ValidIpAddress
+        name: "rpc-address" }: IpAddress
 
       restAddress* {.
         defaultValue: defaultAdminListenAddress(config)
@@ -159,12 +159,6 @@ proc readValue(r: var TomlReader, value: var IpAddress) =
   except ValueError as ex:
     raise newException(SerializationError, ex.msg)
 
-proc readValue(r: var TomlReader, value: var ValidIpAddress) =
-  try:
-    value = ValidIpAddress.init(r.parseAsString())
-  except ValueError as ex:
-    raise newException(SerializationError, ex.msg)
-
 proc readValue(r: var TomlReader, value: var Port) =
   value = r.parseInt(int).Port
 
@@ -181,9 +175,6 @@ proc readValue(r: var WinregReader,
 
 proc readValue(r: var WinregReader, value: var IpAddress) {.used.} =
   value = parseIpAddress(r.readValue(string))
-
-proc readValue(r: var WinregReader, value: var ValidIpAddress) {.used.} =
-  value = ValidIpAddress.init(r.readValue(string))
 
 proc readValue(r: var WinregReader, value: var Port) {.used.} =
   value = r.readValue(int).Port

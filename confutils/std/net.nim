@@ -1,15 +1,6 @@
-import std/parseutils
-import stew/shims/net as stewNet
-export stewNet
-
-export ValidIpAddress
-
-func parseCmdArg*(T: type ValidIpAddress, s: string): T =
-  ValidIpAddress.init(s)
-
-func completeCmdArg*(T: type ValidIpAddress, val: string): seq[string] =
-  # TODO: Maybe complete the local IP address?
-  @[]
+import std/net
+from std/parseutils import parseInt
+export net
 
 func parseCmdArg*(T: type IpAddress, s: string): T =
   parseIpAddress(s)
