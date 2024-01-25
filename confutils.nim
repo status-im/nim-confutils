@@ -889,7 +889,7 @@ var getCLIParams*: proc(): seq[TaintedString]
 # On Posix there is no portable way to get the command
 # line from a DLL and thus the proc isn't defined in this environment.
 # See https://nim-lang.org/docs/os.html#commandLineParams
-when declared(paramCount):
+when declared(commandLineParams):
   getCLIParams = commandLineParams
 else:
   getCLIParams = proc(): seq[TaintedString] =
