@@ -2,7 +2,7 @@ import
   std/[strutils],
   unittest2,
   ../confutils,
-  ./specialint
+  ./private/specialint
 
 type
   TestConf* = object

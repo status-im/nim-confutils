@@ -14,6 +14,8 @@ import
 export
   serialization, reader, writer, types
 
+{.push gcsafe, raises: [].}
+
 serializationFormat Winreg
 
 Winreg.setReader WinregReader
@@ -65,3 +67,5 @@ template saveFile*(_: type Winreg, filename: string, value: auto, params: vararg
   let (hKey, path) = parseWinregPath(filename)
   var writer = unpackArgs(init, [WinregWriter, hKey, path, params])
   writer.writeValue(value)
+
+{.pop.}

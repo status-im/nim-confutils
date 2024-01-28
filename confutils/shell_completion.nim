@@ -24,13 +24,21 @@ const
   WORDBREAKS = "\"'@><=;|&(:"
   SAFE_CHARS = {'a'..'z', 'A'..'Z', '0'..'9', '@', '%', '+', '=', ':', ',', '.', '/', '-'}
 
-proc open(l: var ShellLexer, input: Stream, wordBreakChars: string = WORDBREAKS, preserveTrailingWs = true) =
+{.push gcsafe, raises: [].}
+
+proc open(l: var ShellLexer, 
+          input: Stream, 
+          wordBreakChars: string = WORDBREAKS, 
+          preserveTrailingWs = true) {.gcsafe, raises: [IOError, OSError].} =
   lexbase.open(l, input)
   l.preserveTrailingWs = preserveTrailingWs
   l.mergeWordBreaks = false
   l.wordBreakChars = wordBreakChars
 
-proc parseQuoted(l: var ShellLexer, pos: int, isSingle: bool, output: var string): int =
+proc parseQuoted(l: var ShellLexer, 
+                 pos: int, 
+                 isSingle: bool, 
+                 output: var string): int {.gcsafe, raises: [IOError, OSError].} =
   var pos = pos
   while true:
     case l.buf[pos]:
@@ -62,7 +70,7 @@ proc parseQuoted(l: var ShellLexer, pos: int, isSingle: bool, output: var string
         inc(pos)
   return pos
 
-proc getTok(l: var ShellLexer): Option[string] =
+proc getTok(l: var ShellLexer): Option[string] {.gcsafe, raises: [IOError, OSError].} =
   var pos = l.bufpos
 
   # Skip the initial whitespace
@@ -179,6 +187,8 @@ proc shellPathEscape*(path: string): string =
       result.add('\\')
     result.add(ch)
 
+{.pop.}
+
 when isMainModule:
   # Test data lifted from python's shlex unit-tests
   const data = """
@@ -265,9 +275,9 @@ foo\ bar|foo bar|
       echo "expected ", expected
       doAssert(false)
 
-  doAssert(quoteWord("") == "''")
-  doAssert(quoteWord("\\\"") == "'\\\"'")
-  doAssert(quoteWord("foobar") == "foobar")
-  doAssert(quoteWord("foo$bar") == "'foo$bar'")
-  doAssert(quoteWord("foo bar") == "'foo bar'")
-  doAssert(quoteWord("foo'bar") == "'foo\\'bar'")
+  doAssert(shellQuote("") == "''")
+  doAssert(shellQuote("\\\"") == "'\\\"'")
+  doAssert(shellQuote("foobar") == "foobar")
+  doAssert(shellQuote("foo$bar") == "'foo$bar'")
+  doAssert(shellQuote("foo bar") == "'foo bar'")
+  doAssert(shellQuote("foo'bar") == "'foo\\'bar'")

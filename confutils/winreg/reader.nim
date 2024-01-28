@@ -9,7 +9,7 @@
 
 import
   tables, typetraits, options,
-  serialization/[object_serialization],
+  serialization/[object_serialization, errors],
   ./utils, ./types
 
 type
@@ -24,11 +24,13 @@ type
     deserializedField*: string
     innerException*: ref CatchableError
 
+{.push gcsafe, raises: [].}
+
 proc handleReadException*(r: WinregReader,
                           Record: type,
                           fieldName: string,
                           field: auto,
-                          err: ref CatchableError) =
+                          err: ref CatchableError) {.gcsafe, raises: [WinregError].} =
   var ex = new GenericWinregReaderError
   ex.deserializedField = fieldName
   ex.innerException = err
@@ -39,7 +41,8 @@ proc init*(T: type WinregReader,
   result.hKey = hKey
   result.path = path
 
-proc readValue*[T](r: var WinregReader, value: var T) =
+proc readValue*[T](r: var WinregReader, value: var T)
+      {.gcsafe, raises: [SerializationError, IOError].} =
   mixin readValue
   # TODO: reduce allocation
 
@@ -88,3 +91,5 @@ proc readValue*[T](r: var WinregReader, value: var T) =
   else:
     const typeName = typetraits.name(T)
     {.fatal: "Failed to convert from Winreg an unsupported type: " & typeName.}
+
+{.pop.}

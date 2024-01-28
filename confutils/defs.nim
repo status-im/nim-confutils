@@ -45,6 +45,8 @@ type
 
   SomeDistinctString = InputFile|InputDir|OutPath|OutDir|OutFile
 
+{.push gcsafe, raises: [].}
+
 template `/`*(dir: InputDir|OutDir, path: string): auto =
   string(dir) / path
 
@@ -70,3 +72,5 @@ template implicitlySelectable* {.pragma.}
   ## to allow the value of the discriminator to be determined
   ## implicitly when the user specifies any of the sub-options
   ## that depend on the disciminator value.
+
+{.pop.}

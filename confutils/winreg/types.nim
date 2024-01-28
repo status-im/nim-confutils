@@ -26,5 +26,9 @@ const
   HKCR* = HKEY_CLASSES_ROOT
   HKU*  = HKEY_USERS
 
+{.push gcsafe, raises: [].}
+
 proc `==`*(a, b: HKEY): bool {.borrow.}
 proc `==`*(a, b: RegType): bool {.borrow.}
+
+{.pop.}

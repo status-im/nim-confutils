@@ -20,10 +20,7 @@ type
     field_a: int
     field_b: string
 
-  CheckPoint = int
-  RuntimePreset = int
   GraffitiBytes = array[16, byte]
-  WalletName = string
 
   VCStartUpCmd = enum
     VCNoCommand

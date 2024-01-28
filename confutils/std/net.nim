@@ -11,14 +11,16 @@ import std/net
 from std/parseutils import parseInt
 export net
 
-func parseCmdArg*(T: type IpAddress, s: string): T =
+{.push gcsafe, raises: [].}
+
+func parseCmdArg*(T: type IpAddress, s: string): T {.gcsafe, raises: [ValueError].} =
   parseIpAddress(s)
 
 func completeCmdArg*(T: type IpAddress, val: string): seq[string] =
   # TODO: Maybe complete the local IP address?
   @[]
 
-func parseCmdArg*(T: type Port, s: string): T =
+func parseCmdArg*(T: type Port, s: string): T {.gcsafe, raises: [ValueError].} =
   template fail =
     raise newException(ValueError,
       "The supplied port must be an integer value in the range 1-65535")
@@ -34,3 +36,5 @@ func parseCmdArg*(T: type Port, s: string): T =
 
 func completeCmdArg*(T: type Port, val: string): seq[string] =
   @[]
+
+{.pop.}

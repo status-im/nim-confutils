@@ -45,6 +45,8 @@ type
 
   OriginalToGeneratedFields = OrderedTable[string, GeneratedFieldInfo]
 
+{.push gcsafe, raises: [].}
+
 func isOption(n: NimNode): bool =
   if n.kind != nnkBracketExpr: return false
   eqIdent(n[0], "Option")
@@ -352,3 +354,5 @@ macro generateSecondarySources*(ConfType: type): untyped =
 
   let settersPaths = model.generateSettersPaths
   result.add generateConfigFileSetters(ConfType, result[^1], settersPaths)
+
+{.pop.}

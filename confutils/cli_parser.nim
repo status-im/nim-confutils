@@ -29,6 +29,8 @@ type
                               ## or the argument, and the value is not "" if
                               ## the option was given a value
 
+{.push gcsafe, raises: [].}
+
 func parseWord(s: string, i: int, w: var string,
                delim: set[char] = {'\t', ' '}): int =
   result = i
@@ -161,3 +163,4 @@ iterator getopt*(cmds: seq[string],
     if p.kind == cmdEnd: break
     yield (p.kind, p.key, p.val)
 
+{.pop.}
