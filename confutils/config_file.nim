@@ -250,19 +250,20 @@ proc generateTypes(root: ConfFileSection): seq[NimNode] =
       recList.add generateOptionalField(child.getRenamedName.ident, child.typ)
   result[index].putRecList(recList)
 
-proc generateSettersPaths(node: ConfFileSection, result: var OriginalToGeneratedFields) =
-  var path {.global.}: seq[string]
-  path.add node.getRenamedName
+proc generateSettersPaths(node: ConfFileSection,
+                          result: var OriginalToGeneratedFields,
+                          pathsCache: var seq[string]) =
+  pathsCache.add node.getRenamedName
   if node.children.len == 0:
-    result[node.fieldName] = (node.isCommandOrArgument, path)
+    result[node.fieldName] = (node.isCommandOrArgument, pathsCache)
   else:
     for child in node.children:
-      generateSettersPaths(child, result)
-  path.del path.len - 1
+      generateSettersPaths(child, result, pathsCache)
+  pathsCache.del pathsCache.len - 1
 
-proc generateSettersPaths(root: ConfFileSection): OriginalToGeneratedFields =
+proc generateSettersPaths(root: ConfFileSection, pathsCache: var seq[string]): OriginalToGeneratedFields =
   for child in root.children:
-    generateSettersPaths(child, result)
+    generateSettersPaths(child, result, pathsCache)
 
 template cfSetter(a, b: untyped): untyped =
   when a is Option:
@@ -348,11 +349,14 @@ macro generateSecondarySources*(ConfType: type): untyped =
   let
     model = generateConfigFileModel(ConfType)
     modelType = generateTypes(model)
+  var
+    pathsCache: seq[string]
 
   result = newTree(nnkStmtList)
   result.add newTree(nnkTypeSection, modelType)
 
-  let settersPaths = model.generateSettersPaths
+  let settersPaths = model.generateSettersPaths(pathsCache)
   result.add generateConfigFileSetters(ConfType, result[^1], settersPaths)
+  debugEcho result.repr
 
 {.pop.}
