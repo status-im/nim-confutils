@@ -26,6 +26,8 @@ const
   RT_QWORD*  = 0x00000040
   RT_ANY*    = 0x0000ffff
 
+{.push gcsafe, raises: [].}
+
 proc regGetValue(hKey: HKEY, lpSubKey, lpValue: cstring,
                  dwFlags: int32, pdwType: ptr RegType,
                  pvData: pointer, pcbData: ptr int32): int32 {.
@@ -39,12 +41,18 @@ template call(f) =
   if f != 0:
     return false
 
+template safeCast(destType: type, src: typed): auto =
+  when sizeof(src) < sizeof(destType):
+    destType(src)
+  else:
+    cast[destType](src)
+
 proc setValue*(hKey: HKEY, path, key: string, val: SomePrimitives): bool =
   when sizeof(val) < 8:
-    var dw = cast[int32](val)
+    var dw = int32.safeCast(val)
     call regSetValue(hKey, path, key, REG_DWORD, dw.addr, sizeof(dw).int32)
   else:
-    var dw = cast[int64](val)
+    var dw = int64.safeCast(val)
     call regSetValue(hKey, path, key, REG_QWORD, dw.addr, sizeof(dw).int32)
   result = true
 
@@ -160,3 +168,5 @@ func constructPath*(root: string, keys: openArray[string]): string =
     result.add keys[i]
     if i < keys.len-2:
       result. add '\\'
+
+{.pop.}

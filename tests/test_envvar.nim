@@ -34,10 +34,6 @@ type
       abbr: "d"
       name: "data-dir" }: OutDir
 
-func defaultObject(conf: TestConf): SomeObject =
-  discard
-
-
 func completeCmdArg(T: type SomeObject, val: string): seq[string] =
   @[]
 

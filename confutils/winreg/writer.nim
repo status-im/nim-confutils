@@ -18,6 +18,8 @@ type
     path: string
     key: seq[string]
 
+{.push gcsafe, raises: [].}
+
 proc init*(T: type WinregWriter,
            hKey: HKEY, path: string): T =
   result.hKey = hKey
@@ -55,3 +57,5 @@ proc writeValue*(w: var WinregWriter, value: auto) {.raises: [IOError].} =
   else:
     const typeName = typetraits.name(value.type)
     {.fatal: "Failed to convert to Winreg an unsupported type: " & typeName.}
+
+{.pop.}

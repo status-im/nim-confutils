@@ -14,16 +14,20 @@ import
 export
   net, toml_serialization
 
+{.push gcsafe, raises: [].}
+
 proc readValue*(r: var TomlReader, val: var IpAddress)
-               {.raises: [SerializationError, IOError, Defect].} =
+               {.raises: [SerializationError, IOError].} =
   val =  try: parseIpAddress(r.readValue(string))
          except ValueError as err:
-           r.lex.raiseUnexpectedValue("IP address")
+           r.lex.raiseUnexpectedValue("IP address " & err.msg)
 
 proc readValue*(r: var TomlReader, val: var Port)
-               {.raises: [SerializationError, IOError, Defect].} =
+               {.raises: [SerializationError, IOError].} =
   let port = try: r.readValue(uint16)
-             except ValueError:
-               r.lex.raiseUnexpectedValue("Port")
+             except ValueError as exc:
+               r.lex.raiseUnexpectedValue("Port " & exc.msg)
 
   val = Port port
+
+{.pop.}

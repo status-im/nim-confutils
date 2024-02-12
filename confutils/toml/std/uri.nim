@@ -14,9 +14,12 @@ import
 export
   uri, toml_serialization
 
+{.push gcsafe, raises: [].}
+
 proc readValue*(r: var TomlReader, val: var Uri)
-               {.raises: [SerializationError, IOError, Defect].} =
+               {.raises: [SerializationError, IOError].} =
   val =  try: parseUri(r.readValue(string))
          except ValueError as err:
-           r.lex.raiseUnexpectedValue("URI")
+           r.lex.raiseUnexpectedValue("URI " & err.msg)
 
+{.pop.}

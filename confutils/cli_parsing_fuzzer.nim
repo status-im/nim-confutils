@@ -12,6 +12,8 @@ import
   stew/byteutils, testutils/fuzzing,
   ../confutils
 
+{.push gcsafe, raises: [].}
+
 template fuzzCliParsing*(Conf: type) =
   test:
     block:
@@ -22,3 +24,4 @@ template fuzzCliParsing*(Conf: type) =
       except ConfigurationError as err:
         discard
 
+{.pop.}

@@ -13,6 +13,8 @@ import
 export
   toml_serialization, confutilsDefs
 
+{.push gcsafe, raises: [].}
+
 template readConfutilsType(T: type) =
   template readValue*(r: var TomlReader, val: var T) =
     val = T r.readValue(string)
@@ -22,3 +24,5 @@ readConfutilsType InputDir
 readConfutilsType OutPath
 readConfutilsType OutDir
 readConfutilsType OutFile
+
+{.pop.}

@@ -26,7 +26,7 @@ const
 
 when not defined(nimscript):
   import
-    os, terminal,
+    terminal,
     confutils/shell_completion
 
 type
@@ -69,6 +69,8 @@ type
 const
   confutils_description_width {.intdefine.} = 80
   confutils_narrow_terminal_width {.intdefine.} = 36
+
+{.push gcsafe, raises: [].}
 
 func getFieldName(caseField: NimNode): NimNode =
   result = caseField
@@ -565,7 +567,10 @@ proc parseCmdArgAux(T: type, s: string): T {.raises: [ValueError].} =
   # If you have provided your own specializations, please handle
   # all other exception types.
   mixin parseCmdArg
-  parseCmdArg(T, s)
+  try:
+    parseCmdArg(T, s)
+  except CatchableError as exc:
+    raise newException(ValueError, exc.msg)
 
 func completeCmdArg*(T: type enum, val: string): seq[string] =
   for e in low(T)..high(T):
@@ -1291,3 +1296,5 @@ func load*(f: TypedInputFile): f.ContentType =
   else:
     mixin loadFile
     loadFile(f.Format, f.string, f.ContentType)
+
+{.pop.}
