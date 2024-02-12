@@ -357,6 +357,5 @@ macro generateSecondarySources*(ConfType: type): untyped =
 
   let settersPaths = model.generateSettersPaths(pathsCache)
   result.add generateConfigFileSetters(ConfType, result[^1], settersPaths)
-  debugEcho result.repr
 
 {.pop.}
