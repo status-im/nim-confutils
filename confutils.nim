@@ -410,7 +410,6 @@ proc showHelp(help: var string,
   appInfo.maxNameLen = cmd.maxNameLen
   if cmd.hasAbbrs:
     appInfo.maxAbbrLen = cmd.maxAbbrLen
-    echo cmd.maxAbbrLen
   appInfo.abbrsWidth = max(4, appInfo.maxAbbrLen) + 1
 
   appInfo.hasAbbrs = cmd.hasAbbrs
