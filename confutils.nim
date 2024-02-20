@@ -89,8 +89,11 @@ when defined(nimscript):
 
   proc appInvocation: string =
     let scriptNameIdx = scriptNameParamIdx()
-    "nim " & (if paramCount() > scriptNameIdx: paramStr(
-        scriptNameIdx) else: "<nims-script>")
+    "nim " & (
+      if paramCount() > scriptNameIdx:
+        paramStr(scriptNameIdx)
+      else:
+        "<nims-script>")
 
   type stderr = object
 
@@ -350,8 +353,8 @@ proc describeOptions(help: var string,
 
       if opt.abbr.len > 0:
         let switch = "-" & opt.abbr & ", "
-        helpOutput fgOption, styleBright, switch, padding(switch,
-                   appInfo.abbrsWidth)
+        helpOutput fgOption, styleBright, switch,
+                   padding(switch, appInfo.abbrsWidth)
       elif appInfo.hasAbbrs:
         # Add additional indentatition, so all names are aligned
         helpOutput spaces(appInfo.abbrsWidth)
@@ -376,7 +379,7 @@ proc describeOptions(help: var string,
           if not subCmd.hasOpts: continue
 
           helpOutput "\pWhen ", styleBright, fgBlue, opt.humaneName, resetStyle,
-              " = ", fgGreen, subCmd.name
+                     " = ", fgGreen, subCmd.name
 
           if i == opt.defaultSubCmd: helpOutput " (default)"
           help.describeOptions subCmd, cmdInvocation, appInfo, conditionalOpts
@@ -710,12 +713,12 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
     # be typed as a tyTypeDesc[tyString] instead of just `tyString`. To be filed.
     var fixedFieldType = newTree(nnkTypeOfExpr, field.typ)
 
-    settersArray.add newTree(nnkTupleConstr,
-                             newLit($paramName),
-                             setterName, completerName,
-                             newCall(bindSym"requiresInput", fixedFieldType),
-                             newCall(bindSym"acceptsMultipleValues",
-                                 fixedFieldType))
+    settersArray.add newTree(
+      nnkTupleConstr,
+      newLit($paramName),
+      setterName, completerName,
+      newCall(bindSym"requiresInput", fixedFieldType),
+      newCall(bindSym"acceptsMultipleValues", fixedFieldType))
 
     result.add quote do:
       {.push hint[XCannotRaiseY]: off.}
@@ -861,7 +864,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
       if field.caseBranch.kind == nnkElse:
         error "Sub-command parameters cannot appear in an else branch. " &
               "Please specify the sub-command branch precisely",
-                  field.caseBranch[0]
+              field.caseBranch[0]
 
       var branchEnumVal = field.caseBranch[0]
       if branchEnumVal.kind == nnkDotExpr:
@@ -982,7 +985,7 @@ proc loadImpl[C, SecondarySources](
 
   template applySetter(setterIdx: int, cmdLineVal: string) =
     when defined(nimHasWarnBareExcept):
-      {.push warning[BareExcept]: off.}
+      {.push warning[BareExcept]:off.}
 
     try:
       fieldSetters[setterIdx][1](confAddr[], some(cmdLineVal))
@@ -1016,8 +1019,8 @@ proc loadImpl[C, SecondarySources](
         argName
         argAbbr
 
-    proc showMatchingOptions(cmd: CmdInfo, prefix: string, filterKind: set[
-        ArgKindFilter]) =
+    proc showMatchingOptions(
+        cmd: CmdInfo, prefix: string, filterKind: set[ArgKindFilter]) =
       var matchingOptions: seq[OptInfo]
 
       if len(prefix) > 0:
@@ -1139,8 +1142,8 @@ proc loadImpl[C, SecondarySources](
         let subCmdDiscriminator = lastCmd.getSubCmdDiscriminator
         if subCmdDiscriminator != nil:
           if subCmdDiscriminator.defaultSubCmd != -1:
-            let defaultCmd = subCmdDiscriminator.subCmds[
-                subCmdDiscriminator.defaultSubCmd]
+            let defaultCmd =
+              subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
             opt = findOpt(defaultCmd.opts, key)
             if opt != nil:
               activateCmd(subCmdDiscriminator, defaultCmd)
@@ -1179,8 +1182,8 @@ proc loadImpl[C, SecondarySources](
   if subCmdDiscriminator != nil and
      subCmdDiscriminator.defaultSubCmd != -1 and
      fieldCounters[subCmdDiscriminator.idx] == 0:
-    let defaultCmd = subCmdDiscriminator.subCmds[
-        subCmdDiscriminator.defaultSubCmd]
+    let defaultCmd =
+      subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
     activateCmd(subCmdDiscriminator, defaultCmd)
 
   if secondarySources != nil:
