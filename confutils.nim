@@ -659,8 +659,8 @@ template setField[T](loc: var T, val: Option[string], defaultVal: untyped) =
   loc = if isSome(val): parseCmdArgAux(FieldType, val.get)
         else: FieldType(defaultVal)
 
-template setField[T](loc: var seq[T], val: Option[string],
-    defaultVal: untyped) =
+template setField[T](
+    loc: var seq[T], val: Option[string], defaultVal: untyped) =
   if val.isSome:
     loc.add parseCmdArgAux(type(loc[0]), val.get)
   else:
