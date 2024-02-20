@@ -24,7 +24,7 @@ suite "winreg utils test suite":
   readWrite("some number", 123'u32)
   readWrite("some number 64", 123'u64)
   readWrite("some bytes", @[1.byte, 2.byte])
-  readWrite("some int list", @[4,5,6])
+  readWrite("some int list", @[4, 5, 6])
   readWrite("some array", [1.byte, 2.byte, 4.byte])
   readWrite("some string", "hello world")
   readWrite("some enum", Apple)
@@ -47,7 +47,8 @@ type
 proc readValue(r: var WinregReader, value: var ValidIpAddress) =
   r.readValue(value.value)
 
-proc writeValue(w: var WinregWriter, value: ValidIpAddress) =
+proc writeValue(
+    w: var WinregWriter, value: ValidIpAddress) {.raises: [IOError].} =
   w.writeValue(value.value)
 
 suite "optional fields test suite":
@@ -101,7 +102,7 @@ suite "winreg encoder test suite":
         fuel: Diesel
       ),
       wheel: 6,
-      door: [1,2,3,4],
+      door: [1, 2, 3, 4],
       suspension: [
         Suspension(dist: 1, length: 5),
         Suspension(dist: 2, length: 6),

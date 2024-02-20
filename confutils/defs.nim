@@ -1,3 +1,12 @@
+# confutils
+# Copyright (c) 2018-2024 Status Research & Development GmbH
+# Licensed under either of
+#  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
+#  * MIT license ([LICENSE-MIT](LICENSE-MIT))
+# at your option.
+# This file may not be copied, modified, or distributed except according to
+# those terms.
+
 import
   std/options
 
@@ -36,6 +45,8 @@ type
 
   SomeDistinctString = InputFile|InputDir|OutPath|OutDir|OutFile
 
+{.push gcsafe, raises: [].}
+
 template `/`*(dir: InputDir|OutDir, path: string): auto =
   string(dir) / path
 
@@ -61,3 +72,5 @@ template implicitlySelectable* {.pragma.}
   ## to allow the value of the discriminator to be determined
   ## implicitly when the user specifies any of the sub-options
   ## that depend on the disciminator value.
+
+{.pop.}

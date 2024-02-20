@@ -1,3 +1,12 @@
+# confutils
+# Copyright (c) 2018-2024 Status Research & Development GmbH
+# Licensed under either of
+#  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
+#  * MIT license ([LICENSE-MIT](LICENSE-MIT))
+# at your option.
+# This file may not be copied, modified, or distributed except according to
+# those terms.
+
 ## A simple lexer meant to tokenize an input string as a shell would do.
 import lexbase
 import options
@@ -15,13 +24,21 @@ const
   WORDBREAKS = "\"'@><=;|&(:"
   SAFE_CHARS = {'a'..'z', 'A'..'Z', '0'..'9', '@', '%', '+', '=', ':', ',', '.', '/', '-'}
 
-proc open(l: var ShellLexer, input: Stream, wordBreakChars: string = WORDBREAKS, preserveTrailingWs = true) =
+{.push gcsafe, raises: [].}
+
+proc open(l: var ShellLexer, 
+          input: Stream, 
+          wordBreakChars: string = WORDBREAKS, 
+          preserveTrailingWs = true) {.gcsafe, raises: [IOError, OSError].} =
   lexbase.open(l, input)
   l.preserveTrailingWs = preserveTrailingWs
   l.mergeWordBreaks = false
   l.wordBreakChars = wordBreakChars
 
-proc parseQuoted(l: var ShellLexer, pos: int, isSingle: bool, output: var string): int =
+proc parseQuoted(l: var ShellLexer, 
+                 pos: int, 
+                 isSingle: bool, 
+                 output: var string): int {.gcsafe, raises: [IOError, OSError].} =
   var pos = pos
   while true:
     case l.buf[pos]:
@@ -31,7 +48,7 @@ proc parseQuoted(l: var ShellLexer, pos: int, isSingle: bool, output: var string
       of '\\':
         # Consume the backslash and the following character
         inc(pos)
-        if (isSingle and l.buf[pos] in {'\''}) or 
+        if (isSingle and l.buf[pos] in {'\''}) or
           (not isSingle and l.buf[pos] in {'$', '`', '\\', '"'}):
           # Escape the character
           output.add(l.buf[pos])
@@ -53,7 +70,7 @@ proc parseQuoted(l: var ShellLexer, pos: int, isSingle: bool, output: var string
         inc(pos)
   return pos
 
-proc getTok(l: var ShellLexer): Option[string] =
+proc getTok(l: var ShellLexer): Option[string] {.gcsafe, raises: [IOError, OSError].} =
   var pos = l.bufpos
 
   # Skip the initial whitespace
@@ -120,7 +137,11 @@ proc getTok(l: var ShellLexer): Option[string] =
 
 proc splitCompletionLine*(): seq[string] =
   let comp_line = os.getEnv("COMP_LINE")
-  var comp_point = parseInt(os.getEnv("COMP_POINT", "0"))
+  var comp_point =
+    try:
+      parseInt(os.getEnv("COMP_POINT", "0"))
+    except ValueError:
+      return @[]
 
   if comp_point == len(comp_line):
     comp_point -= 1
@@ -133,12 +154,15 @@ proc splitCompletionLine*(): seq[string] =
 
   # Split the resulting string
   var l: ShellLexer
-  l.open(strm)
-  while true:
-    let token = l.getTok()
-    if token.isNone():
-      break
-    result.add(token.get())
+  try:
+    l.open(strm)
+    while true:
+      let token = l.getTok()
+      if token.isNone():
+        break
+      result.add(token.get())
+  except IOError, OSError:
+    return @[]
 
 proc shellQuote*(word: string): string =
   if len(word) == 0:
@@ -162,6 +186,8 @@ proc shellPathEscape*(path: string): string =
     if ch notin SAFE_CHARS:
       result.add('\\')
     result.add(ch)
+
+{.pop.}
 
 when isMainModule:
   # Test data lifted from python's shlex unit-tests
@@ -249,9 +275,9 @@ foo\ bar|foo bar|
       echo "expected ", expected
       doAssert(false)
 
-  doAssert(quoteWord("") == "''")
-  doAssert(quoteWord("\\\"") == "'\\\"'")
-  doAssert(quoteWord("foobar") == "foobar")
-  doAssert(quoteWord("foo$bar") == "'foo$bar'")
-  doAssert(quoteWord("foo bar") == "'foo bar'")
-  doAssert(quoteWord("foo'bar") == "'foo\\'bar'")
+  doAssert(shellQuote("") == "''")
+  doAssert(shellQuote("\\\"") == "'\\\"'")
+  doAssert(shellQuote("foobar") == "foobar")
+  doAssert(shellQuote("foo$bar") == "'foo$bar'")
+  doAssert(shellQuote("foo bar") == "'foo bar'")
+  doAssert(shellQuote("foo'bar") == "'foo\\'bar'")

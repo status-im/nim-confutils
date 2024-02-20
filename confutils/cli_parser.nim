@@ -1,4 +1,12 @@
-# Copyright 2018-2022 Status Research & Development GmbH
+# confutils
+# Copyright (c) 2018-2024 Status Research & Development GmbH
+# Licensed under either of
+#  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
+#  * MIT license ([LICENSE-MIT](LICENSE-MIT))
+# at your option.
+# This file may not be copied, modified, or distributed except according to
+# those terms.
+
 # Parts taken from Nim's Runtime Library (c) Copyright 2015 Andreas Rumpf
 
 type
@@ -20,6 +28,8 @@ type
     key*, val*: string        ## Key and value pair; the key is the option
                               ## or the argument, and the value is not "" if
                               ## the option was given a value
+
+{.push gcsafe, raises: [].}
 
 func parseWord(s: string, i: int, w: var string,
                delim: set[char] = {'\t', ' '}): int =
@@ -153,3 +163,4 @@ iterator getopt*(cmds: seq[string],
     if p.kind == cmdEnd: break
     yield (p.kind, p.key, p.val)
 
+{.pop.}

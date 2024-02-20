@@ -1,5 +1,5 @@
 # nim-confutils
-# Copyright (c) 2020 Status Research & Development GmbH
+# Copyright (c) 2020-2024 Status Research & Development GmbH
 # Licensed and distributed under either of
 #   * MIT license: [LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT
 #   * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
@@ -13,18 +13,14 @@ import
 
 import
   toml_serialization, json_serialization,
-  ../confutils/winreg/winreg_serialization,
-  ../confutils/envvar/envvar_serialization
+  ../confutils/winreg/winreg_serialization
 
 type
   ValidatorPrivKey = object
     field_a: int
     field_b: string
 
-  CheckPoint = int
-  RuntimePreset = int
   GraffitiBytes = array[16, byte]
-  WalletName = string
 
   VCStartUpCmd = enum
     VCNoCommand
@@ -93,7 +89,12 @@ type
       rpcAddress* {.
         defaultValue: defaultAdminListenAddress(config)
         desc: "Address of the server to connect to for RPC - for the validator duties in the pull model"
-        name: "rpc-address" }: ValidIpAddress
+        name: "rpc-address" }: IpAddress
+
+      restAddress* {.
+        defaultValue: defaultAdminListenAddress(config)
+        desc: "Address of the server to connect to for RPC - for the validator duties in the pull model"
+        name: "rest-address" }: IpAddress
 
       retryDelay* {.
         defaultValue: 10
@@ -128,8 +129,8 @@ func parseCmdArg*(T: type GraffitiBytes, input: string): T
 func completeCmdArg*(T: type GraffitiBytes, input: string): seq[string] =
   @[]
 
-func defaultAdminListenAddress*(conf: TestConf): ValidIpAddress =
-  (static ValidIpAddress.init("127.0.0.1"))
+func defaultAdminListenAddress*(conf: TestConf): IpAddress =
+  (static parseIpAddress("127.0.0.1"))
 
 const
   defaultEth2TcpPort* = 9000
@@ -149,9 +150,9 @@ proc readValue(r: var TomlReader,
   type T = type value
   value = T r.parseAsString()
 
-proc readValue(r: var TomlReader, value: var ValidIpAddress) =
+proc readValue(r: var TomlReader, value: var IpAddress) =
   try:
-    value = ValidIpAddress.init(r.parseAsString())
+    value = parseIpAddress(r.parseAsString())
   except ValueError as ex:
     raise newException(SerializationError, ex.msg)
 
@@ -164,27 +165,13 @@ proc readValue(r: var TomlReader, value: var GraffitiBytes) =
   except ValueError as ex:
     raise newException(SerializationError, ex.msg)
 
-proc readValue(r: var EnvvarReader,
-  value: var (InputFile | InputDir | OutFile | OutDir | ValidatorKeyPath)) =
-  type T = type value
-  value = r.readValue(string).T
-
-proc readValue(r: var EnvvarReader, value: var ValidIpAddress) =
-  value = ValidIpAddress.init(r.readValue(string))
-
-proc readValue(r: var EnvvarReader, value: var Port) =
-  value = r.readValue(int).Port
-
-proc readValue(r: var EnvvarReader, value: var GraffitiBytes) =
-  value = hexToByteArray[value.len](r.readValue(string))
-
 proc readValue(r: var WinregReader,
   value: var (InputFile | InputDir | OutFile | OutDir | ValidatorKeyPath)) =
   type T = type value
   value = r.readValue(string).T
 
-proc readValue(r: var WinregReader, value: var ValidIpAddress) {.used.} =
-  value = ValidIpAddress.init(r.readValue(string))
+proc readValue(r: var WinregReader, value: var IpAddress) {.used.} =
+  value = parseIpAddress(r.readValue(string))
 
 proc readValue(r: var WinregReader, value: var Port) {.used.} =
   value = r.readValue(int).Port
@@ -194,12 +181,14 @@ proc readValue(r: var WinregReader, value: var GraffitiBytes) {.used.} =
 
 proc testConfigFile() =
   suite "config file test suite":
-    putEnv("prefixdata-dir", "ENV VAR DATADIR")
+    putEnv("PREFIX_DATA_DIR", "ENV VAR DATADIR")
 
     test "basic config file":
-      let conf = TestConf.load(secondarySources = proc (config: TestConf, sources: auto) =
-        sources.addConfigFile(Envvar, InputFile "prefix")
-
+      let conf = TestConf.load(
+          envVarsPrefix="prefix",
+          secondarySources = proc (
+            config: TestConf, sources: ref SecondarySources
+      ) {.raises: [ConfigurationError].} =
         if config.configFile.isSome:
           sources.addConfigFile(Toml, config.configFile.get)
         else:

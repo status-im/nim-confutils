@@ -1,7 +1,16 @@
+# confutils
+# Copyright (c) 2018-2024 Status Research & Development GmbH
+# Licensed under either of
+#  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
+#  * MIT license ([LICENSE-MIT](LICENSE-MIT))
+# at your option.
+# This file may not be copied, modified, or distributed except according to
+# those terms.
+
 import
   std/[tables, macrocache],
   stew/shims/macros
-  
+
 {.warning[UnusedImport]:off.}
 import
   std/typetraits,
@@ -35,6 +44,8 @@ type
     path: seq[string]
 
   OriginalToGeneratedFields = OrderedTable[string, GeneratedFieldInfo]
+
+{.push gcsafe, raises: [].}
 
 func isOption(n: NimNode): bool =
   if n.kind != nnkBracketExpr: return false
@@ -239,19 +250,20 @@ proc generateTypes(root: ConfFileSection): seq[NimNode] =
       recList.add generateOptionalField(child.getRenamedName.ident, child.typ)
   result[index].putRecList(recList)
 
-proc generateSettersPaths(node: ConfFileSection, result: var OriginalToGeneratedFields) =
-  var path {.global.}: seq[string]
-  path.add node.getRenamedName
+proc generateSettersPaths(node: ConfFileSection,
+                          result: var OriginalToGeneratedFields,
+                          pathsCache: var seq[string]) =
+  pathsCache.add node.getRenamedName
   if node.children.len == 0:
-    result[node.fieldName] = (node.isCommandOrArgument, path)
+    result[node.fieldName] = (node.isCommandOrArgument, pathsCache)
   else:
     for child in node.children:
-      generateSettersPaths(child, result)
-  path.del path.len - 1
+      generateSettersPaths(child, result, pathsCache)
+  pathsCache.del pathsCache.len - 1
 
-proc generateSettersPaths(root: ConfFileSection): OriginalToGeneratedFields =
+proc generateSettersPaths(root: ConfFileSection, pathsCache: var seq[string]): OriginalToGeneratedFields =
   for child in root.children:
-    generateSettersPaths(child, result)
+    generateSettersPaths(child, result, pathsCache)
 
 template cfSetter(a, b: untyped): untyped =
   when a is Option:
@@ -310,13 +322,17 @@ proc generateConfigFileSetters(confType, optType: NimNode,
     (setterProcs, assignments, numSetters) = generateSetters(T, CF, fieldsPaths)
     stmtList = quote do:
       type
-        `SetterProcType` = proc(s: var `T`, cf: ref `CF`): bool {.nimcall, gcsafe.}
+        `SetterProcType` = proc(
+          s: var `T`, cf: ref `CF`
+        ): bool {.nimcall, gcsafe, raises: [].}
 
         `CF` = object
            data*: seq[`optT`]
            setters: array[`numSetters`, `SetterProcType`]
 
-      proc defaultConfigFileSetter(s: var `T`, cf: ref `CF`): bool {.nimcall, gcsafe, used.} =
+      proc defaultConfigFileSetter(
+          s: var `T`, cf: ref `CF`
+      ): bool {.nimcall, gcsafe, raises: [], used.} =
         discard
 
       `setterProcs`
@@ -333,9 +349,13 @@ macro generateSecondarySources*(ConfType: type): untyped =
   let
     model = generateConfigFileModel(ConfType)
     modelType = generateTypes(model)
+  var
+    pathsCache: seq[string]
 
   result = newTree(nnkStmtList)
   result.add newTree(nnkTypeSection, modelType)
 
-  let settersPaths = model.generateSettersPaths
+  let settersPaths = model.generateSettersPaths(pathsCache)
   result.add generateConfigFileSetters(ConfType, result[^1], settersPaths)
+
+{.pop.}

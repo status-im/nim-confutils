@@ -1,11 +1,18 @@
+# confutils
+# Copyright (c) 2018-2024 Status Research & Development GmbH
+# Licensed under either of
+#  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
+#  * MIT license ([LICENSE-MIT](LICENSE-MIT))
+# at your option.
+# This file may not be copied, modified, or distributed except according to
+# those terms.
+
 import
-  std/[options, strutils, wordwrap],
+  os,
+  std/[enumutils, options, strutils, wordwrap, strformat],
   stew/shims/macros,
   serialization,
   confutils/[defs, cli_parser, config_file]
-
-when (NimMajor, NimMinor) > (1, 4):
-  import std/enumutils
 
 export
   options, serialization, defs, config_file
@@ -19,7 +26,7 @@ const
 
 when not defined(nimscript):
   import
-    os, terminal,
+    terminal,
     confutils/shell_completion
 
 type
@@ -65,6 +72,8 @@ const
   confutils_description_width {.intdefine.} = 80
   confutils_narrow_terminal_width {.intdefine.} = 36
 
+{.push gcsafe, raises: [].}
+
 func getFieldName(caseField: NimNode): NimNode =
   result = caseField
   if result.kind == nnkIdentDefs: result = result[0]
@@ -101,7 +110,10 @@ when defined(nimscript):
 
 else:
   template appInvocation: string =
-    getAppFilename().splitFile.name
+    try:
+      getAppFilename().splitFile.name
+    except OSError:
+      ""
 
 when noColors:
   const
@@ -126,10 +138,16 @@ when useBufferedOutput:
 
 else:
   template errorOutput(args: varargs[untyped]) =
-    styledWrite stderr, args
+    try:
+      styledWrite stderr, args
+    except IOError, ValueError:
+      discard
 
   template helpOutput(args: varargs[untyped]) =
-    styledWrite stdout, args
+    try:
+      styledWrite stdout, args
+    except IOError, ValueError:
+      discard
 
   template flushOutput =
     discard
@@ -393,7 +411,11 @@ proc showHelp(help: var string,
   appInfo.abbrsWidth = max(4, appInfo.maxAbbrLen) + 1
 
   appInfo.hasAbbrs = cmd.hasAbbrs
-  appInfo.terminalWidth = terminalWidth()
+  appInfo.terminalWidth =
+    try:
+      terminalWidth()
+    except ValueError:
+      int.high  # https://github.com/nim-lang/Nim/pull/21968
   appInfo.namesWidth = max(minNameWidth, appInfo.maxNameLen) + descPadding
 
   var cmdInvocation = appInfo.appInvocation
@@ -416,9 +438,15 @@ func getNextArgIdx(cmd: CmdInfo, consumedArgIdx: int): int =
 
   -1
 
-proc noMoreArgsError(cmd: CmdInfo): string =
-  result = if cmd.isSubCommand: "The command '$1'" % [cmd.name]
-           else: appInvocation()
+proc noMoreArgsError(cmd: CmdInfo): string {.raises: [].} =
+  result =
+    if cmd.isSubCommand:
+      try:
+        "The command '$1'" % [cmd.name]
+      except ValueError as err:
+        raiseAssert "strutils.`%` failed: " & err.msg
+    else:
+      appInvocation()
   result.add " does not accept"
   if cmd.hasArgs: result.add " additional"
   result.add " arguments"
@@ -485,13 +513,13 @@ else:
   template printCmdTree(cmd: CmdInfo) = discard
 
 # TODO remove the overloads here to get better "missing overload" error message
-proc parseCmdArg*(T: type InputDir, p: string): T =
+proc parseCmdArg*(T: type InputDir, p: string): T {.raises: [ValueError].} =
   if not dirExists(p):
     raise newException(ValueError, "Directory doesn't exist")
 
   T(p)
 
-proc parseCmdArg*(T: type InputFile, p: string): T =
+proc parseCmdArg*(T: type InputFile, p: string): T {.raises: [ValueError].} =
   # TODO this is needed only because InputFile cannot be made
   # an alias of TypedInputFile at the moment, because of a generics
   # caching issue
@@ -507,7 +535,8 @@ proc parseCmdArg*(T: type InputFile, p: string): T =
 
   T(p)
 
-proc parseCmdArg*(T: type TypedInputFile, p: string): T =
+proc parseCmdArg*(
+    T: type TypedInputFile, p: string): T {.raises: [ValueError].} =
   var path = p
   when T.defaultExt.len > 0:
     path = path.addFileExt(T.defaultExt)
@@ -527,36 +556,42 @@ proc parseCmdArg*(T: type TypedInputFile, p: string): T =
 func parseCmdArg*(T: type[OutDir|OutFile|OutPath], p: string): T =
   T(p)
 
-proc parseCmdArg*[T](_: type Option[T], s: string): Option[T] =
+proc parseCmdArg*[T](
+    _: type Option[T], s: string): Option[T] {.raises: [ValueError].} =
   some(parseCmdArg(T, s))
 
 template parseCmdArg*(T: type string, s: string): string =
   s
 
-func parseCmdArg*(T: type SomeSignedInt, s: string): T =
+func parseCmdArg*(
+    T: type SomeSignedInt, s: string): T {.raises: [ValueError].} =
   T parseBiggestInt(s)
 
-func parseCmdArg*(T: type SomeUnsignedInt, s: string): T =
+func parseCmdArg*(
+    T: type SomeUnsignedInt, s: string): T {.raises: [ValueError].} =
   T parseBiggestUInt(s)
 
-func parseCmdArg*(T: type SomeFloat, p: string): T =
+func parseCmdArg*(T: type SomeFloat, p: string): T {.raises: [ValueError].} =
   parseFloat(p)
 
-func parseCmdArg*(T: type bool, p: string): T =
+func parseCmdArg*(T: type bool, p: string): T {.raises: [ValueError].} =
   try:
     p.len == 0 or parseBool(p)
   except CatchableError:
     raise newException(ValueError, "'" & p & "' is not a valid boolean value. Supported values are on/off, yes/no, true/false or 1/0")
 
-func parseCmdArg*(T: type enum, s: string): T =
+func parseCmdArg*(T: type enum, s: string): T {.raises: [ValueError].} =
   parseEnum[T](s)
 
-proc parseCmdArgAux(T: type, s: string): T = # {.raises: [ValueError].} =
+proc parseCmdArgAux(T: type, s: string): T {.raises: [ValueError].} =
   # The parseCmdArg procs are allowed to raise only `ValueError`.
   # If you have provided your own specializations, please handle
   # all other exception types.
   mixin parseCmdArg
-  parseCmdArg(T, s)
+  try:
+    parseCmdArg(T, s)
+  except CatchableError as exc:
+    raise newException(ValueError, exc.msg)
 
 func completeCmdArg*(T: type enum, val: string): seq[string] =
   for e in low(T)..high(T):
@@ -630,7 +665,7 @@ template setField[T](loc: var seq[T], val: Option[string],
     loc = FieldType(defaultVal)
 
 func makeDefaultValue*(T: type): T =
-  discard
+  default(T)
 
 func requiresInput*(T: type): bool =
   not ((T is seq) or (T is Option) or (T is bool))
@@ -643,14 +678,11 @@ template debugMacroResult(macroName: string) {.dirty.} =
     echo "\n-------- ", macroName, " ----------------------"
     echo result.repr
 
-func parseEnumNormalized[T: enum](s: string): T =
+func parseEnumNormalized[T: enum](s: string): T {.raises: [ValueError].} =
   # Note: In Nim 1.6 `parseEnum` normalizes the string except for the first
   # character. Nim 1.2 would normalize for all characters. In config options
   # the latter behaviour is required so this custom function is needed.
-  when (NimMajor, NimMinor) > (1, 4):
-    genEnumCaseStmt(T, s, default = nil, ord(low(T)), ord(high(T)), normalize)
-  else:
-    parseEnum[T](s)
+  genEnumCaseStmt(T, s, default = nil, ord(low(T)), ord(high(T)), normalize)
 
 proc generateFieldSetters(RecordType: NimNode): NimNode =
   var recordDef = getImpl(RecordType)
@@ -685,19 +717,15 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
                              newCall(bindSym"acceptsMultipleValues",
                                  fixedFieldType))
 
-    when (NimMajor, NimMinor) >= (1, 6):
-      result.add quote do:
-        {.push hint[XCannotRaiseY]: off.}
-    else:
-      result.add quote do:
-        {.push hint[XDeclaredButNotUsed]: off.}
+    result.add quote do:
+      {.push hint[XCannotRaiseY]: off.}
 
     result.add quote do:
       proc `completerName`(val: string): seq[string] {.
         nimcall
         gcsafe
         sideEffect
-        raises: [Defect]
+        raises: []
       .} =
         return completeCmdArgAux(`fixedFieldType`, val)
 
@@ -705,7 +733,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
         nimcall
         gcsafe
         sideEffect
-        raises: [Defect, CatchableError]
+        raises: [ValueError]
       .} =
         when `configField` is enum:
           # TODO: For some reason, the normal `setField` rejects enum fields
@@ -865,7 +893,7 @@ macro configurationRtti(RecordType: type): untyped =
 
 proc addConfigFile*(secondarySources: auto,
                     Format: type,
-                    path: InputFile) =
+                    path: InputFile) {.raises: [ConfigurationError].} =
   try:
     secondarySources.data.add loadFile(Format, string path,
                                        type(secondarySources.data[0]))
@@ -886,6 +914,20 @@ proc addConfigFileContent*(secondarySources: auto,
   except IOError:
     raiseAssert "This should not be possible"
 
+func constructEnvKey*(prefix: string, key: string): string {.raises: [].} =
+  ## Generates env. variable names from keys and prefix following the
+  ## IEEE Open Group env. variable spec: https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
+  try:
+    (&"{prefix}_{key}").toUpperAscii.multiReplace(("-", "_"), (" ", "_"))
+  except ValueError as err:
+    raiseAssert "strformat.`&` failed: " & err.msg
+
+# On Posix there is no portable way to get the command
+# line from a DLL and thus the proc isn't defined in this environment.
+# See https://nim-lang.org/docs/os.html#commandLineParams
+when not declared(commandLineParams):
+  proc commandLineParams(): seq[string] = discard
+
 proc loadImpl[C, SecondarySources](
     Configuration: typedesc[C],
     cmdLine = commandLineParams(),
@@ -894,8 +936,11 @@ proc loadImpl[C, SecondarySources](
     printUsage = true,
     quitOnFailure = true,
     secondarySourcesRef: ref SecondarySources,
-    secondarySources: proc (config: Configuration,
-                            sources: ref SecondarySources) = nil): Configuration =
+    secondarySources: proc (
+        config: Configuration, sources: ref SecondarySources
+    ) {.gcsafe, raises: [ConfigurationError].} = nil,
+    envVarsPrefix = getAppFilename()
+): Configuration {.raises: [ConfigurationError].} =
   ## Loads a program configuration by parsing command-line arguments
   ## and a standard set of config files that can specify:
   ##
@@ -992,9 +1037,15 @@ proc loadImpl[C, SecondarySources](
         let trailing = if opt.typename != "bool": "=" else: ""
 
         if argName in filterKind and len(opt.name) > 0:
-          stdout.writeLine("--", opt.name, trailing)
+          try:
+            stdout.writeLine("--", opt.name, trailing)
+          except IOError:
+            discard
         if argAbbr in filterKind and len(opt.abbr) > 0:
-          stdout.writeLine('-', opt.abbr, trailing)
+          try:
+            stdout.writeLine('-', opt.abbr, trailing)
+          except IOError:
+            discard
 
     let completion = splitCompletionLine()
     # If we're not asked to complete a command line the result is an empty list
@@ -1040,12 +1091,18 @@ proc loadImpl[C, SecondarySources](
         let opt = findOpt(cmdStack, option_word)
         if opt != nil:
           for arg in getArgCompletions(opt, cur_word):
-            stdout.writeLine(arg)
+            try:
+              stdout.writeLine(arg)
+            except IOError:
+              discard
       elif cmdStack[^1].hasSubCommands:
         # Show all the available subcommands
         for subCmd in subCmds(cmdStack[^1]):
           if startsWithIgnoreStyle(subCmd.name, cur_word):
-            stdout.writeLine(subCmd.name)
+            try:
+              stdout.writeLine(subCmd.name)
+            except IOError:
+              discard
       else:
         # Full options listing
         for i in countdown(cmdStack.len - 1, 0):
@@ -1127,19 +1184,31 @@ proc loadImpl[C, SecondarySources](
     activateCmd(subCmdDiscriminator, defaultCmd)
 
   if secondarySources != nil:
-    secondarySources(result, secondarySourcesRef)
+    try:
+      secondarySources(result, secondarySourcesRef)
+    except ConfigurationError as err:
+      fail "Failed to load secondary sources: '$1'" % [err.msg]
 
-  proc processMissingOpts(conf: var Configuration, cmd: CmdInfo) =
+  proc processMissingOpts(
+      conf: var Configuration, cmd: CmdInfo) {.raises: [ConfigurationError].} =
     for opt in cmd.opts:
       if fieldCounters[opt.idx] == 0:
-        if secondarySourcesRef.setters[opt.idx](conf, secondarySourcesRef):
-          # all work is done in the config file setter,
-          # there is nothing left to do here.
-          discard
-        elif opt.hasDefault:
-          fieldSetters[opt.idx][1](conf, none[string]())
-        elif opt.required:
-          fail "The required option '$1' was not specified" % [opt.name]
+        let envKey = constructEnvKey(envVarsPrefix, opt.name)
+
+        try:
+          if existsEnv(envKey):
+            let envContent = getEnv(envKey)
+            applySetter(opt.idx, envContent)
+          elif secondarySourcesRef.setters[opt.idx](conf, secondarySourcesRef):
+            # all work is done in the config file setter,
+            # there is nothing left to do here.
+            discard
+          elif opt.hasDefault:
+            fieldSetters[opt.idx][1](conf, none[string]())
+          elif opt.required:
+            fail "The required option '$1' was not specified" % [opt.name]
+        except ValueError as err:
+          fail "Option '$1' failed to parse: '$2'" % [opt.name, err.msg]
 
   for cmd in activeCmds:
     result.processMissingOpts(cmd)
@@ -1151,13 +1220,14 @@ template load*(
     copyrightBanner = "",
     printUsage = true,
     quitOnFailure = true,
-    secondarySources: untyped = nil): untyped =
+    secondarySources: untyped = nil,
+    envVarsPrefix = getAppFilename()): untyped =
 
   block:
     var secondarySourcesRef = generateSecondarySources(Configuration)
     loadImpl(Configuration, cmdLine, version,
              copyrightBanner, printUsage, quitOnFailure,
-             secondarySourcesRef, secondarySources)
+             secondarySourcesRef, secondarySources, envVarsPrefix)
 
 func defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
@@ -1254,3 +1324,4 @@ func load*(f: TypedInputFile): f.ContentType =
     mixin loadFile
     loadFile(f.Format, f.string, f.ContentType)
 
+{.pop.}

@@ -1,3 +1,12 @@
+# confutils
+# Copyright (c) 2018-2024 Status Research & Development GmbH
+# Licensed under either of
+#  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
+#  * MIT license ([LICENSE-MIT](LICENSE-MIT))
+# at your option.
+# This file may not be copied, modified, or distributed except according to
+# those terms.
+
 import
   std/uri,
   toml_serialization, toml_serialization/lexer
@@ -5,9 +14,12 @@ import
 export
   uri, toml_serialization
 
+{.push gcsafe, raises: [].}
+
 proc readValue*(r: var TomlReader, val: var Uri)
-               {.raises: [SerializationError, IOError, Defect].} =
+               {.raises: [SerializationError, IOError].} =
   val =  try: parseUri(r.readValue(string))
          except ValueError as err:
-           r.lex.raiseUnexpectedValue("URI")
+           r.lex.raiseUnexpectedValue("URI " & err.msg)
 
+{.pop.}
