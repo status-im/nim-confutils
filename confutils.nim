@@ -881,7 +881,7 @@ proc addConfigFile*(secondarySources: auto,
 
 proc addConfigFileContent*(secondarySources: auto,
                            Format: type,
-                           content: string) =
+                           content: string) {.raises: [ConfigurationError].} =
   try:
     secondarySources.data.add decode(Format, content,
                                      type(secondarySources.data[0]))
