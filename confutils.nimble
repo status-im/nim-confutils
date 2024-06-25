@@ -35,9 +35,9 @@ proc build(args, path: string) =
   exec nimc & " " & lang & " " & cfg & " " & flags & " " & args & " " & path
 
 proc run(args, path: string) =
-  build args & " -r", path
+  build args & " --mm:refc -r", path
   if (NimMajor, NimMinor) > (1, 6):
-    build args & " --mm:refc -r", path
+    build args & " --mm:orc -r", path
 
 task test, "Run all tests":
   for threads in ["--threads:off", "--threads:on"]:
@@ -47,9 +47,8 @@ task test, "Run all tests":
   #Also iterate over every test in tests/fail, and verify they fail to compile.
   echo "\r\nTest Fail to Compile:"
   for path in listFiles(thisDir() / "tests" / "fail"):
-    if path.split(".")[^1] != "nim":
+    if not path.endsWith(".nim"):
       continue
-
     if gorgeEx(nimc & " " & lang & " " & flags & " " & path).exitCode != 0:
       echo "  [OK] ", path.split(DirSep)[^1]
     else:
