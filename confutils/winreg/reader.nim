@@ -71,18 +71,18 @@ proc readValue*[T](r: var WinregReader, value: var T)
   elif T is (object or tuple):
     type T = type(value)
     when T.totalSerializedFields > 0:
-      let fields = T.fieldReadersTable(WinregReader)
+      const fields = T.fieldReadersTable(WinregReader)
       var expectedFieldPos = 0
       r.key.add ""
       value.enumInstanceSerializedFields(fieldName, field):
         when T is tuple:
           r.key[^1] = $expectedFieldPos
-          var reader = fields[][expectedFieldPos].reader
+          var reader = fields[expectedFieldPos].reader
           expectedFieldPos += 1
 
         else:
           r.key[^1] = fieldName
-          var reader = findFieldReader(fields[], fieldName, expectedFieldPos)
+          var reader = findFieldReader(fields, fieldName, expectedFieldPos)
 
         if reader != nil:
           reader(value, r)
