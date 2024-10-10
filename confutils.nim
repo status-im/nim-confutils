@@ -21,8 +21,8 @@ const
   useBufferedOutput = defined(nimscript)
   noColors = useBufferedOutput or defined(confutils_no_colors)
   hasCompletions = not defined(nimscript)
-  descPadding = 6
-  minNameWidth =  24 - descPadding
+  descPadding = 2
+  minNameWidth = 24 - descPadding
 
 when not defined(nimscript):
   import
@@ -35,8 +35,10 @@ type
     copyrightBanner: string
     hasAbbrs: bool
     maxNameLen: int
+    maxAbbrLen: int
     terminalWidth: int
     namesWidth: int
+    abbrsWidth: int
 
   CmdInfo = ref object
     name: string
@@ -87,7 +89,11 @@ when defined(nimscript):
 
   proc appInvocation: string =
     let scriptNameIdx = scriptNameParamIdx()
-    "nim " & (if paramCount() > scriptNameIdx: paramStr(scriptNameIdx) else: "<nims-script>")
+    "nim " & (
+      if paramCount() > scriptNameIdx:
+        paramStr(scriptNameIdx)
+      else:
+        "<nims-script>")
 
   type stderr = object
 
@@ -211,6 +217,16 @@ iterator subCmds(cmd: CmdInfo): CmdInfo =
 
 template isSubCommand(cmd: CmdInfo): bool =
   cmd.name.len > 0
+
+func maxAbbrLen(cmd: CmdInfo): int =
+  result = 0
+  for opt in cmd.opts:
+    if opt.kind == Arg or opt.kind == Discriminator and opt.isCommand:
+      continue
+    result = max(result, opt.abbr.len)
+    if opt.kind == Discriminator:
+      for subCmd in opt.subCmds:
+        result = max(result, subCmd.maxAbbrLen)
 
 func maxNameLen(cmd: CmdInfo): int =
   result = 0
@@ -336,10 +352,12 @@ proc describeOptions(help: var string,
       helpOutput " "
 
       if opt.abbr.len > 0:
-        helpOutput fgOption, styleBright, "-", opt.abbr, ", "
+        let switch = "-" & opt.abbr & ", "
+        helpOutput fgOption, styleBright, switch,
+                   padding(switch, appInfo.abbrsWidth)
       elif appInfo.hasAbbrs:
         # Add additional indentatition, so all names are aligned
-        helpOutput "    "
+        helpOutput spaces(appInfo.abbrsWidth)
 
       if opt.name.len > 0:
         let switch = "--" & opt.name
@@ -360,7 +378,8 @@ proc describeOptions(help: var string,
         for i, subCmd in opt.subCmds:
           if not subCmd.hasOpts: continue
 
-          helpOutput "\pWhen ", styleBright, fgBlue, opt.humaneName, resetStyle, " = ", fgGreen, subCmd.name
+          helpOutput "\pWhen ", styleBright, fgBlue, opt.humaneName, resetStyle,
+                     " = ", fgGreen, subCmd.name
 
           if i == opt.defaultSubCmd: helpOutput " (default)"
           help.describeOptions subCmd, cmdInvocation, appInfo, conditionalOpts
@@ -389,13 +408,17 @@ proc showHelp(help: var string,
   let cmd = activeCmds[^1]
 
   appInfo.maxNameLen = cmd.maxNameLen
+  if cmd.hasAbbrs:
+    appInfo.maxAbbrLen = cmd.maxAbbrLen
+  appInfo.abbrsWidth = max(4, appInfo.maxAbbrLen) + 1
+
   appInfo.hasAbbrs = cmd.hasAbbrs
   appInfo.terminalWidth =
     try:
       terminalWidth()
     except ValueError:
       int.high  # https://github.com/nim-lang/Nim/pull/21968
-  appInfo.namesWidth = min(minNameWidth, appInfo.maxNameLen) + descPadding
+  appInfo.namesWidth = max(minNameWidth, appInfo.maxNameLen) + descPadding
 
   var cmdInvocation = appInfo.appInvocation
   for i in 1 ..< activeCmds.len:
@@ -598,7 +621,7 @@ proc completeCmdArg*(T: type[InputFile|TypedInputFile|InputDir|OutFile|OutDir|Ou
     let show_dotfiles = len(name) > 0 and name[0] == '.'
 
     try:
-      for kind, path in walkDir(dir_path, relative=true):
+      for kind, path in walkDir(dir_path, relative = true):
         if not show_dotfiles and path[0] == '.':
           continue
 
@@ -635,7 +658,8 @@ template setField[T](loc: var T, val: Option[string], defaultVal: untyped) =
   loc = if isSome(val): parseCmdArgAux(FieldType, val.get)
         else: FieldType(defaultVal)
 
-template setField[T](loc: var seq[T], val: Option[string], defaultVal: untyped) =
+template setField[T](
+    loc: var seq[T], val: Option[string], defaultVal: untyped) =
   if val.isSome:
     loc.add parseCmdArgAux(type(loc[0]), val.get)
   else:
@@ -688,11 +712,12 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
     # be typed as a tyTypeDesc[tyString] instead of just `tyString`. To be filed.
     var fixedFieldType = newTree(nnkTypeOfExpr, field.typ)
 
-    settersArray.add newTree(nnkTupleConstr,
-                             newLit($paramName),
-                             setterName, completerName,
-                             newCall(bindSym"requiresInput", fixedFieldType),
-                             newCall(bindSym"acceptsMultipleValues", fixedFieldType))
+    settersArray.add newTree(
+      nnkTupleConstr,
+      newLit($paramName),
+      setterName, completerName,
+      newCall(bindSym"requiresInput", fixedFieldType),
+      newCall(bindSym"acceptsMultipleValues", fixedFieldType))
 
     result.add quote do:
       {.push hint[XCannotRaiseY]: off.}
@@ -837,7 +862,8 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
 
       if field.caseBranch.kind == nnkElse:
         error "Sub-command parameters cannot appear in an else branch. " &
-              "Please specify the sub-command branch precisely", field.caseBranch[0]
+              "Please specify the sub-command branch precisely",
+              field.caseBranch[0]
 
       var branchEnumVal = field.caseBranch[0]
       if branchEnumVal.kind == nnkDotExpr:
@@ -992,7 +1018,8 @@ proc loadImpl[C, SecondarySources](
         argName
         argAbbr
 
-    proc showMatchingOptions(cmd: CmdInfo, prefix: string, filterKind: set[ArgKindFilter]) =
+    proc showMatchingOptions(
+        cmd: CmdInfo, prefix: string, filterKind: set[ArgKindFilter]) =
       var matchingOptions: seq[OptInfo]
 
       if len(prefix) > 0:
@@ -1114,7 +1141,8 @@ proc loadImpl[C, SecondarySources](
         let subCmdDiscriminator = lastCmd.getSubCmdDiscriminator
         if subCmdDiscriminator != nil:
           if subCmdDiscriminator.defaultSubCmd != -1:
-            let defaultCmd = subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
+            let defaultCmd =
+              subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
             opt = findOpt(defaultCmd.opts, key)
             if opt != nil:
               activateCmd(subCmdDiscriminator, defaultCmd)
@@ -1153,7 +1181,8 @@ proc loadImpl[C, SecondarySources](
   if subCmdDiscriminator != nil and
      subCmdDiscriminator.defaultSubCmd != -1 and
      fieldCounters[subCmdDiscriminator.idx] == 0:
-    let defaultCmd = subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
+    let defaultCmd =
+      subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
     activateCmd(subCmdDiscriminator, defaultCmd)
 
   if secondarySources != nil:
