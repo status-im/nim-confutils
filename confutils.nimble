@@ -66,7 +66,7 @@ task test, "Run all tests":
       baz = true
       arg ./tests/cli_example.nim
       arg 42"""
-  if expectedOutput == actualOutput:
+  if actualOutput.strip() == expectedOutput:
     echo "  [OK] tests/cli_example.nim"
   else:
     echo "  [FAILED] tests/cli_example.nim"
