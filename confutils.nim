@@ -7,22 +7,28 @@
 # This file may not be copied, modified, or distributed except according to
 # those terms.
 
+{.push raises: [].}
+
 import
   os,
-  std/[enumutils, options, strutils, wordwrap, strformat],
+  std/[enumutils, options, strutils, wordwrap],
   stew/shims/macros,
-  serialization,
   confutils/[defs, cli_parser, config_file]
 
 export
-  options, serialization, defs, config_file
+  options, defs, config_file
 
 const
+  hasSerialization = not defined(nimscript)
   useBufferedOutput = defined(nimscript)
   noColors = useBufferedOutput or defined(confutils_no_colors)
   hasCompletions = not defined(nimscript)
   descPadding = 6
   minNameWidth =  24 - descPadding
+
+when hasSerialization:
+  import serialization
+  export serialization
 
 when not defined(nimscript):
   import
@@ -420,10 +426,7 @@ func getNextArgIdx(cmd: CmdInfo, consumedArgIdx: int): int =
 proc noMoreArgsError(cmd: CmdInfo): string {.raises: [].} =
   result =
     if cmd.isSubCommand:
-      try:
-        "The command '$1'" % [cmd.name]
-      except ValueError as err:
-        raiseAssert "strutils.`%` failed: " & err.msg
+      "The command '" & cmd.name & "'"
     else:
       appInvocation()
   result.add " does not accept"
@@ -630,12 +633,14 @@ proc completeCmdArgAux(T: type, val: string): seq[string] =
   mixin completeCmdArg
   return completeCmdArg(T, val)
 
-template setField[T](loc: var T, val: Option[string], defaultVal: untyped) =
+template setField[T](
+    loc: var T, val: Option[string], defaultVal: untyped): untyped =
   type FieldType = type(loc)
   loc = if isSome(val): parseCmdArgAux(FieldType, val.get)
         else: FieldType(defaultVal)
 
-template setField[T](loc: var seq[T], val: Option[string], defaultVal: untyped) =
+template setField[T](
+    loc: var seq[T], val: Option[string], defaultVal: untyped): untyped =
   if val.isSome:
     loc.add parseCmdArgAux(type(loc[0]), val.get)
   else:
@@ -867,36 +872,34 @@ macro configurationRtti(RecordType: type): untyped =
 
   result = newTree(nnkPar, newLitFixed cmdInfo, fieldSetters)
 
-proc addConfigFile*(secondarySources: auto,
-                    Format: type,
-                    path: InputFile) {.raises: [ConfigurationError].} =
-  try:
-    secondarySources.data.add loadFile(Format, string path,
-                                       type(secondarySources.data[0]))
-  except SerializationError as err:
-    raise newException(ConfigurationError, err.formatMsg(string path), err)
-  except IOError as err:
-    raise newException(ConfigurationError,
-      "Failed to read config file at '" & string(path) & "': " & err.msg)
+when hasSerialization:
+  proc addConfigFile*(secondarySources: auto,
+                      Format: type,
+                      path: InputFile) {.raises: [ConfigurationError].} =
+    try:
+      secondarySources.data.add loadFile(Format, string path,
+                                         type(secondarySources.data[0]))
+    except SerializationError as err:
+      raise newException(ConfigurationError, err.formatMsg(string path), err)
+    except IOError as err:
+      raise newException(ConfigurationError,
+        "Failed to read config file at '" & string(path) & "': " & err.msg)
 
-proc addConfigFileContent*(secondarySources: auto,
-                           Format: type,
-                           content: string) {.raises: [ConfigurationError].} =
-  try:
-    secondarySources.data.add decode(Format, content,
-                                     type(secondarySources.data[0]))
-  except SerializationError as err:
-    raise newException(ConfigurationError, err.formatMsg("<content>"), err)
-  except IOError:
-    raiseAssert "This should not be possible"
+  proc addConfigFileContent*(secondarySources: auto,
+                             Format: type,
+                             content: string) {.raises: [ConfigurationError].} =
+    try:
+      secondarySources.data.add decode(Format, content,
+                                       type(secondarySources.data[0]))
+    except SerializationError as err:
+      raise newException(ConfigurationError, err.formatMsg("<content>"), err)
+    except IOError:
+      raiseAssert "This should not be possible"
 
 func constructEnvKey*(prefix: string, key: string): string {.raises: [].} =
   ## Generates env. variable names from keys and prefix following the
   ## IEEE Open Group env. variable spec: https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
-  try:
-    (&"{prefix}_{key}").toUpperAscii.multiReplace(("-", "_"), (" ", "_"))
-  except ValueError as err:
-    raiseAssert "strformat.`&` failed: " & err.msg
+  (prefix & "_" & key).toUpperAscii.multiReplace(("-", "_"), (" ", "_"))
 
 # On Posix there is no portable way to get the command
 # line from a DLL and thus the proc isn't defined in this environment.
@@ -915,7 +918,7 @@ proc loadImpl[C, SecondarySources](
     secondarySources: proc (
         config: Configuration, sources: ref SecondarySources
     ) {.gcsafe, raises: [ConfigurationError].} = nil,
-    envVarsPrefix = getAppFilename()
+    envVarsPrefix = appInvocation()
 ): Configuration {.raises: [ConfigurationError].} =
   ## Loads a program configuration by parsing command-line arguments
   ## and a standard set of config files that can specify:
@@ -928,7 +931,6 @@ proc loadImpl[C, SecondarySources](
 
   # This is an initial naive implementation that will be improved
   # over time.
-
   let (rootCmd, fieldSetters) = configurationRtti(Configuration)
   var fieldCounters: array[fieldSetters.len, int]
 
@@ -941,11 +943,11 @@ proc loadImpl[C, SecondarySources](
   var help = ""
 
   proc suggestCallingHelp =
-    errorOutput "Try ", fgCommand, ("$1 --help" % appInvocation())
+    errorOutput "Try ", fgCommand, appInvocation() & " --help"
     errorOutput " for more information.\p"
     flushOutputAndQuit QuitFailure
 
-  template fail(args: varargs[untyped]) =
+  template fail(args: varargs[untyped]): untyped =
     if quitOnFailure:
       errorOutput args
       errorOutput "\p"
@@ -954,14 +956,13 @@ proc loadImpl[C, SecondarySources](
       # TODO: populate this string
       raise newException(ConfigurationError, "")
 
-  let confAddr = addr result
-
-  template applySetter(setterIdx: int, cmdLineVal: string) =
+  template applySetter(
+      conf: Configuration, setterIdx: int, cmdLineVal: string): untyped =
     when defined(nimHasWarnBareExcept):
       {.push warning[BareExcept]:off.}
 
     try:
-      fieldSetters[setterIdx][1](confAddr[], some(cmdLineVal))
+      fieldSetters[setterIdx][1](conf, some(cmdLineVal))
       inc fieldCounters[setterIdx]
     except:
       fail("Error while processing the ",
@@ -979,10 +980,11 @@ proc loadImpl[C, SecondarySources](
   template required(opt: OptInfo): bool =
     fieldSetters[opt.idx][3] and not opt.hasDefault
 
-  template activateCmd(discriminator: OptInfo, activatedCmd: CmdInfo) =
+  template activateCmd(
+      conf: Configuration, discriminator: OptInfo, activatedCmd: CmdInfo) =
     let cmd = activatedCmd
-    applySetter(discriminator.idx, if cmd.desc.len > 0: cmd.desc
-                                   else: cmd.name)
+    conf.applySetter(discriminator.idx, if cmd.desc.len > 0: cmd.desc
+                                        else: cmd.name)
     activeCmds.add cmd
     nextArgIdx = cmd.getNextArgIdx(-1)
 
@@ -1117,14 +1119,14 @@ proc loadImpl[C, SecondarySources](
             let defaultCmd = subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
             opt = findOpt(defaultCmd.opts, key)
             if opt != nil:
-              activateCmd(subCmdDiscriminator, defaultCmd)
+              result.activateCmd(subCmdDiscriminator, defaultCmd)
           else:
             discard
 
       if opt != nil:
-        applySetter(opt.idx, val)
+        result.applySetter(opt.idx, val)
       else:
-        fail "Unrecognized option '$1'" % [key]
+        fail "Unrecognized option '" & key & "'"
 
     of cmdArgument:
       if lastCmd.hasSubCommands:
@@ -1135,13 +1137,13 @@ proc loadImpl[C, SecondarySources](
         if subCmdDiscriminator != nil:
           let subCmd = findCmd(subCmdDiscriminator.subCmds, key)
           if subCmd != nil:
-            activateCmd(subCmdDiscriminator, subCmd)
+            result.activateCmd(subCmdDiscriminator, subCmd)
             break processArg
 
         if nextArgIdx == -1:
           fail lastCmd.noMoreArgsError
 
-        applySetter(nextArgIdx, key)
+        result.applySetter(nextArgIdx, key)
 
         if not fieldSetters[nextArgIdx][4]:
           nextArgIdx = lastCmd.getNextArgIdx(nextArgIdx)
@@ -1154,13 +1156,13 @@ proc loadImpl[C, SecondarySources](
      subCmdDiscriminator.defaultSubCmd != -1 and
      fieldCounters[subCmdDiscriminator.idx] == 0:
     let defaultCmd = subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
-    activateCmd(subCmdDiscriminator, defaultCmd)
+    result.activateCmd(subCmdDiscriminator, defaultCmd)
 
-  if secondarySources != nil:
+  if not isNil(secondarySources):  # Nim v2.0.10: `!= nil` broken in nimscript
     try:
       secondarySources(result, secondarySourcesRef)
     except ConfigurationError as err:
-      fail "Failed to load secondary sources: '$1'" % [err.msg]
+      fail "Failed to load secondary sources: '" & err.msg & "'"
 
   proc processMissingOpts(
       conf: var Configuration, cmd: CmdInfo) {.raises: [ConfigurationError].} =
@@ -1171,7 +1173,7 @@ proc loadImpl[C, SecondarySources](
         try:
           if existsEnv(envKey):
             let envContent = getEnv(envKey)
-            applySetter(opt.idx, envContent)
+            conf.applySetter(opt.idx, envContent)
           elif secondarySourcesRef.setters[opt.idx](conf, secondarySourcesRef):
             # all work is done in the config file setter,
             # there is nothing left to do here.
@@ -1179,9 +1181,9 @@ proc loadImpl[C, SecondarySources](
           elif opt.hasDefault:
             fieldSetters[opt.idx][1](conf, none[string]())
           elif opt.required:
-            fail "The required option '$1' was not specified" % [opt.name]
+            fail "The required option '" & opt.name & "' was not specified"
         except ValueError as err:
-          fail "Option '$1' failed to parse: '$2'" % [opt.name, err.msg]
+          fail "Option '" & opt.name & "' failed to parse: '" & err.msg & "'"
 
   for cmd in activeCmds:
     result.processMissingOpts(cmd)
@@ -1194,10 +1196,9 @@ template load*(
     printUsage = true,
     quitOnFailure = true,
     secondarySources: untyped = nil,
-    envVarsPrefix = getAppFilename()): untyped =
-
+    envVarsPrefix = appInvocation()): untyped =
   block:
-    var secondarySourcesRef = generateSecondarySources(Configuration)
+    let secondarySourcesRef = generateSecondarySources(Configuration)
     loadImpl(Configuration, cmdLine, version,
              copyrightBanner, printUsage, quitOnFailure,
              secondarySourcesRef, secondarySources, envVarsPrefix)

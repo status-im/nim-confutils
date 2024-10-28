@@ -54,3 +54,20 @@ task test, "Run all tests":
     else:
       echo "  [FAILED] ", path.split(DirSep)[^1]
       quit(QuitFailure)
+
+  echo "\r\nNimscript test:"
+  let
+    actualOutput = gorgeEx(
+      nimc & " --verbosity:0 e " & flags & " " & "./tests/cli_example.nim " &
+      "--foo=1 --bar=2 --withBaz 42").output
+    expectedOutput = unindent"""
+      foo = 1
+      bar = 2
+      baz = true
+      arg ./tests/cli_example.nim
+      arg 42"""
+  if expectedOutput == actualOutput:
+    echo "  [OK] tests/cli_example.nim"
+  else:
+    echo "  [FAILED] tests/cli_example.nim"
+    quit(QuitFailure)
