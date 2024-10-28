@@ -70,4 +70,5 @@ task test, "Run all tests":
     echo "  [OK] tests/cli_example.nim"
   else:
     echo "  [FAILED] tests/cli_example.nim"
+    echo actualOutput
     quit(QuitFailure)
