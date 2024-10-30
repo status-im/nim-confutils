@@ -1158,6 +1158,7 @@ proc loadImpl[C, SecondarySources](
     let defaultCmd = subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
     result.activateCmd(subCmdDiscriminator, defaultCmd)
 
+  # https://github.com/status-im/nim-confutils/pull/109#discussion_r1820076739
   if not isNil(secondarySources):  # Nim v2.0.10: `!= nil` broken in nimscript
     try:
       secondarySources(result, secondarySourcesRef)
