@@ -1125,8 +1125,8 @@ proc loadImpl[C, SecondarySources](
 
       if opt != nil:
         result.applySetter(opt.idx, val)
-      else:
-        fail "Unrecognized option '" & key & "'"
+      # else:
+      #   fail "Unrecognized option '" & key & "'"
 
     of cmdArgument:
       if lastCmd.hasSubCommands:
