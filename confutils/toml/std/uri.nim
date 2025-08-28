@@ -7,19 +7,7 @@
 # This file may not be copied, modified, or distributed except according to
 # those terms.
 
-import
-  std/uri,
-  toml_serialization, toml_serialization/lexer
+{.deprecated: "moved to toml_serialization".}
 
-export
-  uri, toml_serialization
-
-{.push gcsafe, raises: [].}
-
-proc readValue*(r: var TomlReader, val: var Uri)
-               {.raises: [SerializationError, IOError].} =
-  val =  try: parseUri(r.readValue(string))
-         except ValueError as err:
-           r.lex.raiseUnexpectedValue("URI " & err.msg)
-
-{.pop.}
+import toml_serialization/std/uri as tomluri
+export tomluri

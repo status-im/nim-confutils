@@ -9,14 +9,14 @@
 
 {.push raises: [], gcsafe.}
 
-# Optional toml support - add `requires "toml_serialization"` to your package
+# Optional json support - add `requires "json_serialization"` to your package
 # dependencies before using
 
-import toml_serialization, ../defs as confutilsDefs
+import serialization, json_serialization, ../defs as confutilsDefs
 
-export toml_serialization, confutilsDefs
+export json_serialization, confutilsDefs
 
 type ConfTypes = InputFile | InputDir | OutPath | OutDir | OutFile
-serializesAsBase(ConfTypes, Toml)
+serializesAsBase(ConfTypes, Json)
 
 {.pop.}
