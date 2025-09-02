@@ -38,12 +38,20 @@ type
     isCommandOrArgument: bool
     isCaseBranch: bool
     isDiscriminator: bool
+    isIgnore: bool
 
-  GeneratedFieldInfo = tuple
+  GeneratedFieldInfo = object
+    isIgnore: bool
     isCommandOrArgument: bool
     path: seq[string]
 
   OriginalToGeneratedFields = OrderedTable[string, GeneratedFieldInfo]
+
+  SectionParam = object
+    isCommandOrArgument: bool
+    isIgnore: bool
+    defaultValue: string
+    namePragma: string
 
 {.push gcsafe, raises: [].}
 
@@ -69,26 +77,25 @@ proc generateOptionalField(fieldName: NimNode, fieldType: NimNode): NimNode =
   let right = if isOption(fieldType): fieldType else: makeOption(fieldType)
   newIdentDefs(fieldName, right)
 
-proc traverseIdent(ident: NimNode, typ: NimNode, isDiscriminator: bool,
-                   isCommandOrArgument = false, defaultValue = "",
-                   namePragma = ""): ConfFileSection =
+proc traverseIdent(ident: NimNode, typ: NimNode,
+                   isDiscriminator: bool, param = SectionParam()): ConfFileSection =
   ident.expectKind nnkIdent
-  ConfFileSection(fieldName: $ident, namePragma: namePragma, typ: typ,
-                  defaultValue: defaultValue, isCommandOrArgument: isCommandOrArgument,
-                  isDiscriminator: isDiscriminator)
+  ConfFileSection(fieldName: $ident,
+                  namePragma: param.namePragma, typ: typ,
+                  defaultValue: param.defaultValue,
+                  isCommandOrArgument: param.isCommandOrArgument,
+                  isDiscriminator: isDiscriminator,
+                  isIgnore: param.isIgnore)
 
 proc traversePostfix(postfix: NimNode, typ: NimNode, isDiscriminator: bool,
-                     isCommandOrArgument = false, defaultValue = "",
-                     namePragma = ""): ConfFileSection =
+                     param = SectionParam()): ConfFileSection =
   postfix.expectKind nnkPostfix
 
   case postfix[1].kind
   of nnkIdent:
-    traverseIdent(postfix[1], typ, isDiscriminator, isCommandOrArgument,
-                  defaultValue, namePragma)
+    traverseIdent(postfix[1], typ, isDiscriminator, param)
   of nnkAccQuoted:
-    traverseIdent(postfix[1][0], typ, isDiscriminator, isCommandOrArgument,
-                  defaultValue, namePragma)
+    traverseIdent(postfix[1][0], typ, isDiscriminator, param)
   else:
     raiseAssert "[Postfix] Unsupported child node:\n" & postfix[1].treeRepr
 
@@ -98,8 +105,7 @@ proc shortEnumName(n: NimNode): NimNode =
   else:
     n
 
-proc traversePragma(pragma: NimNode):
-    tuple[isCommandOrArgument: bool, defaultValue, namePragma: string] =
+proc traversePragma(pragma: NimNode): SectionParam =
   pragma.expectKind nnkPragma
   var child: NimNode
 
@@ -120,6 +126,8 @@ proc traversePragma(pragma: NimNode):
       let sym = $child
       if sym == "command" or sym == "argument":
         result.isCommandOrArgument = true
+      elif sym == "ignore":
+        result.isIgnore = true
     of nnkExprColonExpr:
       let pragma = $child[0]
       if pragma == "defaultValue":
@@ -132,19 +140,15 @@ proc traversePragma(pragma: NimNode):
 proc traversePragmaExpr(pragmaExpr: NimNode, typ: NimNode,
                         isDiscriminator: bool): ConfFileSection =
   pragmaExpr.expectKind nnkPragmaExpr
-  let (isCommandOrArgument, defaultValue, namePragma) =
-    traversePragma(pragmaExpr[1])
+  let param = traversePragma(pragmaExpr[1])
 
   case pragmaExpr[0].kind
   of nnkIdent:
-    traverseIdent(pragmaExpr[0], typ, isDiscriminator, isCommandOrArgument,
-                  defaultValue, namePragma)
+    traverseIdent(pragmaExpr[0], typ, isDiscriminator, param)
   of nnkAccQuoted:
-    traverseIdent(pragmaExpr[0][0], typ, isDiscriminator, isCommandOrArgument,
-                  defaultValue, namePragma)
+    traverseIdent(pragmaExpr[0][0], typ, isDiscriminator, param)
   of nnkPostfix:
-    traversePostfix(pragmaExpr[0], typ, isDiscriminator, isCommandOrArgument,
-                    defaultValue, namePragma)
+    traversePostfix(pragmaExpr[0], typ, isDiscriminator, param)
   else:
     raiseAssert "[PragmaExpr] Unsupported expression:\n" & pragmaExpr.treeRepr
 
@@ -239,7 +243,7 @@ proc generateTypes(root: ConfFileSection): seq[NimNode] =
   result.add getAst(objectDecl(genSym(nskType, root.fieldName)))[0]
   var recList = newNimNode(nnkRecList)
   for child in root.children:
-    if child.isCommandOrArgument:
+    if child.isCommandOrArgument or child.isIgnore:
       continue
     if child.isCaseBranch:
       if child.children.len > 0:
@@ -255,7 +259,11 @@ proc generateSettersPaths(node: ConfFileSection,
                           pathsCache: var seq[string]) =
   pathsCache.add node.getRenamedName
   if node.children.len == 0:
-    result[node.fieldName] = (node.isCommandOrArgument, pathsCache)
+    result[node.fieldName] = GeneratedFieldInfo(
+      isIgnore: node.isIgnore,
+      isCommandOrArgument: node.isCommandOrArgument,
+      path: pathsCache,
+    )
   else:
     for child in node.children:
       generateSettersPaths(child, result, pathsCache)
@@ -279,8 +287,8 @@ proc generateSetters(confType, CF: NimNode, fieldsPaths: OriginalToGeneratedFiel
     numSetters = 0
 
   let c = "c".ident
-  for field, (isCommandOrArgument, path) in fieldsPaths:
-    if isCommandOrArgument:
+  for field, param in fieldsPaths:
+    if param.isCommandOrArgument or param.isIgnore:
       assignments.add quote do:
         result.setters[`numSetters`] = defaultConfigFileSetter
       inc numSetters
@@ -288,7 +296,7 @@ proc generateSetters(confType, CF: NimNode, fieldsPaths: OriginalToGeneratedFiel
 
     var fieldPath = c
     var condition: NimNode
-    for fld in path:
+    for fld in param.path:
       fieldPath = newDotExpr(fieldPath, fld.ident)
       let fieldChecker = newDotExpr(fieldPath, "isSome".ident)
       if condition == nil:
