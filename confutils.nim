@@ -914,6 +914,7 @@ proc loadImpl[C, SecondarySources](
     copyrightBanner = "",
     printUsage = true,
     quitOnFailure = true,
+    ignoreUnknown = false,
     secondarySourcesRef: ref SecondarySources,
     secondarySources: proc (
         config: Configuration, sources: ref SecondarySources
@@ -1125,7 +1126,7 @@ proc loadImpl[C, SecondarySources](
 
       if opt != nil:
         result.applySetter(opt.idx, val)
-      else:
+      elif not ignoreUnknown:
         fail "Unrecognized option '" & key & "'"
 
     of cmdArgument:
@@ -1196,12 +1197,13 @@ template load*(
     copyrightBanner = "",
     printUsage = true,
     quitOnFailure = true,
+    ignoreUnknown = false,
     secondarySources: untyped = nil,
     envVarsPrefix = appInvocation()): untyped =
   block:
     let secondarySourcesRef = generateSecondarySources(Configuration)
     loadImpl(Configuration, cmdLine, version,
-             copyrightBanner, printUsage, quitOnFailure,
+             copyrightBanner, printUsage, quitOnFailure, ignoreUnknown,
              secondarySourcesRef, secondarySources, envVarsPrefix)
 
 func defaults*(Configuration: type): Configuration =
