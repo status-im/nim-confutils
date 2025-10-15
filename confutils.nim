@@ -562,8 +562,14 @@ func parseCmdArg*(T: type bool, p: string): T {.raises: [ValueError].} =
   except CatchableError:
     raise newException(ValueError, "'" & p & "' is not a valid boolean value. Supported values are on/off, yes/no, true/false or 1/0")
 
+func parseEnumNormalized[T: enum](s: string): T {.raises: [ValueError].} =
+  # Note: In Nim 1.6 `parseEnum` normalizes the string except for the first
+  # character. Nim 1.2 would normalize for all characters. In config options
+  # the latter behaviour is required so this custom function is needed.
+  genEnumCaseStmt(T, s, default = nil, ord(low(T)), ord(high(T)), normalize)
+
 func parseCmdArg*(T: type enum, s: string): T {.raises: [ValueError].} =
-  parseEnum[T](s)
+  parseEnumNormalized[T](s)
 
 proc parseCmdArgAux(T: type, s: string): T {.raises: [ValueError].} =
   # The parseCmdArg procs are allowed to raise only `ValueError`.
@@ -661,12 +667,6 @@ template debugMacroResult(macroName: string) {.dirty.} =
     echo "\n-------- ", macroName, " ----------------------"
     echo result.repr
 
-func parseEnumNormalized[T: enum](s: string): T {.raises: [ValueError].} =
-  # Note: In Nim 1.6 `parseEnum` normalizes the string except for the first
-  # character. Nim 1.2 would normalize for all characters. In config options
-  # the latter behaviour is required so this custom function is needed.
-  genEnumCaseStmt(T, s, default = nil, ord(low(T)), ord(high(T)), normalize)
-
 proc generateFieldSetters(RecordType: NimNode): NimNode =
   var recordDef = getImpl(RecordType)
   let makeDefaultValue = bindSym"makeDefaultValue"
@@ -685,6 +685,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
       configField = newTree(nnkDotExpr, configVar, fieldName)
       defaultValue = field.readPragma"defaultValue"
       completerName = ident($field.name & "Complete")
+      isFieldDiscriminator = newLit field.isDiscriminator
 
     if defaultValue == nil:
       defaultValue = newCall(makeDefaultValue, newTree(nnkTypeOfExpr, configField))
@@ -717,13 +718,9 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
         sideEffect
         raises: [ValueError]
       .} =
-        when `configField` is enum:
-          # TODO: For some reason, the normal `setField` rejects enum fields
-          # when they are used as case discriminators. File this as a bug.
-          if isSome(val):
-            `configField` = parseEnumNormalized[type(`configField`)](val.get)
-          else:
-            `configField` = `defaultValue`
+        when `isFieldDiscriminator`:
+          {.cast(uncheckedAssign).}:
+            setField(`configField`, val, `defaultValue`)
         else:
           setField(`configField`, val, `defaultValue`)
 

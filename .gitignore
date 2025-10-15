@@ -4,3 +4,5 @@ nimble.develop
 nimble.paths
 build/
 vendor/
+tests/test_all
+tests/test_nested_cmd

@@ -29,7 +29,8 @@ let verbose = getEnv("V", "") notin ["", "0"]
 let cfg =
   " --styleCheck:usages --styleCheck:error" &
   (if verbose: "" else: " --verbosity:0 --hints:off") &
-  " --skipParentCfg --skipUserCfg --outdir:build --nimcache:build/nimcache -f"
+  " --skipParentCfg --skipUserCfg --outdir:build --nimcache:build/nimcache -f" &
+  (if NimMajor >= 2: "" else: " -d:nimOldCaseObjects")
 
 proc build(args, path: string) =
   exec nimc & " " & lang & " " & cfg & " " & flags & " " & args & " " & path
