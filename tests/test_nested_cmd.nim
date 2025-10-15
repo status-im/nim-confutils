@@ -16,6 +16,7 @@ type
 
   InnerCmd = enum
     innerCmd1 = "Inner cmd 1"
+    innerCmd2 = "Inner cmd 2"
 
   TestConf = object
     case cmd {.
@@ -37,18 +38,68 @@ type
           defaultValue: "innerArg1 default"
           desc: "innerArg1 desc"
           name: "inner-arg1" }: string
+      of InnerCmd.innerCmd2:
+        innerArg2 {.
+          defaultValue: "innerArg2 default"
+          desc: "innerArg2 desc"
+          name: "inner-arg2" }: string
 
 suite "test nested cmd":
   test "no command":
     let conf = TestConf.load(cmdLine = @[
        "--outer-arg=foobar"
     ])
-    check conf.outerArg == "foobar"
+    check:
+      conf.cmd == OuterCmd.noCommand
+      conf.outerArg == "foobar"
 
-  test "inner param":
+  test "subcommand outerCmd1 innerCmd1":
     let conf = TestConf.load(cmdLine = @[
       "outerCmd1",
       "innerCmd1",
       "--inner-arg1=foobar"
     ])
-    check conf.innerArg1 == "foobar"
+    check:
+      conf.cmd == OuterCmd.outerCmd1
+      conf.innerCmd == InnerCmd.innerCmd1
+      conf.innerArg1 == "foobar"
+
+  test "subcommand outerCmd1 innerCmd2":
+    let conf = TestConf.load(cmdLine = @[
+      "outerCmd1",
+      "innerCmd2",
+      "--inner-arg2=foobar"
+    ])
+    check:
+      conf.cmd == OuterCmd.outerCmd1
+      conf.innerCmd == InnerCmd.innerCmd2
+      conf.innerArg2 == "foobar"
+
+suite "test nested cmd default args":
+  test "no command default":
+    let conf = TestConf.load(cmdLine = newSeq[string]())
+    check:
+      conf.cmd == OuterCmd.noCommand
+      conf.outerArg == "outerArg default"
+
+  test "subcommand outerCmd1 innerCmd1":
+    let conf = TestConf.load(cmdLine = @[
+      "outerCmd1",
+      "innerCmd1"
+    ])
+    check:
+      conf.cmd == OuterCmd.outerCmd1
+      conf.innerCmd == InnerCmd.innerCmd1
+      conf.outerArg1 == "outerArg1 default"
+      conf.innerArg1 == "innerArg1 default"
+
+  test "subcommand outerCmd1 innerCmd2":
+    let conf = TestConf.load(cmdLine = @[
+      "outerCmd1",
+      "innerCmd2"
+    ])
+    check:
+      conf.cmd == OuterCmd.outerCmd1
+      conf.innerCmd == InnerCmd.innerCmd2
+      conf.outerArg1 == "outerArg1 default"
+      conf.innerArg2 == "innerArg2 default"
