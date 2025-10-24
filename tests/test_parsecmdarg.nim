@@ -9,7 +9,7 @@ import
   std/[sequtils],
   unittest2,
   ../confutils
-  
+
 func testValidValues[T](lo: T = low(T), hi: T = high(T)): bool =
   allIt(lo .. hi, T.parseCmdArg($it) == it)
 
@@ -105,3 +105,21 @@ suite "parseCmdArg":
           false
         except ValueError:
           true
+
+  test "enum":
+    type TestEnumArg {.pure.} = enum
+      arg1 = "Arg1"
+      arg2
+      Arg3
+    check:
+      parseCmdArg(TestEnumArg, "Arg1") == TestEnumArg.arg1
+      parseCmdArg(TestEnumArg, "arg1") == TestEnumArg.arg1
+      parseCmdArg(TestEnumArg, "aRG1") == TestEnumArg.arg1
+      parseCmdArg(TestEnumArg, "arg2") == TestEnumArg.arg2
+      parseCmdArg(TestEnumArg, "Arg2") == TestEnumArg.arg2
+      parseCmdArg(TestEnumArg, "aRG2") == TestEnumArg.arg2
+      parseCmdArg(TestEnumArg, "arg3") == TestEnumArg.Arg3
+      parseCmdArg(TestEnumArg, "Arg3") == TestEnumArg.Arg3
+      parseCmdArg(TestEnumArg, "aRG3") == TestEnumArg.Arg3
+    expect ValueError:
+      discard parseCmdArg(TestEnumArg, "Arg123")

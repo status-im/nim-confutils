@@ -13,7 +13,8 @@ import
   test_envvar,
   test_parsecmdarg,
   test_pragma,
-  test_qualified_ident
+  test_qualified_ident,
+  test_nested_cmd
 
 when defined(windows):
   import test_winreg
