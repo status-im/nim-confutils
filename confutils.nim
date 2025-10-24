@@ -718,6 +718,10 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
         sideEffect
         raises: [ValueError]
       .} =
+        # This works as long as the object is fresh (i.e: `default(theObj)`)
+        # and the fields are processed in order.
+        # See https://github.com/status-im/nim-confutils/pull/117
+        # for a general solution.
         when `isFieldDiscriminator`:
           {.cast(uncheckedAssign).}:
             setField(`configField`, val, `defaultValue`)
