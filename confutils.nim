@@ -14,7 +14,7 @@ import
   std/[enumutils, options, strutils, wordwrap],
   results,
   stew/shims/macros,
-  confutils/[defs, cli_parser, config_file]
+  confutils/[defs, cli_parser, config_file, utils]
 
 export
   options, results, defs, config_file
@@ -809,6 +809,64 @@ template debugMacroResult(macroName: string) {.dirty.} =
     echo "\n-------- ", macroName, " ----------------------"
     echo result.repr
 
+type
+  ConfFieldDescRef = ref ConfFieldDesc
+  ConfFieldDesc = object
+    field: FieldDescription
+    parent: ConfFieldDescRef
+
+proc newConfFieldDesc(
+  field: FieldDescription, parent: ConfFieldDescRef
+): ConfFieldDescRef =
+  ConfFieldDescRef(field: field, parent: parent)
+
+proc fieldCaseBranch(cf: ConfFieldDesc): NimNode =
+  if cf.field.caseBranch != nil:
+    cf.field.caseBranch
+  elif cf.parent != nil:
+    fieldCaseBranch(cf.parent[])
+  else:
+    nil
+
+proc fieldCaseField(cf: ConfFieldDesc): NimNode =
+  if cf.field.caseField != nil:
+    cf.field.caseField
+  elif cf.parent != nil:
+    fieldCaseField(cf.parent[])
+  else:
+    nil
+
+proc confFields(typeImpl: NimNode, parent: ConfFieldDescRef = nil): seq[ConfFieldDesc] =
+  result = newSeq[ConfFieldDesc]()
+  for field in recordFields(typeImpl):
+    if field.readPragma"flatten" != nil:
+      for cf in confFields(getImpl(field.typ), newConfFieldDesc(field, parent)):
+        result.add cf
+    else:
+      result.add ConfFieldDesc(field: field, parent: parent)
+
+proc genFieldDotExpr(cf: ConfFieldDesc): NimNode =
+  if cf.parent != nil:
+    dotExpr(genFieldDotExpr(cf.parent[]), cf.field.name)
+  else:
+    cf.field.name
+
+proc fullFieldName(cf: ConfFieldDesc): string =
+  if cf.parent != nil:
+    $fullFieldName(cf.parent[]) & "Dot" & $cf.field.name
+  else:
+    $cf.field.name
+
+proc fieldCaseFieldFullName(cf: ConfFieldDesc): string =
+  if cf.field.caseField != nil:
+    if cf.parent != nil:
+      fullFieldName(cf.parent[]) & "Dot" & $cf.field.caseField.getFieldName
+    else:
+      $cf.field.caseField.getFieldName
+  else:
+    doAssert cf.parent != nil, "caseField not found"
+    fieldCaseFieldFullName(cf.parent[])
+
 proc generateFieldSetters(RecordType: NimNode): NimNode =
   var recordDef = getImpl(RecordType)
   let makeDefaultValue = bindSym"makeDefaultValue"
@@ -816,17 +874,18 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
   result = newTree(nnkStmtListExpr)
   var settersArray = newTree(nnkBracket)
 
-  for field in recordFields(recordDef):
+  for cf in confFields(recordDef):
+    let field = cf.field
     var
-      setterName = ident($field.name & "Setter")
+      setterName = ident(cf.fullFieldName() & "Setter")
       fieldName = field.name
       namePragma = field.readPragma"name"
       paramName = if namePragma != nil: namePragma
                   else: fieldName
       configVar = ident "config"
-      configField = newTree(nnkDotExpr, configVar, fieldName)
+      configField = dotExpr(configVar, genFieldDotExpr(cf))
       defaultValue = field.readPragma"defaultValue"
-      completerName = ident($field.name & "Complete")
+      completerName = ident(cf.fullFieldName() & "Complete")
       isFieldDiscriminator = newLit field.isDiscriminator
 
     if defaultValue == nil:
@@ -877,6 +936,8 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
   debugMacroResult "Field Setters"
 
 func checkDuplicate(cmd: CmdInfo, opt: OptInfo, fieldName: NimNode) =
+  if opt.kind == Discriminator and opt.isCommand:
+    return
   for x in cmd.opts:
     if opt.name == x.name:
       error "duplicate name detected: " & opt.name, fieldName
@@ -920,11 +981,12 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
 
   var
     recordDef = getImpl(T)
-    discriminatorFields = newSeq[OptInfo]()
+    discriminatorFields = newSeq[(string, OptInfo)]()
     fieldIdx = 0
 
-  for field in recordFields(recordDef):
+  for cf in confFields(recordDef):
     let
+      field = cf.field
       isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
       defaultValue = field.readPragma"defaultValue"
       defaultValueDesc = field.readPragma"defaultValueDesc"
@@ -962,7 +1024,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     inc fieldIdx
 
     if field.isDiscriminator:
-      discriminatorFields.add opt
+      discriminatorFields.add (cf.fullFieldName(), opt)
       let cmdType = field.typ.getImpl[^1]
       if cmdType.kind != nnkEnumTy:
         error "Only enums are supported as case object discriminators", field.name
@@ -988,20 +1050,25 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
         if opt.defaultSubCmd == -1:
           error "The default value is not a valid enum value", defaultValue
 
-    if field.caseField != nil and field.caseBranch != nil:
-      let fieldName = field.caseField.getFieldName
-      var discriminator = findOpt(discriminatorFields, $fieldName)
+    let caseField = cf.fieldCaseField()
+    let caseBranch = cf.fieldCaseBranch()
+    if caseField != nil and caseBranch != nil:
+      let fieldName = cf.fieldCaseFieldFullName()
+      var discriminator: OptInfo
+      for (name, opt) in discriminatorFields:
+        if fieldName == name:
+          discriminator = opt
 
       if discriminator == nil:
-        error "Unable to find " & $fieldName
+        error "Unable to find " & $caseField.getFieldName
 
-      if field.caseBranch.kind == nnkElse:
+      if caseBranch.kind == nnkElse:
         error "Sub-command parameters cannot appear in an else branch. " &
-              "Please specify the sub-command branch precisely", field.caseBranch[0]
+              "Please specify the sub-command branch precisely", caseBranch[0]
 
       # support multiple subcommands in the same branch; skip branch body
-      for enumValIdx in 0 .. field.caseBranch.len - 2:
-        var branchEnumVal = field.caseBranch[enumValIdx]
+      for enumValIdx in 0 .. caseBranch.len - 2:
+        var branchEnumVal = caseBranch[enumValIdx]
         if branchEnumVal.kind == nnkDotExpr:
           branchEnumVal = branchEnumVal[1]
         let cmd = findCmd(discriminator.subCmds, $branchEnumVal)
@@ -1029,6 +1096,8 @@ macro configurationRtti(RecordType: type): untyped =
     fieldSetters = generateFieldSetters T
 
   result = newTree(nnkPar, newLitFixed cmdInfo, fieldSetters)
+
+  debugMacroResult "configurationRtti"
 
 when hasSerialization:
   template addConfigFileImpl(
@@ -1529,5 +1598,29 @@ func load*(f: TypedInputFile): f.ContentType =
   else:
     mixin loadFile
     loadFile(f.Format, f.string, f.ContentType)
+
+proc flattenedAccessorsImpl(RecordType: NimNode): NimNode =
+  result = newTree(nnkStmtListExpr)
+  let T = RecordType.getType[1]
+  let recordDef = getImpl(T)
+  for cf in confFields(recordDef):
+    if cf.parent != nil:
+      let
+        configVar = ident "config"
+        configField = dotExpr(configVar, genFieldDotExpr(cf))
+        accessorName = if cf.field.isPublic:
+          newTree(nnkPostfix, ident("*"), cf.field.name)
+        else:
+          ident $cf.field.name
+      result.add quote do:
+        template `accessorName`(`configVar`: `T`): untyped =
+          `configField`
+
+  debugMacroResult "Flattened Accessors"
+
+macro flattenedAccessors*(Configuration: type): untyped =
+  ## Generates accessors to omit specifying the ``{.flatten.}``
+  ## field name when accessing a flattened option.
+  flattenedAccessorsImpl(Configuration)
 
 {.pop.}
