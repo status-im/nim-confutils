@@ -22,8 +22,14 @@ import
   test_parsecmdarg,
   test_pragma,
   test_qualified_ident,
+<<<<<<< HEAD
   test_results_opt,
   test_help
+=======
+  test_nested_cmd,
+  test_help,
+  test_flatten_pragma
+>>>>>>> b884111 (wip)
 
 when defined(windows):
   import test_winreg

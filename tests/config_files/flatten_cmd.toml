@@ -1,0 +1,8 @@
+top-opt1 = "foo"
+top-opt2 = true
+outer-arg = "bar"
+
+[outerCmd1]
+top-opt1 = "baz"
+top-opt2 = true
+outer-arg1 = "quz"

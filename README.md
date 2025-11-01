@@ -390,6 +390,15 @@ let c = MyConf.load(onLoaded = myLogger)
 -----------------
 
 ```nim
+template flatten* {.pragma.}
+```
+
+Apply it to an object field to traverse the object options as if they were "top-level".
+This allows the object options to be reused in various configurations.
+
+-----------------
+
+```nim
 template implicitlySelectable* {.pragma.}
 ```
 
