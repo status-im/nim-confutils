@@ -4,6 +4,7 @@ test_nested_cmd outerCmd1 [OPTIONS]... command
 
 The following options are available:
 
+ --top-arg1                topArg1 desc [=topArg1 default].
  --top-outercmd1-arg1      topOuterCmd1Arg1 desc [=topOuterCmd1Arg1 default].
 
 Available sub-commands:

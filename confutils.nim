@@ -170,6 +170,24 @@ template flushOutputAndQuit(exitCode: int) =
   flushOutput
   quit exitCode
 
+func validPath(path: var seq[CmdInfo], parent, node: CmdInfo): bool =
+  for x in parent.opts:
+    if x.kind != Discriminator: continue
+    for y in x.subCmds:
+      if y == node:
+        path.add y
+        return true
+      if validPath(path, y, node):
+        path.add y
+        return true
+  false
+
+func findPath(parent, node: CmdInfo): seq[CmdInfo] =
+  # find valid path from parent to node
+  result = newSeq[CmdInfo]()
+  doAssert validPath(result, parent, node)
+  result.add parent
+
 func isCliSwitch(opt: OptInfo): bool =
   opt.kind == CliSwitch or
   (opt.kind == Discriminator and opt.isCommand == false)
@@ -317,10 +335,59 @@ type
     defaultCmdOpts
     conditionalOpts
 
-proc describeOptions(help: var string,
-                     cmd: CmdInfo, cmdInvocation: string,
-                     appInfo: HelpAppInfo, optionsType = normalOpts) =
-  if cmd.hasOpts:
+proc describeOptionsList(
+  help: var string,
+  cmd: CmdInfo,
+  appInfo: HelpAppInfo
+) =
+  for opt in cmd.opts:
+    if opt.kind == Arg or
+        opt.kind == Discriminator or
+        opt.isHidden:
+      continue
+
+    if opt.separator.len > 0:
+      helpOutput opt.separator
+      helpOutput "\p"
+
+    # Indent all command-line switches
+    helpOutput " "
+
+    if opt.abbr.len > 0:
+      helpOutput fgOption, styleBright, "-", opt.abbr, ", "
+    elif appInfo.hasAbbrs:
+      # Add additional indentatition, so all names are aligned
+      helpOutput "    "
+
+    if opt.name.len > 0:
+      let switch = "--" & opt.name
+      helpOutput fgOption, styleBright,
+                  switch, padding(switch, appInfo.namesWidth)
+    else:
+      helpOutput spaces(2 + appInfo.namesWidth)
+
+    if opt.desc.len > 0:
+      help.writeDesc appInfo,
+                      opt.desc.replace("%t", opt.typename),
+                      opt.defaultInHelpText
+      help.writeLongDesc appInfo, opt.longDesc
+
+    helpOutput "\p"
+
+proc describeOptions(
+  help: var string,
+  cmd: CmdInfo,
+  cmdInvocation: string,
+  appInfo: HelpAppInfo,
+  optionsType = normalOpts,
+  path: seq[CmdInfo] = @[]
+) =
+  var hasOpts = cmd.hasOpts
+  for c in path:
+    if c.hasOpts:
+      hasOpts = true
+
+  if hasOpts:
     case optionsType
     of normalOpts:
       helpOutput "\pThe following options are available:\p\p"
@@ -329,47 +396,20 @@ proc describeOptions(help: var string,
     of defaultCmdOpts:
       discard
 
-    for opt in cmd.opts:
-      if opt.kind == Arg or
-         opt.kind == Discriminator or
-         opt.isHidden: continue
+    if path.len > 0:
+      for i in countdown(path.len-1, 0):
+        describeOptionsList(help, path[i], appInfo)
+    else:
+      describeOptionsList(help, cmd, appInfo)
 
-      if opt.separator.len > 0:
-        helpOutput opt.separator
-        helpOutput "\p"
-
-      # Indent all command-line switches
-      helpOutput " "
-
-      if opt.abbr.len > 0:
-        helpOutput fgOption, styleBright, "-", opt.abbr, ", "
-      elif appInfo.hasAbbrs:
-        # Add additional indentatition, so all names are aligned
-        helpOutput "    "
-
-      if opt.name.len > 0:
-        let switch = "--" & opt.name
-        helpOutput fgOption, styleBright,
-                   switch, padding(switch, appInfo.namesWidth)
-      else:
-        helpOutput spaces(2 + appInfo.namesWidth)
-
-      if opt.desc.len > 0:
-        help.writeDesc appInfo,
-                       opt.desc.replace("%t", opt.typename),
-                       opt.defaultInHelpText
-        help.writeLongDesc appInfo, opt.longDesc
-
-      helpOutput "\p"
-
-      if opt.kind == Discriminator:
-        for i, subCmd in opt.subCmds:
-          if not subCmd.hasOpts: continue
-
-          helpOutput "\pWhen ", styleBright, fgBlue, opt.humaneName, resetStyle, " = ", fgGreen, subCmd.name
-
-          if i == opt.defaultSubCmd: helpOutput " (default)"
-          help.describeOptions subCmd, cmdInvocation, appInfo, conditionalOpts
+#      if opt.kind == Discriminator:
+#        for i, subCmd in opt.subCmds:
+#          if not subCmd.hasOpts: continue
+#
+#          helpOutput "\pWhen ", styleBright, fgBlue, opt.humaneName, resetStyle, " = ", fgGreen, subCmd.name
+#
+#          if i == opt.defaultSubCmd: helpOutput " (default)"
+#          help.describeOptions subCmd, cmdInvocation, appInfo, conditionalOpts
 
   let subCmdDiscriminator = cmd.getSubCmdDiscriminator
   if subCmdDiscriminator != nil:
@@ -393,7 +433,10 @@ proc showHelp(help: var string,
     helpOutput appInfo.copyrightBanner, "\p\p"
 
   let cmd = activeCmds[^1]
-
+  let path = if activeCmds.len > 1:
+    findPath(activeCmds[0], cmd)
+  else:
+    newSeq[CmdInfo]()
   appInfo.maxNameLen = cmd.maxNameLen
   appInfo.hasAbbrs = cmd.hasAbbrs
   let termWidth =
@@ -413,7 +456,7 @@ proc showHelp(help: var string,
   # Write out the app or script name
   helpOutput fgSection, "Usage: \p"
   help.describeInvocation cmd, cmdInvocation, appInfo
-  help.describeOptions cmd, cmdInvocation, appInfo
+  help.describeOptions cmd, cmdInvocation, appInfo, path = path
   helpOutput "\p"
 
   flushOutputAndQuit QuitSuccess
@@ -742,24 +785,6 @@ func checkDuplicate(cmd: CmdInfo, opt: OptInfo, fieldName: NimNode) =
       error "duplicate name detected: " & opt.name, fieldName
     if opt.abbr.len > 0 and opt.abbr == x.abbr:
       error "duplicate abbr detected: " & opt.abbr, fieldName
-
-func validPath(path: var seq[CmdInfo], parent, node: CmdInfo): bool =
-  for x in parent.opts:
-    if x.kind != Discriminator: continue
-    for y in x.subCmds:
-      if y == node:
-        path.add y
-        return true
-      if validPath(path, y, node):
-        path.add y
-        return true
-  false
-
-func findPath(parent, node: CmdInfo): seq[CmdInfo] =
-  # find valid path from parent to node
-  result = newSeq[CmdInfo]()
-  doAssert validPath(result, parent, node)
-  result.add parent
 
 func toText(n: NimNode): string =
   if n == nil: ""

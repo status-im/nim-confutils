@@ -56,3 +56,5 @@ suite "test --help":
   test "test test_nested_cmd outerCmd1":
     cmdTest("test_nested_cmd", "outerCmd1")
     
+  test "test test_nested_cmd outerCmd1 innerCmd2":
+    cmdTest("test_nested_cmd", "outerCmd1 innerCmd2")
