@@ -1,0 +1,25 @@
+Usage: 
+
+test_nested_cmd outerCmd1 [OPTIONS]... command
+
+The following options are available:
+
+ --outer-arg1      outerArg1 desc [=outerArg1 default].
+
+Available sub-commands:
+
+test_nested_cmd outerCmd1 innerCmd1 [OPTIONS]...
+
+Inner cmd 1.
+
+The following options are available:
+
+ --inner-arg1      innerArg1 desc [=innerArg1 default].
+
+test_nested_cmd outerCmd1 innerCmd2 [OPTIONS]...
+
+Inner cmd 2.
+
+The following options are available:
+
+ --inner-arg2      innerArg2 desc [=innerArg2 default].
