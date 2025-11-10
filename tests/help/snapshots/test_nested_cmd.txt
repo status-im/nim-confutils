@@ -1,7 +1,11 @@
 Usage: 
 
-test_nested_cmd command
- --outer-arg  outerArg desc [=outerArg default].
+test_nested_cmd [OPTIONS]... command
+
+The following options are available:
+
+ --top-arg1      topArg1 desc [=topArg1 default].
+ --no-command-arg1  noCommandArg1 desc [=noCommandArg1 default].
 
 Available sub-commands:
 
@@ -9,7 +13,7 @@ test_nested_cmd outerCmd1 [OPTIONS]... command
 
 The following options are available:
 
- --outer-arg1  outerArg1 desc [=outerArg1 default].
+ --top-outercmd1-arg1  topOuterCmd1Arg1 desc [=topOuterCmd1Arg1 default].
 
 Available sub-commands:
 
@@ -19,7 +23,7 @@ Inner cmd 1.
 
 The following options are available:
 
- --inner-arg1  innerArg1 desc [=innerArg1 default].
+ --innercmd1-arg1  innerCmd1Arg1 desc [=innerCmd1Arg1 default].
 
 test_nested_cmd outerCmd1 innerCmd2 [OPTIONS]...
 
@@ -27,4 +31,4 @@ Inner cmd 2.
 
 The following options are available:
 
- --inner-arg2  innerArg2 desc [=innerArg2 default].
+ --innercmd2-arg1  innerCmd2Arg1 desc [=innerCmd2Arg1 default].

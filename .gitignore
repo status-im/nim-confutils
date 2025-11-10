@@ -6,3 +6,4 @@ build/
 vendor/
 tests/test_all
 tests/test_nested_cmd
+tests/test_help

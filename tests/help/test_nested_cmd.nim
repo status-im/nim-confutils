@@ -10,29 +10,35 @@ type
     innerCmd2 = "Inner cmd 2"
 
   TestConf = object
+    topArg1 {.
+      defaultValue: "topArg1 default"
+      desc: "topArg1 desc"
+      name: "top-arg1" }: string
+
     case cmd {.
       command
       defaultValue: OuterCmd.noCommand }: OuterCmd
     of OuterCmd.noCommand:
-      outerArg {.
-        defaultValue: "outerArg default"
-        desc: "outerArg desc"
-        name: "outer-arg" }: string
+      noCommandArg1 {.
+        defaultValue: "noCommandArg1 default"
+        desc: "noCommandArg1 desc"
+        name: "no-command-arg1" }: string
     of OuterCmd.outerCmd1:
-      outerArg1 {.
-        defaultValue: "outerArg1 default"
-        desc: "outerArg1 desc"
-        name: "outer-arg1" }: string
+      topOuterCmd1Arg1 {.
+        defaultValue: "topOuterCmd1Arg1 default"
+        desc: "topOuterCmd1Arg1 desc"
+        name: "top-outercmd1-arg1" }: string
+
       case innerCmd {.command.}: InnerCmd
       of InnerCmd.innerCmd1:
-        innerArg1 {.
-          defaultValue: "innerArg1 default"
-          desc: "innerArg1 desc"
-          name: "inner-arg1" }: string
+        innerCmd1Arg1 {.
+          defaultValue: "innerCmd1Arg1 default"
+          desc: "innerCmd1Arg1 desc"
+          name: "innercmd1-arg1" }: string
       of InnerCmd.innerCmd2:
-        innerArg2 {.
-          defaultValue: "innerArg2 default"
-          desc: "innerArg2 desc"
-          name: "inner-arg2" }: string
+        innerCmd2Arg1 {.
+          defaultValue: "innerCmd2Arg1 default"
+          desc: "innerCmd2Arg1 desc"
+          name: "innercmd2-arg1" }: string
 
 let c = TestConf.load()

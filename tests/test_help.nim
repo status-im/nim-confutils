@@ -16,7 +16,7 @@ import
 const helpPath = "tests" / "help"
 const snapshotsPath = helpPath / "snapshots"
 
-func normalizeSnapshot(s: string): string =
+func normalizeHelp(s: string): string =
   s.replace("\x1B[0m", "")
     .replace("\r\n", "\n")
     .replace("\r", "\n")
@@ -30,26 +30,26 @@ func argsToName(args: string): string =
 
 proc cmdTest(cmdName, args: string) =
   let fname = helpPath / cmdName
-  if not fileExists(fname):
-    var build = "nim c --verbosity:0 --hints:off -d:confutilsNoColors"
-    if NimMajor < 2:
-      build.add " -d:nimOldCaseObjects"
-    let buildRes = execCmdEx(build & " " & fname & ".nim")
-    check buildRes.exitCode == 0
+  #if not fileExists(fname):
+  var build = "nim c --verbosity:0 --hints:off -d:confutilsNoColors"
+  if NimMajor < 2:
+    build.add " -d:nimOldCaseObjects"
+  let buildRes = execCmdEx(build & " " & fname & ".nim")
+  check buildRes.exitCode == 0
   let res = execCmdEx(fname & " " & args & " --help")
-  let output = res.output.normalizeSnapshot()
+  check res.exitCode == 0
+  let output = res.output.normalizeHelp()
   let snapshot = snapshotsPath / cmdName & args.argsToName() & ".txt"
   if not fileExists(snapshot):
     writeFile(snapshot, output)
     checkpoint "Snapshot created: " & snapshot
     fail()
-  let expected = readFile(snapshot).normalizeSnapshot()
-  check res.exitCode == 0
+  let expected = readFile(snapshot).normalizeHelp()
   checkpoint "Cmd output: " & $output.toBytes()
   checkpoint "Snapshot: " & $expected.toBytes()
   check output == expected
 
-suite "test help":
+suite "test --help":
   test "test test_nested_cmd default":
     cmdTest("test_nested_cmd", "")
 
