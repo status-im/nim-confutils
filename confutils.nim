@@ -396,11 +396,13 @@ proc showHelp(help: var string,
 
   appInfo.maxNameLen = cmd.maxNameLen
   appInfo.hasAbbrs = cmd.hasAbbrs
-  appInfo.terminalWidth =
+  let termWidth =
     try:
       terminalWidth()
     except ValueError:
       int.high  # https://github.com/nim-lang/Nim/pull/21968
+  if appInfo.terminalWidth == 0:
+    appInfo.terminalWidth = termWidth
   appInfo.namesWidth = min(minNameWidth, appInfo.maxNameLen) + descPadding
 
   var cmdInvocation = appInfo.appInvocation
@@ -920,7 +922,8 @@ proc loadImpl[C, SecondarySources](
     secondarySources: proc (
         config: Configuration, sources: ref SecondarySources
     ) {.gcsafe, raises: [ConfigurationError].} = nil,
-    envVarsPrefix = appInvocation()
+    envVarsPrefix = appInvocation(),
+    termWidth = 0
 ): Configuration {.raises: [ConfigurationError].} =
   ## Loads a program configuration by parsing command-line arguments
   ## and a standard set of config files that can specify:
@@ -1094,7 +1097,8 @@ proc loadImpl[C, SecondarySources](
   proc lazyHelpAppInfo: HelpAppInfo =
     HelpAppInfo(
       copyrightBanner: copyrightBanner,
-      appInvocation: appInvocation())
+      appInvocation: appInvocation(),
+      terminalWidth: termWidth)
 
   template processHelpAndVersionOptions(optKey: string) =
     let key = optKey
@@ -1200,12 +1204,13 @@ template load*(
     quitOnFailure = true,
     ignoreUnknown = false,
     secondarySources: untyped = nil,
-    envVarsPrefix = appInvocation()): untyped =
+    envVarsPrefix = appInvocation(),
+    termWidth = 0): untyped =
   block:
     let secondarySourcesRef = generateSecondarySources(Configuration)
     loadImpl(Configuration, cmdLine, version,
              copyrightBanner, printUsage, quitOnFailure, ignoreUnknown,
-             secondarySourcesRef, secondarySources, envVarsPrefix)
+             secondarySourcesRef, secondarySources, envVarsPrefix, termWidth)
 
 func defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
