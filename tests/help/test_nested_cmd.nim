@@ -1,13 +1,13 @@
 import ../../confutils
 
 type
-  OuterCmd = enum
-    noCommand
-    outerCmd1
+  Lvl1Cmd = enum
+    lvl1NoCommand
+    lvl1Cmd1
 
-  InnerCmd = enum
-    innerCmd1 = "Inner cmd 1"
-    innerCmd2 = "Inner cmd 2"
+  Lvl2Cmd = enum
+    lvl2Cmd1
+    lvl2Cmd2
 
   TestConf = object
     topArg1 {.
@@ -17,29 +17,29 @@ type
 
     case cmd {.
       command
-      defaultValue: OuterCmd.noCommand }: OuterCmd
-    of OuterCmd.noCommand:
-      noCommandArg1 {.
-        defaultValue: "noCommandArg1 default"
-        desc: "noCommandArg1 desc"
-        name: "no-command-arg1" }: string
-    of OuterCmd.outerCmd1:
-      topOuterCmd1Arg1 {.
-        defaultValue: "topOuterCmd1Arg1 default"
-        desc: "topOuterCmd1Arg1 desc"
-        name: "top-outercmd1-arg1" }: string
+      defaultValue: Lvl1Cmd.lvl1NoCommand }: Lvl1Cmd
+    of Lvl1Cmd.lvl1NoCommand:
+      lvl1NoCommandArg1 {.
+        defaultValue: "lvl1NoCommandArg1 default"
+        desc: "lvl1NoCommandArg1 desc"
+        name: "lvl1-no-command-arg1" }: string
+    of Lvl1Cmd.lvl1Cmd1:
+      lvl1Cmd1Arg1 {.
+        defaultValue: "lvl1Cmd1Arg1 default"
+        desc: "lvl1Cmd1Arg1 desc"
+        name: "lvl1-cmd1-arg1" }: string
 
-      case innerCmd {.command.}: InnerCmd
-      of InnerCmd.innerCmd1:
-        innerCmd1Arg1 {.
-          defaultValue: "innerCmd1Arg1 default"
-          desc: "innerCmd1Arg1 desc"
-          name: "innercmd1-arg1" }: string
-      of InnerCmd.innerCmd2:
-        innerCmd2Arg1 {.
-          defaultValue: "innerCmd2Arg1 default"
-          desc: "innerCmd2Arg1 desc"
-          name: "innercmd2-arg1" }: string
+      case lvl2Cmd {.command.}: Lvl2Cmd
+      of Lvl2Cmd.lvl2Cmd1:
+        lvl2Cmd1Arg1 {.
+          defaultValue: "lvl2Cmd1Arg1 default"
+          desc: "lvl2Cmd1Arg1 desc"
+          name: "lvl2-cmd1-arg1" }: string
+      of Lvl2Cmd.lvl2Cmd2:
+        lvl2Cmd2Arg1 {.
+          defaultValue: "lvl2Cmd2Arg1 default"
+          desc: "lvl2Cmd2Arg1 desc"
+          name: "lvl2-cmd2-arg1" }: string
 
 let c = TestConf.load(termWidth = int.high)
 

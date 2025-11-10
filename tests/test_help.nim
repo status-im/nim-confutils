@@ -50,11 +50,11 @@ proc cmdTest(cmdName, args: string) =
   check output == expected
 
 suite "test --help":
-  test "test test_nested_cmd default":
+  test "test test_nested_cmd":
     cmdTest("test_nested_cmd", "")
 
-  test "test test_nested_cmd outerCmd1":
-    cmdTest("test_nested_cmd", "outerCmd1")
+  test "test test_nested_cmd lvl1Cmd1":
+    cmdTest("test_nested_cmd", "lvl1Cmd1")
     
-  test "test test_nested_cmd outerCmd1 innerCmd2":
-    cmdTest("test_nested_cmd", "outerCmd1 innerCmd2")
+  test "test test_nested_cmd lvl1Cmd1 lvl2Cmd2":
+    cmdTest("test_nested_cmd", "lvl1Cmd1 lvl2Cmd2")
