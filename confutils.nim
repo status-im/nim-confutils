@@ -760,6 +760,13 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
   result.add settersArray
   debugMacroResult "Field Setters"
 
+func checkDuplicate(cmd: CmdInfo, opt: OptInfo, fieldName: NimNode) =
+  for x in cmd.opts:
+    if opt.name == x.name:
+      error "duplicate name detected: " & opt.name, fieldName
+    if opt.abbr.len > 0 and opt.abbr == x.abbr:
+      error "duplicate abbr detected: " & opt.abbr, fieldName
+
 func validPath(path: var seq[CmdInfo], parent, node: CmdInfo): bool =
   for x in parent.opts:
     if x.kind != Discriminator: continue
@@ -777,13 +784,6 @@ func findPath(parent, node: CmdInfo): seq[CmdInfo] =
   result = newSeq[CmdInfo]()
   doAssert validPath(result, parent, node)
   result.add parent
-
-func checkDuplicate(cmd: CmdInfo, opt: OptInfo, fieldName: NimNode) =
-  for x in cmd.opts:
-    if opt.name == x.name:
-      error "duplicate name detected: " & opt.name, fieldName
-    if opt.abbr.len > 0 and opt.abbr == x.abbr:
-      error "duplicate abbr detected: " & opt.abbr, fieldName
 
 func toText(n: NimNode): string =
   if n == nil: ""
