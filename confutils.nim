@@ -170,24 +170,6 @@ template flushOutputAndQuit(exitCode: int) =
   flushOutput
   quit exitCode
 
-func validPath(path: var seq[CmdInfo], parent, node: CmdInfo): bool =
-  for x in parent.opts:
-    if x.kind != Discriminator: continue
-    for y in x.subCmds:
-      if y == node:
-        path.add y
-        return true
-      if validPath(path, y, node):
-        path.add y
-        return true
-  false
-
-func findPath(parent, node: CmdInfo): seq[CmdInfo] =
-  # find valid path from parent to node
-  result = newSeq[CmdInfo]()
-  doAssert validPath(result, parent, node)
-  result.add parent
-
 func isCliSwitch(opt: OptInfo): bool =
   opt.kind == CliSwitch or
   (opt.kind == Discriminator and opt.isCommand == false)
@@ -391,10 +373,10 @@ proc describeOptions(
   cmdInvocation: string,
   appInfo: HelpAppInfo,
   optionsType = normalOpts,
-  path: seq[CmdInfo] = @[]
+  cmdPath: seq[CmdInfo] = @[]
 ) =
   var hasOpts = cmd.hasOpts
-  for c in path:
+  for c in cmdPath:
     if c.hasOpts:
       hasOpts = true
 
@@ -407,9 +389,9 @@ proc describeOptions(
     of defaultCmdOpts:
       discard
 
-    if path.len > 0:
-      for i in countdown(path.len-1, 0):
-        describeOptionsList(help, path[i], appInfo)
+    if cmdPath.len > 0:
+      for c in cmdPath:
+        describeOptionsList(help, c, appInfo)
     else:
       describeOptionsList(help, cmd, appInfo)
 
@@ -430,15 +412,12 @@ proc describeOptions(
 
 proc showHelp(help: var string,
               appInfo: HelpAppInfo,
-              activeCmds: openArray[CmdInfo]) =
+              activeCmds: seq[CmdInfo]) =
   if appInfo.copyrightBanner.len > 0:
     helpOutput appInfo.copyrightBanner, "\p\p"
 
   let cmd = activeCmds[^1]
-  let path = if activeCmds.len > 1:
-    findPath(activeCmds[0], cmd)
-  else:
-    newSeq[CmdInfo]()
+
   appInfo.maxNameLen = cmd.maxNameLen
   appInfo.hasAbbrs = cmd.hasAbbrs
   let termWidth =
@@ -458,7 +437,7 @@ proc showHelp(help: var string,
   # Write out the app or script name
   helpOutput fgSection, "Usage: \p"
   help.describeInvocation cmd, cmdInvocation, appInfo
-  help.describeOptions cmd, cmdInvocation, appInfo, path = path
+  help.describeOptions cmd, cmdInvocation, appInfo, cmdPath = activeCmds
   helpOutput "\p"
 
   flushOutputAndQuit QuitSuccess
@@ -780,6 +759,24 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
 
   result.add settersArray
   debugMacroResult "Field Setters"
+
+func validPath(path: var seq[CmdInfo], parent, node: CmdInfo): bool =
+  for x in parent.opts:
+    if x.kind != Discriminator: continue
+    for y in x.subCmds:
+      if y == node:
+        path.add y
+        return true
+      if validPath(path, y, node):
+        path.add y
+        return true
+  false
+
+func findPath(parent, node: CmdInfo): seq[CmdInfo] =
+  # find valid path from parent to node
+  result = newSeq[CmdInfo]()
+  doAssert validPath(result, parent, node)
+  result.add parent
 
 func checkDuplicate(cmd: CmdInfo, opt: OptInfo, fieldName: NimNode) =
   for x in cmd.opts:

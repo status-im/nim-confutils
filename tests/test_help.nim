@@ -21,27 +21,34 @@ func normalizeHelp(s: string): string =
     .replace("\r\n", "\n")
     .strip(leading = false)
 
-func argsToName(args: string): string =
-  if args.len == 0:
+func cmdsToName(cmds: string): string =
+  if cmds.len == 0:
     ""
   else:
-    "_" & args.replace(" ", "_")
+    "_" & cmds.replace(" ", "_")
 
-proc cmdTest(cmdName, args: string) =
+proc cmdTest(cmdName: string, cmds = "") =
   let fname = helpPath / cmdName
   var build = "nim c --verbosity:0 --hints:off -d:confutilsNoColors"
   if NimMajor < 2:
     build.add " -d:nimOldCaseObjects"
   let buildRes = execCmdEx(build & " " & fname & ".nim")
-  check buildRes.exitCode == 0
-  let res = execCmdEx(fname & " " & args & " --help")
-  check res.exitCode == 0
+  if buildRes.exitCode != 0:
+    checkpoint "Build output: " & buildRes.output
+    fail()
+    return
+  let res = execCmdEx(fname & " " & cmds & " --help")
+  if res.exitCode != 0:
+    checkpoint "Run output: " & res.output
+    fail()
+    return
   let output = res.output.normalizeHelp()
-  let snapshot = snapshotsPath / cmdName & args.argsToName() & ".txt"
+  let snapshot = snapshotsPath / cmdName & cmds.cmdsToName() & ".txt"
   if not fileExists(snapshot):
     writeFile(snapshot, output)
     checkpoint "Snapshot created: " & snapshot
     fail()
+    return
   let expected = readFile(snapshot).normalizeHelp()
   checkpoint "Cmd output: " & $output.toBytes()
   checkpoint "Snapshot: " & $expected.toBytes()
