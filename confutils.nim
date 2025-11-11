@@ -374,6 +374,17 @@ proc describeOptionsList(
 
     helpOutput "\p"
 
+    # TODO: this is not reached: https://github.com/status-im/nim-confutils/issues/39
+    when false:
+      if opt.kind == Discriminator:
+        for i, subCmd in opt.subCmds:
+          if not subCmd.hasOpts: continue
+
+          helpOutput "\pWhen ", styleBright, fgBlue, opt.humaneName, resetStyle, " = ", fgGreen, subCmd.name
+
+          if i == opt.defaultSubCmd: helpOutput " (default)"
+          help.describeOptions subCmd, cmdInvocation, appInfo, conditionalOpts
+
 proc describeOptions(
   help: var string,
   cmd: CmdInfo,
@@ -401,15 +412,6 @@ proc describeOptions(
         describeOptionsList(help, path[i], appInfo)
     else:
       describeOptionsList(help, cmd, appInfo)
-
-#      if opt.kind == Discriminator:
-#        for i, subCmd in opt.subCmds:
-#          if not subCmd.hasOpts: continue
-#
-#          helpOutput "\pWhen ", styleBright, fgBlue, opt.humaneName, resetStyle, " = ", fgGreen, subCmd.name
-#
-#          if i == opt.defaultSubCmd: helpOutput " (default)"
-#          help.describeOptions subCmd, cmdInvocation, appInfo, conditionalOpts
 
   let subCmdDiscriminator = cmd.getSubCmdDiscriminator
   if subCmdDiscriminator != nil:

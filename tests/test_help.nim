@@ -19,7 +19,6 @@ const snapshotsPath = helpPath / "snapshots"
 func normalizeHelp(s: string): string =
   s.replace("\x1B[0m", "")
     .replace("\r\n", "\n")
-    .replace("\r", "\n")
     .strip(leading = false)
 
 func argsToName(args: string): string =
@@ -30,7 +29,6 @@ func argsToName(args: string): string =
 
 proc cmdTest(cmdName, args: string) =
   let fname = helpPath / cmdName
-  #if not fileExists(fname):
   var build = "nim c --verbosity:0 --hints:off -d:confutilsNoColors"
   if NimMajor < 2:
     build.add " -d:nimOldCaseObjects"

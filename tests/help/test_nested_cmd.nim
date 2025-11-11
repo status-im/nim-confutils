@@ -42,7 +42,3 @@ type
           name: "lvl2-cmd2-arg1" }: string
 
 let c = TestConf.load(termWidth = int.high)
-
-
-
-
