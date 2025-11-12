@@ -373,10 +373,10 @@ proc describeOptions(
   cmdInvocation: string,
   appInfo: HelpAppInfo,
   optionsType = normalOpts,
-  cmdPath: openArray[CmdInfo] = @[]
+  activeCmds: openArray[CmdInfo] = @[]
 ) =
   var hasOpts = cmd.hasOpts
-  for c in cmdPath:
+  for c in activeCmds:
     if c.hasOpts:
       hasOpts = true
 
@@ -389,8 +389,8 @@ proc describeOptions(
     of defaultCmdOpts:
       discard
 
-    if cmdPath.len > 0:
-      for c in cmdPath:
+    if activeCmds.len > 0:
+      for c in activeCmds:
         describeOptionsList(help, c, appInfo)
     else:
       describeOptionsList(help, cmd, appInfo)
@@ -437,7 +437,7 @@ proc showHelp(help: var string,
   # Write out the app or script name
   helpOutput fgSection, "Usage: \p"
   help.describeInvocation cmd, cmdInvocation, appInfo
-  help.describeOptions cmd, cmdInvocation, appInfo, cmdPath = activeCmds
+  help.describeOptions cmd, cmdInvocation, appInfo, activeCmds = activeCmds
   helpOutput "\p"
 
   flushOutputAndQuit QuitSuccess
