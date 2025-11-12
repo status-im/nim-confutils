@@ -8,7 +8,7 @@
 # those terms.
 
 import
-  std/[os, osproc, strutils, sequtils],
+  std/[os, osproc, strutils],
   unittest2,
   stew/byteutils,
   ../confutils
@@ -36,23 +36,22 @@ proc cmdTest(cmdName: string, cmds = "") =
   if buildRes.exitCode != 0:
     checkpoint "Build output: " & buildRes.output
     fail()
-    return
-  let res = execCmdEx(fname & " " & cmds & " --help")
-  if res.exitCode != 0:
-    checkpoint "Run output: " & res.output
-    fail()
-    return
-  let output = res.output.normalizeHelp()
-  let snapshot = snapshotsPath / cmdName & cmds.cmdsToName() & ".txt"
-  if not fileExists(snapshot):
-    writeFile(snapshot, output)
-    checkpoint "Snapshot created: " & snapshot
-    fail()
-    return
-  let expected = readFile(snapshot).normalizeHelp()
-  checkpoint "Cmd output: " & $output.toBytes()
-  checkpoint "Snapshot: " & $expected.toBytes()
-  check output == expected
+  else:
+    let res = execCmdEx(fname & " " & cmds & " --help")
+    let output = res.output.normalizeHelp()
+    let snapshot = snapshotsPath / cmdName & cmds.cmdsToName() & ".txt"
+    if res.exitCode != 0:
+      checkpoint "Run output: " & res.output
+      fail()
+    elif not fileExists(snapshot):
+      writeFile(snapshot, output)
+      checkpoint "Snapshot created: " & snapshot
+      fail()
+    else:
+      let expected = readFile(snapshot).normalizeHelp()
+      checkpoint "Cmd output: " & $output.toBytes()
+      checkpoint "Snapshot: " & $expected.toBytes()
+      check output == expected
 
 suite "test --help":
   test "test test_nested_cmd":

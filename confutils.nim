@@ -373,7 +373,7 @@ proc describeOptions(
   cmdInvocation: string,
   appInfo: HelpAppInfo,
   optionsType = normalOpts,
-  cmdPath: seq[CmdInfo] = @[]
+  cmdPath: openArray[CmdInfo] = @[]
 ) =
   var hasOpts = cmd.hasOpts
   for c in cmdPath:
@@ -412,7 +412,7 @@ proc describeOptions(
 
 proc showHelp(help: var string,
               appInfo: HelpAppInfo,
-              activeCmds: seq[CmdInfo]) =
+              activeCmds: openArray[CmdInfo]) =
   if appInfo.copyrightBanner.len > 0:
     helpOutput appInfo.copyrightBanner, "\p\p"
 
