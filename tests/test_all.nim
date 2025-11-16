@@ -14,7 +14,8 @@ import
   test_parsecmdarg,
   test_pragma,
   test_qualified_ident,
-  test_nested_cmd
+  test_nested_cmd,
+  test_help
 
 when defined(windows):
   import test_winreg

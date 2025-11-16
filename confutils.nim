@@ -317,51 +317,47 @@ type
     defaultCmdOpts
     conditionalOpts
 
-proc describeOptions(help: var string,
-                     cmd: CmdInfo, cmdInvocation: string,
-                     appInfo: HelpAppInfo, optionsType = normalOpts) =
-  if cmd.hasOpts:
-    case optionsType
-    of normalOpts:
-      helpOutput "\pThe following options are available:\p\p"
-    of conditionalOpts:
-      helpOutput ", the following additional options are available:\p\p"
-    of defaultCmdOpts:
-      discard
+proc describeOptionsList(
+  help: var string,
+  cmd: CmdInfo,
+  appInfo: HelpAppInfo
+) =
+  for opt in cmd.opts:
+    if opt.kind == Arg or
+        opt.kind == Discriminator or
+        opt.isHidden:
+      continue
 
-    for opt in cmd.opts:
-      if opt.kind == Arg or
-         opt.kind == Discriminator or
-         opt.isHidden: continue
-
-      if opt.separator.len > 0:
-        helpOutput opt.separator
-        helpOutput "\p"
-
-      # Indent all command-line switches
-      helpOutput " "
-
-      if opt.abbr.len > 0:
-        helpOutput fgOption, styleBright, "-", opt.abbr, ", "
-      elif appInfo.hasAbbrs:
-        # Add additional indentatition, so all names are aligned
-        helpOutput "    "
-
-      if opt.name.len > 0:
-        let switch = "--" & opt.name
-        helpOutput fgOption, styleBright,
-                   switch, padding(switch, appInfo.namesWidth)
-      else:
-        helpOutput spaces(2 + appInfo.namesWidth)
-
-      if opt.desc.len > 0:
-        help.writeDesc appInfo,
-                       opt.desc.replace("%t", opt.typename),
-                       opt.defaultInHelpText
-        help.writeLongDesc appInfo, opt.longDesc
-
+    if opt.separator.len > 0:
+      helpOutput opt.separator
       helpOutput "\p"
 
+    # Indent all command-line switches
+    helpOutput " "
+
+    if opt.abbr.len > 0:
+      helpOutput fgOption, styleBright, "-", opt.abbr, ", "
+    elif appInfo.hasAbbrs:
+      # Add additional indentatition, so all names are aligned
+      helpOutput "    "
+
+    if opt.name.len > 0:
+      let switch = "--" & opt.name
+      helpOutput fgOption, styleBright,
+                  switch, padding(switch, appInfo.namesWidth)
+    else:
+      helpOutput spaces(2 + appInfo.namesWidth)
+
+    if opt.desc.len > 0:
+      help.writeDesc appInfo,
+                      opt.desc.replace("%t", opt.typename),
+                      opt.defaultInHelpText
+      help.writeLongDesc appInfo, opt.longDesc
+
+    helpOutput "\p"
+
+    # TODO: this is not reached: https://github.com/status-im/nim-confutils/issues/39
+    when false:
       if opt.kind == Discriminator:
         for i, subCmd in opt.subCmds:
           if not subCmd.hasOpts: continue
@@ -370,6 +366,34 @@ proc describeOptions(help: var string,
 
           if i == opt.defaultSubCmd: helpOutput " (default)"
           help.describeOptions subCmd, cmdInvocation, appInfo, conditionalOpts
+
+proc describeOptions(
+  help: var string,
+  cmd: CmdInfo,
+  cmdInvocation: string,
+  appInfo: HelpAppInfo,
+  optionsType = normalOpts,
+  activeCmds: openArray[CmdInfo] = @[]
+) =
+  var hasOpts = cmd.hasOpts
+  for c in activeCmds:
+    if c.hasOpts:
+      hasOpts = true
+
+  if hasOpts:
+    case optionsType
+    of normalOpts:
+      helpOutput "\pThe following options are available:\p\p"
+    of conditionalOpts:
+      helpOutput ", the following additional options are available:\p\p"
+    of defaultCmdOpts:
+      discard
+
+    if activeCmds.len > 0:
+      for c in activeCmds:
+        describeOptionsList(help, c, appInfo)
+    else:
+      describeOptionsList(help, cmd, appInfo)
 
   let subCmdDiscriminator = cmd.getSubCmdDiscriminator
   if subCmdDiscriminator != nil:
@@ -396,11 +420,13 @@ proc showHelp(help: var string,
 
   appInfo.maxNameLen = cmd.maxNameLen
   appInfo.hasAbbrs = cmd.hasAbbrs
-  appInfo.terminalWidth =
+  let termWidth =
     try:
       terminalWidth()
     except ValueError:
       int.high  # https://github.com/nim-lang/Nim/pull/21968
+  if appInfo.terminalWidth == 0:
+    appInfo.terminalWidth = termWidth
   appInfo.namesWidth = min(minNameWidth, appInfo.maxNameLen) + descPadding
 
   var cmdInvocation = appInfo.appInvocation
@@ -411,7 +437,7 @@ proc showHelp(help: var string,
   # Write out the app or script name
   helpOutput fgSection, "Usage: \p"
   help.describeInvocation cmd, cmdInvocation, appInfo
-  help.describeOptions cmd, cmdInvocation, appInfo
+  help.describeOptions cmd, cmdInvocation, appInfo, activeCmds = activeCmds
   helpOutput "\p"
 
   flushOutputAndQuit QuitSuccess
@@ -920,7 +946,8 @@ proc loadImpl[C, SecondarySources](
     secondarySources: proc (
         config: Configuration, sources: ref SecondarySources
     ) {.gcsafe, raises: [ConfigurationError].} = nil,
-    envVarsPrefix = appInvocation()
+    envVarsPrefix = appInvocation(),
+    termWidth = 0
 ): Configuration {.raises: [ConfigurationError].} =
   ## Loads a program configuration by parsing command-line arguments
   ## and a standard set of config files that can specify:
@@ -1094,7 +1121,8 @@ proc loadImpl[C, SecondarySources](
   proc lazyHelpAppInfo: HelpAppInfo =
     HelpAppInfo(
       copyrightBanner: copyrightBanner,
-      appInvocation: appInvocation())
+      appInvocation: appInvocation(),
+      terminalWidth: termWidth)
 
   template processHelpAndVersionOptions(optKey: string) =
     let key = optKey
@@ -1200,12 +1228,13 @@ template load*(
     quitOnFailure = true,
     ignoreUnknown = false,
     secondarySources: untyped = nil,
-    envVarsPrefix = appInvocation()): untyped =
+    envVarsPrefix = appInvocation(),
+    termWidth = 0): untyped =
   block:
     let secondarySourcesRef = generateSecondarySources(Configuration)
     loadImpl(Configuration, cmdLine, version,
              copyrightBanner, printUsage, quitOnFailure, ignoreUnknown,
-             secondarySourcesRef, secondarySources, envVarsPrefix)
+             secondarySourcesRef, secondarySources, envVarsPrefix, termWidth)
 
 func defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
