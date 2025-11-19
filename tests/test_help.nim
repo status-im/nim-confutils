@@ -59,6 +59,9 @@ suite "test --help":
 
   test "test test_nested_cmd lvl1Cmd1":
     cmdTest("test_nested_cmd", "lvl1Cmd1")
-    
+
   test "test test_nested_cmd lvl1Cmd1 lvl2Cmd2":
     cmdTest("test_nested_cmd", "lvl1Cmd1 lvl2Cmd2")
+
+  test "test test_argument":
+    cmdTest("test_argument", "")

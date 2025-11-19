@@ -182,20 +182,15 @@ func hasOpts(cmd: CmdInfo): bool =
   return false
 
 func hasArgs(cmd: CmdInfo): bool =
-  cmd.opts.len > 0 and cmd.opts[^1].kind == Arg
-
-func firstArgIdx(cmd: CmdInfo): int =
-  # This will work correctly only if the command has arguments.
-  result = cmd.opts.len - 1
-  while result > 0:
-    if cmd.opts[result - 1].kind != Arg:
-      return
-    dec result
+  for opt in cmd.opts:
+    if opt.kind == Arg:
+      return true
+  false
 
 iterator args(cmd: CmdInfo): OptInfo =
-  if cmd.hasArgs:
-    for i in cmd.firstArgIdx ..< cmd.opts.len:
-      yield cmd.opts[i]
+  for opt in cmd.opts:
+    if opt.kind == Arg:
+      yield opt
 
 func getSubCmdDiscriminator(cmd: CmdInfo): OptInfo =
   for i in countdown(cmd.opts.len - 1, 0):
