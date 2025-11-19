@@ -1,0 +1,12 @@
+Usage: 
+
+test_separator [OPTIONS]...
+
+The following options are available:
+
+Network Options:
+ --opt1      opt1 desc [=opt1 default].
+ --opt2      opt2 desc [=opt2 default].
+
+----------------
+ --opt3      opt3 desc [=opt3 default].

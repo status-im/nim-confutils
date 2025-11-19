@@ -4,8 +4,8 @@ test_nested_cmd [OPTIONS]... command
 
 The following options are available:
 
- --top-arg1      topArg1 desc [=topArg1 default].
- --lvl1-no-command-arg1  lvl1NoCommandArg1 desc [=lvl1NoCommandArg1 default].
+ --top-arg1                topArg1 desc [=topArg1 default].
+ --lvl1-no-command-arg1    lvl1NoCommandArg1 desc [=lvl1NoCommandArg1 default].
 
 Available sub-commands:
 
@@ -13,7 +13,7 @@ test_nested_cmd lvl1Cmd1 [OPTIONS]... command
 
 The following options are available:
 
- --lvl1-cmd1-arg1  lvl1Cmd1Arg1 desc [=lvl1Cmd1Arg1 default].
+ --lvl1-cmd1-arg1          lvl1Cmd1Arg1 desc [=lvl1Cmd1Arg1 default].
 
 Available sub-commands:
 
@@ -21,10 +21,10 @@ test_nested_cmd lvl1Cmd1 lvl2Cmd1 [OPTIONS]...
 
 The following options are available:
 
- --lvl2-cmd1-arg1  lvl2Cmd1Arg1 desc [=lvl2Cmd1Arg1 default].
+ --lvl2-cmd1-arg1          lvl2Cmd1Arg1 desc [=lvl2Cmd1Arg1 default].
 
 test_nested_cmd lvl1Cmd1 lvl2Cmd2 [OPTIONS]...
 
 The following options are available:
 
- --lvl2-cmd2-arg1  lvl2Cmd2Arg1 desc [=lvl2Cmd2Arg1 default].
+ --lvl2-cmd2-arg1          lvl2Cmd2Arg1 desc [=lvl2Cmd2Arg1 default].
