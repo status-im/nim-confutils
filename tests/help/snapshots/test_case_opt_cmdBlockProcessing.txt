@@ -1,0 +1,12 @@
+Usage: 
+
+test_case_opt cmdBlockProcessing [OPTIONS]...
+
+The following options are available:
+
+ -p, --pre                     The name of your pre-state (without .ssz) [=pre].
+ --blockProcessingCat      block transitions.
+
+When blockProcessingCat = catAttestations, the following additional options are available:
+
+ --attestation             Attestation filename (without .ssz).
