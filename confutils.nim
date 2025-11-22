@@ -12,11 +12,12 @@
 import
   os,
   std/[enumutils, options, strutils, wordwrap],
+  results,
   stew/shims/macros,
   confutils/[defs, cli_parser, config_file]
 
 export
-  options, defs, config_file
+  options, results, defs, config_file
 
 const
   hasSerialization = not defined(nimscript)
@@ -633,6 +634,9 @@ proc parseCmdArg*[T](
     _: type Option[T], s: string): Option[T] {.raises: [ValueError].} =
   some(parseCmdArg(T, s))
 
+proc parseCmdArg*[T](_: type Opt[T], s: string): Opt[T] {.raises: [ValueError].} =
+  Opt.some(parseCmdArg(T, s))
+
 template parseCmdArg*(T: type string, s: string): string =
   s
 
@@ -734,29 +738,33 @@ proc completeCmdArg*[T](_: type Option[T], val: string): seq[string] =
   mixin completeCmdArg
   return completeCmdArg(type(T), val)
 
+proc completeCmdArg*[T](_: type Opt[T], val: string): seq[string] =
+  mixin completeCmdArg
+  return completeCmdArg(type(T), val)
+
 proc completeCmdArgAux(T: type, val: string): seq[string] =
   mixin completeCmdArg
   return completeCmdArg(T, val)
 
-template setField[T](
-    loc: var T, val: Option[string], defaultVal: untyped): untyped =
+template setField[T](loc: var T, val: Opt[string], defaultVal: untyped): untyped =
   type FieldType = type(loc)
-  loc = if isSome(val): parseCmdArgAux(FieldType, val.get)
-        else: FieldType(defaultVal)
+  loc = if val.isOk:
+    parseCmdArgAux(FieldType, val.get)
+  else:
+    FieldType(defaultVal)
 
-template setField[T](
-    loc: var seq[T], val: Option[string], defaultVal: untyped): untyped =
-  if val.isSome:
+template setField[T](loc: var seq[T], val: Opt[string], defaultVal: untyped): untyped =
+  type FieldType = type(loc)
+  if val.isOk:
     loc.add parseCmdArgAux(type(loc[0]), val.get)
   else:
-    type FieldType = type(loc)
     loc = FieldType(defaultVal)
 
 func makeDefaultValue*(T: type): T =
   default(T)
 
 func requiresInput*(T: type): bool =
-  not ((T is seq) or (T is Option) or (T is bool))
+  not ((T is seq) or (T is Option) or (T is Opt) or (T is bool))
 
 func acceptsMultipleValues*(T: type): bool =
   T is seq
@@ -811,7 +819,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
       .} =
         return completeCmdArgAux(`fixedFieldType`, val)
 
-      proc `setterName`(`configVar`: var `RecordType`, val: Option[string]) {.
+      proc `setterName`(`configVar`: var `RecordType`, val: Opt[string]) {.
         nimcall
         gcsafe
         sideEffect
@@ -1108,7 +1116,7 @@ proc loadImpl[C, SecondarySources](
       {.push warning[BareExcept]:off.}
 
     try:
-      fieldSetters[setterIdx][1](conf, some(cmdLineVal))
+      fieldSetters[setterIdx][1](conf, Opt.some(cmdLineVal))
       inc fieldCounters[setterIdx]
     except:
       fail("Error while processing the ",
@@ -1331,7 +1339,7 @@ proc loadImpl[C, SecondarySources](
             # there is nothing left to do here.
             discard
           elif opt.hasDefault:
-            fieldSetters[opt.idx][1](conf, none[string]())
+            fieldSetters[opt.idx][1](conf, Opt.none(string))
           elif opt.required:
             fail "The required option '" & opt.name & "' was not specified"
         except ValueError as err:

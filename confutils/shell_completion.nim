@@ -8,11 +8,9 @@
 # those terms.
 
 ## A simple lexer meant to tokenize an input string as a shell would do.
-import lexbase
-import options
-import streams
-import os
-import strutils
+import
+  std/[lexbase, streams, os, strutils],
+  results
 
 type
   ShellLexer = object of BaseLexer
@@ -70,7 +68,7 @@ proc parseQuoted(l: var ShellLexer,
         inc(pos)
   return pos
 
-proc getTok(l: var ShellLexer): Option[string] {.gcsafe, raises: [IOError, OSError].} =
+proc getTok(l: var ShellLexer): Opt[string] {.gcsafe, raises: [IOError, OSError].} =
   var pos = l.bufpos
 
   # Skip the initial whitespace
@@ -87,8 +85,8 @@ proc getTok(l: var ShellLexer): Option[string] {.gcsafe, raises: [IOError, OSErr
         # to find out if the string ends with whitespace.
         if l.preserveTrailingWs and l.bufpos != pos:
           l.bufpos = pos
-          return some("")
-        return none(string)
+          return Opt.some("")
+        return Opt.none(string)
       of ' ', '\t':
         inc(pos)
       else:
@@ -133,7 +131,7 @@ proc getTok(l: var ShellLexer): Option[string] {.gcsafe, raises: [IOError, OSErr
           break
 
   l.bufpos = pos
-  return some(tokLit)
+  return Opt.some(tokLit)
 
 proc splitCompletionLine*(): seq[string] =
   let comp_line = os.getEnv("COMP_LINE")

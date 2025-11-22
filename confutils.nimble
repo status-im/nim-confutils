@@ -19,7 +19,8 @@ skipDirs      = @["tests"]
 
 requires "nim >= 1.6.0",
          "stew",
-         "serialization"
+         "serialization",
+         "results"
 
 let nimc = getEnv("NIMC", "nim") # Which nim compiler to use
 let lang = getEnv("NIMLANG", "c") # Which backend (c/cpp/js)
@@ -44,6 +45,7 @@ task test, "Run all tests":
   for threads in ["--threads:off", "--threads:on"]:
     run threads, "tests/test_all"
     build threads, "tests/test_duplicates"
+    run threads, "confutils/shell_completion"
 
   #Also iterate over every test in tests/fail, and verify they fail to compile.
   echo "\r\nTest Fail to Compile:"

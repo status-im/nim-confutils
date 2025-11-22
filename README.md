@@ -269,7 +269,7 @@ template required* {.pragma.}
 ```
 
 By default, all options without default values are considered required.
-An exception to this rule are all `seq[T]` or `Option[T]` options for
+An exception to this rule are all `seq[T]` or `Opt[T]` or `Option[T]` options for
 which the "empty" value can be considered a reasonable default. You can
 also extend this behavior to other user-defined types by providing the
 following overloads:
