@@ -218,7 +218,7 @@ template isSubCommand(cmd: CmdInfo): bool =
 func maxNameLen(cmd: CmdInfo, commands = false): int =
   result = 0
   for opt in cmd.opts:
-    if opt.isOpt:
+    if opt.isOpt or opt.kind == Arg:
       result = max(result, opt.name.len)
       if opt.kind == Discriminator:
         for subCmd in opt.subCmds:
@@ -317,9 +317,9 @@ proc describeInvocation(help: var string,
         helpOutput "\p"
         argsSectionStarted = true
 
-      let cliArg = " <" & arg.humaneName & ">"
-      helpOutput fgArg, styleBright, cliArg
-      helpOutput padding(cliArg, 6 + appInfo.namesWidth)
+      let cliArg = "<" & arg.humaneName & ">"
+      helpOutput fgArg, styleBright, " ", cliArg
+      helpOutput padding(cliArg, appInfo.namesWidth)
       help.writeDesc appInfo, arg.desc, arg.defaultInHelpText
       help.writeLongDesc appInfo, arg.longDesc
       helpOutput "\p"
