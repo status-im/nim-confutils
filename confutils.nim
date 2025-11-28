@@ -292,7 +292,6 @@ proc describeInvocation(help: var string,
                         cmd: CmdInfo, cmdInvocation: string,
                         appInfo: HelpAppInfo) =
   helpOutput styleBright, "\p", fgCommand, cmdInvocation
-  var longestArg = 0
 
   if cmd.opts.len > 0:
     if cmd.hasOpts: helpOutput " [OPTIONS]..."
@@ -302,7 +301,6 @@ proc describeInvocation(help: var string,
 
     for arg in cmd.args:
       helpOutput " <", arg.name, ">"
-      longestArg = max(longestArg, arg.name.len)
 
   helpOutput "\p"
 
