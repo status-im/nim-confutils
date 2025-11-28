@@ -7,7 +7,15 @@
 # This file may not be copied, modified, or distributed except according to
 # those terms.
 
-import unittest2, ../confutils
+import std/os, unittest2, toml_serialization, ../confutils
+
+const configFilePath = "tests" / "config_files"
+
+template loadFile(T, file): untyped =
+  proc (
+    config: T, sources: ref SecondarySources
+  ) {.raises: [ConfigurationError].} =
+    sources.addConfigFile(Toml, InputFile(configFilePath / file))
 
 type
   OuterCmd = enum
@@ -103,3 +111,38 @@ suite "test nested cmd default args":
       conf.innerCmd == InnerCmd.innerCmd2
       conf.outerArg1 == "outerArg1 default"
       conf.innerArg2 == "innerArg2 default"
+
+suite "test nested cmd toml":
+  test "no command default":
+    let conf = TestConf.load(secondarySources = loadFile(TestConf, "nested_cmd.toml"))
+    check:
+      conf.cmd == OuterCmd.noCommand
+      conf.outerArg == "toml outer-arg"
+
+  test "subcommand outerCmd1 innerCmd1":
+    let conf = TestConf.load(
+      secondarySources = loadFile(TestConf, "nested_cmd.toml"),
+      cmdLine = @[
+        "outerCmd1",
+        "innerCmd1"
+      ]
+    )
+    check:
+      conf.cmd == OuterCmd.outerCmd1
+      conf.innerCmd == InnerCmd.innerCmd1
+      conf.outerArg1 == "toml outer-arg1"
+      conf.innerArg1 == "toml inner-arg1"
+
+  test "subcommand outerCmd1 innerCmd2":
+    let conf = TestConf.load(
+      secondarySources = loadFile(TestConf, "nested_cmd.toml"),
+      cmdLine = @[
+        "outerCmd1",
+        "innerCmd2"
+      ]
+    )
+    check:
+      conf.cmd == OuterCmd.outerCmd1
+      conf.innerCmd == InnerCmd.innerCmd2
+      conf.outerArg1 == "toml outer-arg1"
+      conf.innerArg2 == "toml inner-arg2"
