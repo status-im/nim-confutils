@@ -317,7 +317,7 @@ proc describeInvocation(help: var string,
         helpOutput "\p"
         argsSectionStarted = true
 
-      let cliArg = "<" & arg.humaneName & ">"
+      let cliArg = "<" & arg.name & ">"
       helpOutput fgArg, styleBright, " ", cliArg
       helpOutput padding(cliArg, appInfo.namesWidth)
       help.writeDesc appInfo, arg.desc, arg.defaultInHelpText
