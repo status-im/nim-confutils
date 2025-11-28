@@ -174,12 +174,14 @@ func isCliSwitch(opt: OptInfo): bool =
   opt.kind == CliSwitch or
   (opt.kind == Discriminator and opt.isCommand == false)
 
+func isOpt(opt: OptInfo): bool =
+  opt.isCliSwitch and not opt.isHidden
+
 func hasOpts(cmd: CmdInfo): bool =
   for opt in cmd.opts:
-    if opt.isCliSwitch and not opt.isHidden:
+    if opt.isOpt:
       return true
-
-  return false
+  false
 
 func hasArgs(cmd: CmdInfo): bool =
   for opt in cmd.opts:
@@ -213,26 +215,42 @@ iterator subCmds(cmd: CmdInfo): CmdInfo =
 template isSubCommand(cmd: CmdInfo): bool =
   cmd.name.len > 0
 
-func maxNameLen(cmd: CmdInfo): int =
+func maxNameLen(cmd: CmdInfo, commands = false): int =
   result = 0
   for opt in cmd.opts:
-    if opt.kind == Arg or opt.kind == Discriminator and opt.isCommand:
-      continue
-    result = max(result, opt.name.len)
-    if opt.kind == Discriminator:
+    if opt.isOpt or opt.kind == Arg:
+      result = max(result, opt.name.len)
+      if opt.kind == Discriminator:
+        for subCmd in opt.subCmds:
+          result = max(result, maxNameLen(subCmd, commands))
+    elif commands and opt.kind == Discriminator and opt.isCommand:
       for subCmd in opt.subCmds:
-        result = max(result, subCmd.maxNameLen)
+        result = max(result, maxNameLen(subCmd, commands))
 
-func hasAbbrs(cmd: CmdInfo): bool =
+func maxNameLen(cmds: openArray[CmdInfo]): int =
+  result = 0
+  for i, cmd in cmds:
+    result = max(result, maxNameLen(cmd, commands = i == cmds.high))
+
+func hasAbbrs(cmd: CmdInfo, commands = false): bool =
   for opt in cmd.opts:
-    if opt.kind == Arg or opt.kind == Discriminator and opt.isCommand:
-      continue
-    if opt.abbr.len > 0:
-      return true
-    if opt.kind == Discriminator:
+    if opt.isOpt:
+      if opt.abbr.len > 0:
+        return true
+      if opt.kind == Discriminator:
+        for subCmd in opt.subCmds:
+          if hasAbbrs(subCmd, commands):
+            return true
+    elif commands and opt.kind == Discriminator and opt.isCommand:
       for subCmd in opt.subCmds:
-        if hasAbbrs(subCmd):
+        if hasAbbrs(subCmd, commands):
           return true
+
+func hasAbbrs(cmds: openArray[CmdInfo]): bool =
+  for i, cmd in cmds:
+    if hasAbbrs(cmd, commands = i == cmds.high):
+      return true
+  false
 
 func humaneName(opt: OptInfo): string =
   if opt.name.len > 0: opt.name
@@ -274,7 +292,6 @@ proc describeInvocation(help: var string,
                         cmd: CmdInfo, cmdInvocation: string,
                         appInfo: HelpAppInfo) =
   helpOutput styleBright, "\p", fgCommand, cmdInvocation
-  var longestArg = 0
 
   if cmd.opts.len > 0:
     if cmd.hasOpts: helpOutput " [OPTIONS]..."
@@ -284,7 +301,6 @@ proc describeInvocation(help: var string,
 
     for arg in cmd.args:
       helpOutput " <", arg.name, ">"
-      longestArg = max(longestArg, arg.name.len)
 
   helpOutput "\p"
 
@@ -299,9 +315,9 @@ proc describeInvocation(help: var string,
         helpOutput "\p"
         argsSectionStarted = true
 
-      let cliArg = " <" & arg.humaneName & ">"
-      helpOutput fgArg, styleBright, cliArg
-      helpOutput padding(cliArg, 6 + appInfo.namesWidth)
+      let cliArg = "<" & arg.name & ">"
+      helpOutput fgArg, styleBright, " ", cliArg
+      helpOutput padding(cliArg, appInfo.namesWidth)
       help.writeDesc appInfo, arg.desc, arg.defaultInHelpText
       help.writeLongDesc appInfo, arg.longDesc
       helpOutput "\p"
@@ -413,8 +429,8 @@ proc showHelp(help: var string,
 
   let cmd = activeCmds[^1]
 
-  appInfo.maxNameLen = cmd.maxNameLen
-  appInfo.hasAbbrs = cmd.hasAbbrs
+  appInfo.maxNameLen = activeCmds.maxNameLen
+  appInfo.hasAbbrs = activeCmds.hasAbbrs
   let termWidth =
     try:
       terminalWidth()

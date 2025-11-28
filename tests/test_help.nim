@@ -65,3 +65,15 @@ suite "test --help":
 
   test "test test_argument":
     cmdTest("test_argument", "")
+
+  test "test test_default_value_desc":
+    cmdTest("test_default_value_desc", "")
+
+  test "test test_separator":
+    cmdTest("test_separator", "")
+
+  test "test test_longdesc":
+    cmdTest("test_longdesc", "")
+
+  test "test test_longdesc lvl1Cmd1":
+    cmdTest("test_longdesc", "lvl1Cmd1")
