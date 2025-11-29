@@ -77,3 +77,9 @@ suite "test --help":
 
   test "test test_longdesc lvl1Cmd1":
     cmdTest("test_longdesc", "lvl1Cmd1")
+
+  test "test test_case_opt":
+    cmdTest("test_case_opt", "")
+
+  test "test test_case_opt cmdBlockProcessing":
+    cmdTest("test_case_opt", "cmdBlockProcessing")
