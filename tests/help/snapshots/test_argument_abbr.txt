@@ -1,0 +1,14 @@
+Usage: 
+
+test_argument_abbr [OPTIONS]... <arg1>
+
+     <arg1>      arg1 desc.
+                 arg1 longdesc line one.
+                 longdesc line two.
+                 longdesc line three.
+
+The following options are available:
+
+ -o, --opt1      opt1 desc [=opt1 default].
+ -p, --opt2      opt2 desc [=opt2 default].
+     --opt3      opt3 desc [=opt3 default].

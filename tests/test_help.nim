@@ -66,6 +66,9 @@ suite "test --help":
   test "test test_argument":
     cmdTest("test_argument", "")
 
+  test "test test_argument_abbr":
+    cmdTest("test_argument_abbr", "")
+
   test "test test_default_value_desc":
     cmdTest("test_default_value_desc", "")
 
