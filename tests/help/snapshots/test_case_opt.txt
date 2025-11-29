@@ -4,7 +4,7 @@ test_case_opt [OPTIONS]... command
 
 The following options are available:
 
- -p, --pre      The name of your pre-state (without .ssz) [=pre].
+ -p, --pre                     The name of your pre-state (without .ssz) [=pre].
 
 Available sub-commands:
 
@@ -12,14 +12,14 @@ test_case_opt cmdSlotProcessing [OPTIONS]...
 
 The following options are available:
 
- -s, --num-slots  The number of slots the pre-state will be advanced by [=1].
+ -s, --num-slots               The number of slots the pre-state will be advanced by [=1].
 
 test_case_opt cmdBlockProcessing [OPTIONS]...
 
 The following options are available:
 
-     --blockProcessingCat  block transitions.
+     --blockProcessingCat      block transitions.
 
 When blockProcessingCat = catAttestations, the following additional options are available:
 
-     --attestation  Attestation filename (without .ssz).
+     --attestation             Attestation filename (without .ssz).
