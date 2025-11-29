@@ -314,9 +314,11 @@ proc describeInvocation(help: var string,
       if not argsSectionStarted:
         helpOutput "\p"
         argsSectionStarted = true
-
+      helpOutput " "
+      if appInfo.hasAbbrs:
+        helpOutput "    "
       let cliArg = "<" & arg.name & ">"
-      helpOutput fgArg, styleBright, " ", cliArg
+      helpOutput fgArg, styleBright, cliArg
       helpOutput padding(cliArg, appInfo.namesWidth)
       help.writeDesc appInfo, arg.desc, arg.defaultInHelpText
       help.writeLongDesc appInfo, arg.longDesc
