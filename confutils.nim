@@ -1413,28 +1413,4 @@ func load*(f: TypedInputFile): f.ContentType =
     mixin loadFile
     loadFile(f.Format, f.string, f.ContentType)
 
-proc flattenedAccessorsImpl(RecordType: NimNode): NimNode =
-  result = newTree(nnkStmtListExpr)
-  let T = RecordType.getType[1]
-  let recordDef = getImpl(T)
-  for cf in confFields(recordDef):
-    if cf.parent != nil:
-      let
-        configVar = ident "config"
-        configField = dotExpr(configVar, genFieldDotExpr(cf))
-        accessorName = if cf.field.isPublic:
-          newTree(nnkPostfix, ident("*"), cf.field.name)
-        else:
-          ident $cf.field.name
-      result.add quote do:
-        template `accessorName`(`configVar`: `T`): untyped =
-          `configField`
-
-  debugMacroResult "Flattened Accessors"
-
-macro flattenedAccessors*(Configuration: type): untyped =
-  ## Generates accessors to omit specifying the ``{.flatten.}``
-  ## field name when accessing a flattened option.
-  flattenedAccessorsImpl(Configuration)
-
 {.pop.}
