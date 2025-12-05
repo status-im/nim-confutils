@@ -66,6 +66,7 @@ template argument* {.pragma.}
 template hidden* {.pragma.}
 template ignore* {.pragma.}
 template inlineConfiguration* {.pragma.}
+template flatten* {.pragma.}
 
 template implicitlySelectable* {.pragma.}
   ## This can be applied to a case object discriminator

@@ -311,6 +311,15 @@ Network Options:     # this is a separator
   -c, --opt3 desc
 ```
 
+-----------------
+
+```nim
+template flatten* {.pragma.}
+```
+
+Apply it to an object field to traverse the object options as if they were "top-level".
+This allows the object options to be reused in various configurations.
+
 ## Configuration field types
 
 The `confutils/defs` module provides a number of types frequently used

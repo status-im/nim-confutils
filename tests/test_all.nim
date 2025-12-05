@@ -15,7 +15,8 @@ import
   test_pragma,
   test_qualified_ident,
   test_nested_cmd,
-  test_help
+  test_help,
+  test_flatten_pragma
 
 when defined(windows):
   import test_winreg
