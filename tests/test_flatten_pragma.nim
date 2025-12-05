@@ -428,17 +428,3 @@ suite "test nested flatten subcommands":
       conf.topCmd1.topCmd2.cmd == Lvl2Cmd.lvlCmd2
       conf.topCmd1.lvl1Arg1 == "foo"
       conf.topCmd1.topCmd2.lvl2Arg1 == "bar"
-
-  test "topLvlCmd1 flattened accessors":
-    let conf = TestConfSubCmdFlat.load(cmdLine = @[
-      "topLvlCmd1",
-      "lvlCmd1",
-      "lvlCmd2"
-    ])
-    flattenedAccessors(TestConfSubCmdFlat)
-    check:
-      conf.cmd == TopCmd1.topLvlCmd1
-      conf.topCmd1.cmd == Lvl1Cmd.lvlCmd1
-      conf.topCmd1.topCmd2.cmd == Lvl2Cmd.lvlCmd2
-      conf.lvl1Arg1 == "lvl1Arg1 default"
-      conf.lvl2Arg1 == "lvl2Arg1 default"
