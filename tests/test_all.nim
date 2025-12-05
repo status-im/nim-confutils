@@ -13,6 +13,7 @@ import
   test_dispatch,
   test_duplicates,
   test_envvar,
+  test_flatten_pragma,
   test_ignore,
   test_multi_case_values,
   test_nested_cmd,
@@ -22,14 +23,8 @@ import
   test_parsecmdarg,
   test_pragma,
   test_qualified_ident,
-<<<<<<< HEAD
   test_results_opt,
   test_help
-=======
-  test_nested_cmd,
-  test_help,
-  test_flatten_pragma
->>>>>>> b884111 (wip)
 
 when defined(windows):
   import test_winreg

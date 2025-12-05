@@ -1,0 +1,9 @@
+Usage: 
+
+test_flatten_default_value [OPTIONS]...
+
+The following options are available:
+
+ --help      Show this help message and exit.
+ --opt1      tcp port [=9000].
+ --opt2      udp port [=8000].

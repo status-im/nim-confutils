@@ -153,6 +153,8 @@ proc traversePragma(pragma: NimNode): SectionParam =
         result.defaultValue = repr(shortEnumName(child[1]))
       elif pragma == "name":
         result.namePragma = $child[1]
+      elif pragma == "flatten":
+        result.isFlatten = true
     else:
       raiseAssert "[Pragma] Unsupported child node:\n" & child.treeRepr
 

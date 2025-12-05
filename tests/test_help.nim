@@ -130,3 +130,6 @@ suite "help message":
 
   test "nims test_cli_example":
     execCmdTest("nim e " & cmdFlags & " " & helpPath / "test_cli_example.nim", "test_cli_example")
+
+  test "test test_flatten_default_value":
+    cmdTest("test_flatten_default_value")

@@ -429,16 +429,26 @@ suite "test nested flatten subcommands":
       conf.topCmd1.lvl1Arg1 == "foo"
       conf.topCmd1.topCmd2.lvl2Arg1 == "bar"
 
-  test "topLvlCmd1 flattened accessors":
-    let conf = TestConfSubCmdFlat.load(cmdLine = @[
-      "topLvlCmd1",
-      "lvlCmd1",
-      "lvlCmd2"
-    ])
-    flattenedAccessors(TestConfSubCmdFlat)
+suite "test flatten default value override":
+  proc opt1Str: string = "override"
+
+  const opt1Const = opt1Str()
+
+  type
+    TestDefaultLitConf = object
+      topOpts {.flatten: (opt1: "override", opt2: true).}: TopOptsConf
+
+    TestDefaultConstConf = object
+      topOpts {.flatten: (opt1: opt1Const).}: TopOptsConf
+
+  test "override with literals":
+    let conf = TestDefaultLitConf.load(cmdLine = @[])
     check:
-      conf.cmd == TopCmd1.topLvlCmd1
-      conf.topCmd1.cmd == Lvl1Cmd.lvlCmd1
-      conf.topCmd1.topCmd2.cmd == Lvl2Cmd.lvlCmd2
-      conf.lvl1Arg1 == "lvl1Arg1 default"
-      conf.lvl2Arg1 == "lvl2Arg1 default"
+      conf.topOpts.opt1 == "override"
+      conf.topOpts.opt2 == true
+
+  test "override with const":
+    let conf = TestDefaultConstConf.load(cmdLine = @[])
+    check:
+      conf.topOpts.opt1 == opt1Const
+      conf.topOpts.opt2 == false

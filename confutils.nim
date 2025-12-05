@@ -867,6 +867,34 @@ proc fieldCaseFieldFullName(cf: ConfFieldDesc): string =
     doAssert cf.parent != nil, "caseField not found"
     fieldCaseFieldFullName(cf.parent[])
 
+proc flattenDefaultValue(cf: ConfFieldDesc): NimNode =
+  if cf.parent == nil:
+    return nil
+  let ancestorVal = flattenDefaultValue(cf.parent[])
+  if ancestorVal != nil:
+    return ancestorVal
+  let ftn = cf.parent[].field.readPragma"flatten"
+  case ftn.kind
+  of nnkSym: nil
+  of nnkTupleConstr:
+    # XXX validate tuple fields are valid opts
+    var ret: NimNode = nil
+    for x in ftn:
+      if eqIdent(x[0], cf.field.name):
+        ret = x[1]
+    ret
+  else:
+    error "Bad flatten pragma", ftn
+    nil
+
+proc readDefaultValueOverride(cf: ConfFieldDesc): NimNode =
+  cf.flattenDefaultValue()
+
+proc readDefaultValue(cf: ConfFieldDesc): NimNode =
+  result = cf.readDefaultValueOverride()
+  if result == nil:
+    result = cf.field.readPragma"defaultValue"
+
 proc generateFieldSetters(RecordType: NimNode): NimNode =
   var recordDef = getImpl(RecordType)
   let makeDefaultValue = bindSym"makeDefaultValue"
@@ -880,11 +908,14 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
       setterName = ident(cf.fullFieldName() & "Setter")
       fieldName = field.name
       namePragma = field.readPragma"name"
-      paramName = if namePragma != nil: namePragma
-                  else: fieldName
+      paramName =
+        if namePragma != nil:
+          namePragma
+        else:
+          fieldName
       configVar = ident "config"
       configField = dotExpr(configVar, genFieldDotExpr(cf))
-      defaultValue = field.readPragma"defaultValue"
+      defaultValue = cf.readDefaultValue()
       completerName = ident(cf.fullFieldName() & "Complete")
       isFieldDiscriminator = newLit field.isDiscriminator
 
@@ -965,6 +996,9 @@ func findPath(parent, node: CmdInfo): seq[CmdInfo] =
 func toText(n: NimNode): string =
   if n == nil: ""
   elif n.kind in {nnkStrLit..nnkTripleStrLit}: n.strVal
+  elif n.kind == nnkSym and n.getImpl.kind == nnkConstDef:
+    # this works for `flatten(v: typed)`
+    toText(n.getImpl[2])
   else: repr(n)
 
 func readPragmaFlags(field: FieldDescription): set[OptFlag] =
@@ -988,10 +1022,15 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     let
       field = cf.field
       isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
-      defaultValue = field.readPragma"defaultValue"
+      defaultValue = cf.readDefaultValue()
       defaultValueDesc = field.readPragma"defaultValueDesc"
-      defaultInHelp = if defaultValueDesc != nil: defaultValueDesc
-                      else: defaultValue
+      defaultInHelp =
+        if cf.readDefaultValueOverride() != nil:
+          defaultValue
+        elif defaultValueDesc != nil:
+          defaultValueDesc
+        else:
+          defaultValue
       defaultInHelpText = toText(defaultInHelp)
       obsoleteMsg = field.readPragma"obsolete"
       separator = field.readPragma"separator"
@@ -1598,29 +1637,5 @@ func load*(f: TypedInputFile): f.ContentType =
   else:
     mixin loadFile
     loadFile(f.Format, f.string, f.ContentType)
-
-proc flattenedAccessorsImpl(RecordType: NimNode): NimNode =
-  result = newTree(nnkStmtListExpr)
-  let T = RecordType.getType[1]
-  let recordDef = getImpl(T)
-  for cf in confFields(recordDef):
-    if cf.parent != nil:
-      let
-        configVar = ident "config"
-        configField = dotExpr(configVar, genFieldDotExpr(cf))
-        accessorName = if cf.field.isPublic:
-          newTree(nnkPostfix, ident("*"), cf.field.name)
-        else:
-          ident $cf.field.name
-      result.add quote do:
-        template `accessorName`(`configVar`: `T`): untyped =
-          `configField`
-
-  debugMacroResult "Flattened Accessors"
-
-macro flattenedAccessors*(Configuration: type): untyped =
-  ## Generates accessors to omit specifying the ``{.flatten.}``
-  ## field name when accessing a flattened option.
-  flattenedAccessorsImpl(Configuration)
 
 {.pop.}

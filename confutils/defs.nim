@@ -69,6 +69,7 @@ template hidden* {.pragma.}
 template ignore* {.pragma.}
 template debug* {.pragma.}
 template inlineConfiguration* {.pragma.}
+template flatten*(v: typed) {.pragma.}
 template flatten* {.pragma.}
 
 template implicitlySelectable* {.pragma.}
