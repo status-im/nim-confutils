@@ -590,7 +590,10 @@ func parseCmdArg*(
 
 func parseCmdArg*(
     T: type SomeUnsignedInt, s: string): T {.raises: [ValueError].} =
-  T parseBiggestUInt(s)
+  let res = parseBiggestUInt(s)
+  if res > T.high:
+    raise newException(ValueError, s & " exceeds max value of " & $T.high)
+  T(res)
 
 func parseCmdArg*(T: type SomeFloat, p: string): T {.raises: [ValueError].} =
   parseFloat(p)

@@ -18,14 +18,11 @@ func testInvalidValues[T](lo, hi: int64): bool =
   allIt(
     lo .. hi,
     try:
-      when T is SomeUnsignedInt:
-        # TODO https://github.com/status-im/nim-confutils/issues/45
-        it != T.parseCmdArg($it).int64
-      else:
-        discard it != T.parseCmdArg($it).int64
-        false
-    except RangeDefect:
-      true)
+      discard it != T.parseCmdArg($it).int64
+      false
+    except RangeDefect, ValueError:
+      true
+  )
 
 const span = 300000
 
