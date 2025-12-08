@@ -586,7 +586,12 @@ template parseCmdArg*(T: type string, s: string): string =
 
 func parseCmdArg*(
     T: type SomeSignedInt, s: string): T {.raises: [ValueError].} =
-  T parseBiggestInt(s)
+  let res = parseBiggestInt(s)
+  if res > T.high:
+    raise newException(ValueError, s & " exceeds max value of " & $T.high)
+  if res < T.low:
+    raise newException(ValueError, s & " exceeds min value of " & $T.low)
+  T(res)
 
 func parseCmdArg*(
     T: type SomeUnsignedInt, s: string): T {.raises: [ValueError].} =

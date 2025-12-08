@@ -20,7 +20,7 @@ func testInvalidValues[T](lo, hi: int64): bool =
     try:
       discard it != T.parseCmdArg($it).int64
       false
-    except RangeDefect, ValueError:
+    except ValueError:
       true
   )
 
