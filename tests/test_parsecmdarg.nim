@@ -76,9 +76,9 @@ suite "parseCmdArg":
     expect(ValueError):
       discard parseCmdArg(int64, $int64.high & "123")
 
-    let i64LowPlusOne = lowMinusOne(int64)
+    let i64LowMinusOne = lowMinusOne(int64)
     expect(ValueError):
-      discard parseCmdArg(int64, i64LowPlusOne)
+      discard parseCmdArg(int64, i64LowMinusOne)
     expect(ValueError):
       discard parseCmdArg(int64, $int64.low & "123")
 
