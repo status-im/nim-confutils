@@ -331,6 +331,15 @@ The value of such field can still be set in the CLI.
 -----------------
 
 ```nim
+template debug* {.pragma.}
+```
+
+Use this pragma to avoid listing the field in `--help` output.
+Use `--help:debug` to list the debug fields.
+
+-----------------
+
+```nim
 template ignore* {.pragma.}
 ```
 
