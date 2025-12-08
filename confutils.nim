@@ -40,6 +40,7 @@ type
     appInvocation: string
     copyrightBanner: string
     hasAbbrs: bool
+    hasVersion: bool
     maxNameLen: int
     terminalWidth: int
     namesWidth: int
@@ -332,10 +333,10 @@ type
 
 proc describeOptionsList(
   help: var string,
-  cmd: CmdInfo,
+  opts: openArray[OptInfo],
   appInfo: HelpAppInfo
 ) =
-  for opt in cmd.opts:
+  for opt in opts:
     if not opt.isOpt:
       continue
 
@@ -372,7 +373,8 @@ proc describeOptions(
   cmds: openArray[CmdInfo],
   cmdInvocation: string,
   appInfo: HelpAppInfo,
-  optionsType = normalOpts
+  optionsType = normalOpts,
+  showBuiltIns = false
 ) =
   if cmds.len == 0:
     return
@@ -391,8 +393,24 @@ proc describeOptions(
     of defaultCmdOpts:
       discard
 
+    if showBuiltIns:
+      var builtIns = @[
+        OptInfo(
+          kind: CliSwitch,
+          name: "help",
+          desc: "Show this help message and exit"
+        )
+      ]
+      if cmds.len == 1 and appInfo.hasVersion:
+        builtIns.add OptInfo(
+          kind: CliSwitch,
+          name: "version",
+          desc: "Show program's version number and exit"
+        )
+      describeOptionsList(help, builtIns, appInfo)
+
     for c in cmds:
-      describeOptionsList(help, c, appInfo)
+      describeOptionsList(help, c.opts, appInfo)
 
     for c in cmds:
       for opt in c.opts:
@@ -450,7 +468,7 @@ proc showHelp(help: var string,
   # Write out the app or script name
   helpOutput fgSection, "Usage: \p"
   help.describeInvocation cmd, cmdInvocation, appInfo
-  help.describeOptions activeCmds, cmdInvocation, appInfo
+  help.describeOptions activeCmds, cmdInvocation, appInfo, showBuiltIns = true
   helpOutput "\p"
 
   flushOutputAndQuit QuitSuccess
@@ -1135,7 +1153,9 @@ proc loadImpl[C, SecondarySources](
     HelpAppInfo(
       copyrightBanner: copyrightBanner,
       appInvocation: appInvocation(),
-      terminalWidth: termWidth)
+      terminalWidth: termWidth,
+      hasVersion: version.len > 0
+    )
 
   template processHelpAndVersionOptions(optKey: string) =
     let key = optKey
