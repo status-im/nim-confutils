@@ -255,6 +255,16 @@ The default value of the option if no value was supplied by the user.
 -----------------
 
 ```nim
+template defaultValueDesc*(v: string) {.pragma.}
+```
+
+The default value description displayed in the help message.
+If the value is a non-string `const` or compile-time expression,
+it must be prefixed with `$` (i.e: converted to string).
+
+-----------------
+
+```nim
 template required* {.pragma.}
 ```
 
@@ -308,6 +318,37 @@ Network Options:     # this is a separator
 ----------------     # this is a separator too
   -c, --opt3 desc
 ```
+
+-----------------
+
+```nim
+template hidden* {.pragma.}
+```
+
+Apply it to a field to not show it in the help message.
+The value of such field can still be set in the CLI.
+
+-----------------
+
+```nim
+template ignore* {.pragma.}
+```
+
+This can be applied to a field to not
+include it in the CLI. It won't show in the help message.
+The value/argument won't be able to be set in the CLI.
+The `defaultValue` won't be set.
+
+-----------------
+
+```nim
+template implicitlySelectable* {.pragma.}
+```
+
+This can be applied to a case object discriminator
+to allow the value of the discriminator to be determined
+implicitly when the user specifies any of the sub-options
+that depend on the disciminator value.
 
 ## Configuration field types
 
