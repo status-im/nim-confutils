@@ -1,0 +1,10 @@
+Simple program
+
+Usage: 
+
+test_dispatch [OPTIONS]...
+
+The following options are available:
+
+ --foo    
+ --bar

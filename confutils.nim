@@ -1328,6 +1328,13 @@ proc dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
   for i in 1 ..< cliArgs.len:
     var arg = copy cliArgs[i]
 
+    # Replace symbol with ident
+    let paramName = ident $skipPragma(arg[0])
+    if arg[0].kind == nnkPragmaExpr:
+      arg[0][0] = paramName
+    else:
+      arg[0] = paramName
+
     # If an argument doesn't specify a type, we infer it from the default value
     if arg[1].kind == nnkEmpty:
       if arg[2].kind == nnkEmpty:
@@ -1342,7 +1349,7 @@ proc dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
       arg[2] = newEmptyNode()
 
     configFields.add arg
-    dispatchCall.add newTree(nnkDotExpr, configVar, skipPragma arg[0])
+    dispatchCall.add newTree(nnkDotExpr, configVar, paramName)
 
   let cliConfigType = nnkTypeSection.newTree(
     nnkTypeDef.newTree(

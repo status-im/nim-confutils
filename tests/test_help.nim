@@ -104,3 +104,6 @@ suite "test --help":
 
   test "test test_debug lvl1Cmd1 --help:debug":
     cmdTest("test_debug", "lvl1Cmd1", ":debug")
+
+  test "test test_dispatch":
+    cmdTest("test_dispatch", "")

@@ -8,13 +8,16 @@
 {. warning[UnusedImport]:off .}
 
 import
-  test_ignore,
+  test_argument,
   test_config_file,
+  test_dispatch,
+  test_duplicates,
   test_envvar,
+  test_ignore,
+  test_nested_cmd,
   test_parsecmdarg,
   test_pragma,
   test_qualified_ident,
-  test_nested_cmd,
   test_help
 
 when defined(windows):

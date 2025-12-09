@@ -1,4 +1,5 @@
 import
+  unittest2,
   ../confutils,
   ../confutils/defs
 
@@ -15,7 +16,7 @@ type
   BranchCmd = enum
     branchA
     branchB
-    
+
   TestConf* = object
     dataDir* {.abbr: "d" }: OutDir
 
@@ -56,5 +57,44 @@ type
           name: "import-folder"
         }: OutDir
 
-let c = TestConf.load()
-discard c
+suite "test duplicates":
+  test "no command":
+    let conf = TestConf.load(cmdLine = @[
+      "--dataDir=/data",
+      "--import=/in",
+      "--output=/out"
+    ])
+    check:
+      conf.cmd == Command.noCommand
+      conf.dataDir.string == "/data"
+      conf.importDir.string == "/in"
+      conf.outputDir.string == "/out"
+
+  test "sub-command branchA":
+    let conf = TestConf.load(cmdLine = @[
+      "--dataDir=/data",
+      "subCommand",
+      "--import=/in",
+      "--output=/out"
+    ])
+    check:
+      conf.cmd == Command.subCommand
+      conf.dataDir.string == "/data"
+      conf.importKey.string == "/in"
+      conf.subcmd == BranchCmd.branchA
+      conf.outputFolder.string == "/out"
+
+  test "sub-command branchB":
+    let conf = TestConf.load(cmdLine = @[
+      "--dataDir=/data",
+      "subCommand",
+      "--import=/in",
+      "branchB",
+      "--import-folder=/out"
+    ])
+    check:
+      conf.cmd == Command.subCommand
+      conf.dataDir.string == "/data"
+      conf.importKey.string == "/in"
+      conf.subcmd == BranchCmd.branchB
+      conf.importFolder.string == "/out"
