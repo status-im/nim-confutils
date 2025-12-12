@@ -405,7 +405,7 @@ proc describeOptions(
         desc: "Show this help message and exit. Available arguments: debug"
       )
       describeOptionsList(help, [helpOpt], appInfo)
-      if appInfo.hasVersion and cmds.len == 1:
+      if appInfo.hasVersion:
         let versionOpt = OptInfo(
           kind: CliSwitch,
           name: "version",

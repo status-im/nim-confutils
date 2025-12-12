@@ -19,9 +19,7 @@ type
       desc: "foobar1 desc"
       name: "foobar1" }: int
 
-    case cmd {.
-      command
-      defaultValue: Lvl1Cmd.lvl1Cmd1 }: Lvl1Cmd
+    case cmd {.command.}: Lvl1Cmd
     of Lvl1Cmd.lvl1Cmd1:
       foobar2 {.
         defaultValue: 2
