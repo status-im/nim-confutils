@@ -4,7 +4,7 @@ test_separator [OPTIONS]...
 
 The following options are available:
 
- --help      Show this help message and exit.
+ --help      Show this help message and exit. Available arguments: debug.
 Network Options:
  --opt1      opt1 desc [=opt1 default].
  --opt2      opt2 desc [=opt2 default].

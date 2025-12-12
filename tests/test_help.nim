@@ -86,3 +86,9 @@ suite "test --help":
 
   test "test test_case_opt cmdBlockProcessing":
     cmdTest("test_case_opt", "cmdBlockProcessing")
+
+  test "test test_builtins":
+    cmdTest("test_builtins", "")
+
+  test "test test_builtins lvl1Cmd1":
+    cmdTest("test_builtins", "lvl1Cmd1")

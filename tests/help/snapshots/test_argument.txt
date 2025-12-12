@@ -1,6 +1,10 @@
 Usage: 
 
-test_argument command
+test_argument [OPTIONS]... command
+
+The following options are available:
+
+ --help                    Show this help message and exit. Available arguments: debug.
 
 Available sub-commands:
 

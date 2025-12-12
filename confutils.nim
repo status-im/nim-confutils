@@ -289,19 +289,24 @@ proc writeLongDesc(help: var string,
       helpOutput padding("", 5 + appInfo.namesWidth)
       help.writeDesc appInfo, line, ""
 
-proc describeInvocation(help: var string,
-                        cmd: CmdInfo, cmdInvocation: string,
-                        appInfo: HelpAppInfo) =
+proc describeInvocation(
+  help: var string,
+  cmd: CmdInfo,
+  cmdInvocation: string,
+  appInfo: HelpAppInfo,
+  showBuiltIns = false
+) =
   helpOutput styleBright, "\p", fgCommand, cmdInvocation
 
-  if cmd.opts.len > 0:
-    if cmd.hasOpts: helpOutput " [OPTIONS]..."
+  if cmd.hasOpts or showBuiltIns:
+    helpOutput " [OPTIONS]..."
 
-    let subCmdDiscriminator = cmd.getSubCmdDiscriminator
-    if subCmdDiscriminator != nil: helpOutput " command"
+  let subCmdDiscriminator = cmd.getSubCmdDiscriminator
+  if subCmdDiscriminator != nil:
+    helpOutput " command"
 
-    for arg in cmd.args:
-      helpOutput " <", arg.name, ">"
+  for arg in cmd.args:
+    helpOutput " <", arg.name, ">"
 
   helpOutput "\p"
 
@@ -384,7 +389,7 @@ proc describeOptions(
     if c.hasOpts:
       hasOpts = true
 
-  if hasOpts:
+  if hasOpts or showBuiltIns:
     case optionsType
     of normalOpts:
       helpOutput "\pThe following options are available:\p\p"
@@ -394,20 +399,19 @@ proc describeOptions(
       discard
 
     if showBuiltIns:
-      var builtIns = @[
-        OptInfo(
-          kind: CliSwitch,
-          name: "help",
-          desc: "Show this help message and exit"
-        )
-      ]
-      if cmds.len == 1 and appInfo.hasVersion:
-        builtIns.add OptInfo(
+      let helpOpt = OptInfo(
+        kind: CliSwitch,
+        name: "help",
+        desc: "Show this help message and exit. Available arguments: debug"
+      )
+      describeOptionsList(help, [helpOpt], appInfo)
+      if appInfo.hasVersion and cmds.len == 1:
+        let versionOpt = OptInfo(
           kind: CliSwitch,
           name: "version",
-          desc: "Show program's version number and exit"
+          desc: "Show program's version and exit"
         )
-      describeOptionsList(help, builtIns, appInfo)
+        describeOptionsList(help, [versionOpt], appInfo)
 
     for c in cmds:
       describeOptionsList(help, c.opts, appInfo)
@@ -467,7 +471,7 @@ proc showHelp(help: var string,
 
   # Write out the app or script name
   helpOutput fgSection, "Usage: \p"
-  help.describeInvocation cmd, cmdInvocation, appInfo
+  help.describeInvocation cmd, cmdInvocation, appInfo, showBuiltIns = true
   help.describeOptions activeCmds, cmdInvocation, appInfo, showBuiltIns = true
   helpOutput "\p"
 

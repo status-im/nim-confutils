@@ -1,0 +1,9 @@
+Usage: 
+
+test_builtins lvl1Cmd1 [OPTIONS]...
+
+The following options are available:
+
+ --help         Show this help message and exit. Available arguments: debug.
+ --foobar1      foobar1 desc [=1].
+ --foobar2      foobar2 desc [=2].
