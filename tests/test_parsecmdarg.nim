@@ -18,14 +18,21 @@ func testInvalidValues[T](lo, hi: int64): bool =
   allIt(
     lo .. hi,
     try:
-      when T is SomeUnsignedInt:
-        # TODO https://github.com/status-im/nim-confutils/issues/45
-        it != T.parseCmdArg($it).int64
-      else:
-        discard it != T.parseCmdArg($it).int64
-        false
-    except RangeDefect:
-      true)
+      discard parseCmdArg(T, $it)
+      false
+    except ValueError:
+      true
+  )
+
+func highPlusOne(T: type): string =
+  result = $T.high
+  assert result[^1] != '9'
+  result[^1] = chr(result[^1].ord + 1)
+
+func lowMinusOne(T: type): string =
+  result = $T.low
+  assert result[^1] != '9'
+  result[^1] = chr(result[^1].ord + 1)
 
 const span = 300000
 
@@ -63,6 +70,18 @@ suite "parseCmdArg":
       # https://github.com/nim-lang/Nim/issues/16353 so target high(T) - 1
       testValidValues[int64](high(int64) - span, high(int64) - 1)
 
+    let i64HighPlusOne = highPlusOne(int64)
+    expect(ValueError):
+      discard parseCmdArg(int64, i64HighPlusOne)
+    expect(ValueError):
+      discard parseCmdArg(int64, $int64.high & "123")
+
+    let i64LowMinusOne = lowMinusOne(int64)
+    expect(ValueError):
+      discard parseCmdArg(int64, i64LowMinusOne)
+    expect(ValueError):
+      discard parseCmdArg(int64, $int64.low & "123")
+
   test "uint8":
     const highBase = int16(high(uint8)) + 1
     check:
@@ -92,6 +111,12 @@ suite "parseCmdArg":
 
       # https://github.com/nim-lang/Nim/issues/16353 so target high(T) - 1
       testValidValues[uint64](high(uint64) - span, high(uint64) - 1)
+
+    let u64HighPlusOne = highPlusOne(uint64)
+    expect(ValueError):
+      discard parseCmdArg(uint64, u64HighPlusOne)
+    expect(ValueError):
+      discard parseCmdArg(uint64, $uint64.high & "123")
 
   test "bool":
     for trueish in ["y", "yes", "true", "1", "on"]:
