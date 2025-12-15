@@ -40,6 +40,7 @@ type
     appInvocation: string
     copyrightBanner: string
     hasAbbrs: bool
+    hasVersion: bool
     maxNameLen: int
     terminalWidth: int
     namesWidth: int
@@ -288,19 +289,24 @@ proc writeLongDesc(help: var string,
       helpOutput padding("", 5 + appInfo.namesWidth)
       help.writeDesc appInfo, line, ""
 
-proc describeInvocation(help: var string,
-                        cmd: CmdInfo, cmdInvocation: string,
-                        appInfo: HelpAppInfo) =
+proc describeInvocation(
+  help: var string,
+  cmd: CmdInfo,
+  cmdInvocation: string,
+  appInfo: HelpAppInfo,
+  showBuiltIns = false
+) =
   helpOutput styleBright, "\p", fgCommand, cmdInvocation
 
-  if cmd.opts.len > 0:
-    if cmd.hasOpts: helpOutput " [OPTIONS]..."
+  if cmd.hasOpts or showBuiltIns:
+    helpOutput " [OPTIONS]..."
 
-    let subCmdDiscriminator = cmd.getSubCmdDiscriminator
-    if subCmdDiscriminator != nil: helpOutput " command"
+  let subCmdDiscriminator = cmd.getSubCmdDiscriminator
+  if subCmdDiscriminator != nil:
+    helpOutput " command"
 
-    for arg in cmd.args:
-      helpOutput " <", arg.name, ">"
+  for arg in cmd.args:
+    helpOutput " <", arg.name, ">"
 
   helpOutput "\p"
 
@@ -332,10 +338,10 @@ type
 
 proc describeOptionsList(
   help: var string,
-  cmd: CmdInfo,
+  opts: openArray[OptInfo],
   appInfo: HelpAppInfo
 ) =
-  for opt in cmd.opts:
+  for opt in opts:
     if not opt.isOpt:
       continue
 
@@ -372,7 +378,8 @@ proc describeOptions(
   cmds: openArray[CmdInfo],
   cmdInvocation: string,
   appInfo: HelpAppInfo,
-  optionsType = normalOpts
+  optionsType = normalOpts,
+  showBuiltIns = false
 ) =
   if cmds.len == 0:
     return
@@ -382,7 +389,7 @@ proc describeOptions(
     if c.hasOpts:
       hasOpts = true
 
-  if hasOpts:
+  if hasOpts or showBuiltIns:
     case optionsType
     of normalOpts:
       helpOutput "\pThe following options are available:\p\p"
@@ -391,8 +398,23 @@ proc describeOptions(
     of defaultCmdOpts:
       discard
 
+    if showBuiltIns:
+      let helpOpt = OptInfo(
+        kind: CliSwitch,
+        name: "help",
+        desc: "Show this help message and exit. Available arguments: debug"
+      )
+      describeOptionsList(help, [helpOpt], appInfo)
+      if appInfo.hasVersion:
+        let versionOpt = OptInfo(
+          kind: CliSwitch,
+          name: "version",
+          desc: "Show program's version and exit"
+        )
+        describeOptionsList(help, [versionOpt], appInfo)
+
     for c in cmds:
-      describeOptionsList(help, c, appInfo)
+      describeOptionsList(help, c.opts, appInfo)
 
     for c in cmds:
       for opt in c.opts:
@@ -449,8 +471,8 @@ proc showHelp(help: var string,
 
   # Write out the app or script name
   helpOutput fgSection, "Usage: \p"
-  help.describeInvocation cmd, cmdInvocation, appInfo
-  help.describeOptions activeCmds, cmdInvocation, appInfo
+  help.describeInvocation cmd, cmdInvocation, appInfo, showBuiltIns = true
+  help.describeOptions activeCmds, cmdInvocation, appInfo, showBuiltIns = true
   helpOutput "\p"
 
   flushOutputAndQuit QuitSuccess
@@ -1143,7 +1165,9 @@ proc loadImpl[C, SecondarySources](
     HelpAppInfo(
       copyrightBanner: copyrightBanner,
       appInvocation: appInvocation(),
-      terminalWidth: termWidth)
+      terminalWidth: termWidth,
+      hasVersion: version.len > 0
+    )
 
   template processHelpAndVersionOptions(optKey: string) =
     let key = optKey

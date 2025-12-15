@@ -4,6 +4,7 @@ test_longdesc [OPTIONS]... command
 
 The following options are available:
 
+     --help      Show this help message and exit. Available arguments: debug.
  -o, --opt1      opt1 regular description [=opt1 default].
                  opt1 longdesc line one.
                  longdesc line two.

@@ -1,0 +1,17 @@
+Usage: 
+
+test_builtins [OPTIONS]... command
+
+The following options are available:
+
+ --help         Show this help message and exit. Available arguments: debug.
+ --version      Show program's version and exit.
+ --foobar1      foobar1 desc [=1].
+
+Available sub-commands:
+
+test_builtins lvl1Cmd1 [OPTIONS]...
+
+The following options are available:
+
+ --foobar2      foobar2 desc [=2].

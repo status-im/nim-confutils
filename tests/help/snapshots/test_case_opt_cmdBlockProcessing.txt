@@ -4,6 +4,7 @@ test_case_opt cmdBlockProcessing [OPTIONS]...
 
 The following options are available:
 
+     --help                    Show this help message and exit. Available arguments: debug.
  -p, --pre                     The name of your pre-state (without .ssz) [=pre].
      --blockProcessingCat      block transitions.
 
