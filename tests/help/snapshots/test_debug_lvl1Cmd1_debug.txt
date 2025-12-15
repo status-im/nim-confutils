@@ -1,0 +1,11 @@
+Usage: 
+
+test_debug lvl1Cmd1 [OPTIONS]...
+
+The following options are available:
+
+ --help        Show this help message and exit. Available arguments: debug.
+ --opt1        opt1 regular description [=opt1 default].
+ --debug1      debug1 regular description [=debug1 default].
+ --opt2        opt2 regular description [=opt2 default].
+ --debug2      debug2 desc [=debug2 default].

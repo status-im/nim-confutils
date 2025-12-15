@@ -65,6 +65,7 @@ template command* {.pragma.}
 template argument* {.pragma.}
 template hidden* {.pragma.}
 template ignore* {.pragma.}
+template debug* {.pragma.}
 template inlineConfiguration* {.pragma.}
 
 template implicitlySelectable* {.pragma.}

@@ -36,6 +36,9 @@ when not defined(nimscript):
     confutils/shell_completion
 
 type
+  HelpFlag = enum
+    hlpDebug
+
   HelpAppInfo = ref object
     appInvocation: string
     copyrightBanner: string
@@ -44,11 +47,11 @@ type
     maxNameLen: int
     terminalWidth: int
     namesWidth: int
+    flags: set[HelpFlag]
 
   CmdInfo = ref object
     name: string
     desc: string
-    isHidden: bool
     opts: seq[OptInfo]
 
   OptKind = enum
@@ -56,12 +59,16 @@ type
     CliSwitch
     Arg
 
+  OptFlag = enum
+    optHidden
+    optDebug
+
   OptInfo = ref object
     name, abbr, desc, typename: string
     separator: string
     longDesc: string
     idx: int
-    isHidden: bool
+    flags: set[OptFlag]
     hasDefault: bool
     defaultInHelpText: string
     case kind: OptKind
@@ -78,6 +85,14 @@ const
   confutils_narrow_terminal_width {.intdefine.} = 36
 
 {.push gcsafe, raises: [].}
+
+func toHelpFlags(s: string): set[HelpFlag] =
+  # if adding more flags parse `debug:experimental:etc`
+  case s
+  of "debug":
+    result.incl hlpDebug
+  else:
+    discard
 
 func getFieldName(caseField: NimNode): NimNode =
   result = caseField
@@ -175,12 +190,12 @@ func isCliSwitch(opt: OptInfo): bool =
   opt.kind == CliSwitch or
   (opt.kind == Discriminator and opt.isCommand == false)
 
-func isOpt(opt: OptInfo): bool =
-  opt.isCliSwitch and not opt.isHidden
+func isOpt(opt: OptInfo, excl: set[OptFlag]): bool =
+  opt.isCliSwitch and excl * opt.flags == {}
 
-func hasOpts(cmd: CmdInfo): bool =
+func hasOpts(cmd: CmdInfo, excl: set[OptFlag]): bool =
   for opt in cmd.opts:
-    if opt.isOpt:
+    if opt.isOpt(excl):
       return true
   false
 
@@ -216,40 +231,42 @@ iterator subCmds(cmd: CmdInfo): CmdInfo =
 template isSubCommand(cmd: CmdInfo): bool =
   cmd.name.len > 0
 
-func maxNameLen(cmd: CmdInfo, commands = false): int =
+func maxNameLen(cmd: CmdInfo, inclCmds: bool, excl: set[OptFlag]): int =
   result = 0
   for opt in cmd.opts:
-    if opt.isOpt or opt.kind == Arg:
+    if opt.isOpt(excl) or opt.kind == Arg:
       result = max(result, opt.name.len)
       if opt.kind == Discriminator:
         for subCmd in opt.subCmds:
-          result = max(result, maxNameLen(subCmd, commands))
-    elif commands and opt.kind == Discriminator and opt.isCommand:
+          result = max(result, maxNameLen(subCmd, inclCmds, excl))
+    elif inclCmds and opt.kind == Discriminator and opt.isCommand:
       for subCmd in opt.subCmds:
-        result = max(result, maxNameLen(subCmd, commands))
+        result = max(result, maxNameLen(subCmd, inclCmds, excl))
 
-func maxNameLen(cmds: openArray[CmdInfo]): int =
+func maxNameLen(cmds: openArray[CmdInfo], excl: set[OptFlag]): int =
   result = 0
   for i, cmd in cmds:
-    result = max(result, maxNameLen(cmd, commands = i == cmds.high))
+    let inclCmds = i == cmds.high
+    result = max(result, maxNameLen(cmd, inclCmds, excl))
 
-func hasAbbrs(cmd: CmdInfo, commands = false): bool =
+func hasAbbrs(cmd: CmdInfo, inclCmds: bool, excl: set[OptFlag]): bool =
   for opt in cmd.opts:
-    if opt.isOpt:
+    if opt.isOpt(excl):
       if opt.abbr.len > 0:
         return true
       if opt.kind == Discriminator:
         for subCmd in opt.subCmds:
-          if hasAbbrs(subCmd, commands):
+          if hasAbbrs(subCmd, inclCmds, excl):
             return true
-    elif commands and opt.kind == Discriminator and opt.isCommand:
+    elif inclCmds and opt.kind == Discriminator and opt.isCommand:
       for subCmd in opt.subCmds:
-        if hasAbbrs(subCmd, commands):
+        if hasAbbrs(subCmd, inclCmds, excl):
           return true
 
-func hasAbbrs(cmds: openArray[CmdInfo]): bool =
+func hasAbbrs(cmds: openArray[CmdInfo], excl: set[OptFlag]): bool =
   for i, cmd in cmds:
-    if hasAbbrs(cmd, commands = i == cmds.high):
+    let inclCmds = i == cmds.high
+    if hasAbbrs(cmd, inclCmds, excl):
       return true
   false
 
@@ -294,11 +311,12 @@ proc describeInvocation(
   cmd: CmdInfo,
   cmdInvocation: string,
   appInfo: HelpAppInfo,
+  excl: set[OptFlag],
   showBuiltIns = false
 ) =
   helpOutput styleBright, "\p", fgCommand, cmdInvocation
 
-  if cmd.hasOpts or showBuiltIns:
+  if cmd.hasOpts(excl) or showBuiltIns:
     helpOutput " [OPTIONS]..."
 
   let subCmdDiscriminator = cmd.getSubCmdDiscriminator
@@ -339,10 +357,11 @@ type
 proc describeOptionsList(
   help: var string,
   opts: openArray[OptInfo],
-  appInfo: HelpAppInfo
+  appInfo: HelpAppInfo,
+  excl: set[OptFlag]
 ) =
   for opt in opts:
-    if not opt.isOpt:
+    if not opt.isOpt(excl):
       continue
 
     if opt.separator.len > 0:
@@ -378,6 +397,7 @@ proc describeOptions(
   cmds: openArray[CmdInfo],
   cmdInvocation: string,
   appInfo: HelpAppInfo,
+  excl: set[OptFlag],
   optionsType = normalOpts,
   showBuiltIns = false
 ) =
@@ -386,7 +406,7 @@ proc describeOptions(
 
   var hasOpts = false
   for c in cmds:
-    if c.hasOpts:
+    if c.hasOpts(excl):
       hasOpts = true
 
   if hasOpts or showBuiltIns:
@@ -404,30 +424,30 @@ proc describeOptions(
         name: "help",
         desc: "Show this help message and exit. Available arguments: debug"
       )
-      describeOptionsList(help, [helpOpt], appInfo)
+      describeOptionsList(help, [helpOpt], appInfo, excl)
       if appInfo.hasVersion:
         let versionOpt = OptInfo(
           kind: CliSwitch,
           name: "version",
           desc: "Show program's version and exit"
         )
-        describeOptionsList(help, [versionOpt], appInfo)
+        describeOptionsList(help, [versionOpt], appInfo, excl)
 
     for c in cmds:
-      describeOptionsList(help, c.opts, appInfo)
+      describeOptionsList(help, c.opts, appInfo, excl)
 
     for c in cmds:
       for opt in c.opts:
-        if opt.isOpt and opt.kind == Discriminator:
+        if opt.isOpt(excl) and opt.kind == Discriminator:
           for i, subCmd in opt.subCmds:
-            if not subCmd.hasOpts:
+            if not subCmd.hasOpts(excl):
               continue
 
             helpOutput "\pWhen ", styleBright, fgBlue, opt.humaneName, resetStyle, " = ", fgGreen, subCmd.name
 
             if i == opt.defaultSubCmd:
               helpOutput " (default)"
-            help.describeOptions [subCmd], cmdInvocation, appInfo, conditionalOpts
+            help.describeOptions [subCmd], cmdInvocation, appInfo, excl, conditionalOpts
 
   let cmd = cmds[^1]
   let subCmdDiscriminator = cmd.getSubCmdDiscriminator
@@ -435,15 +455,15 @@ proc describeOptions(
     let defaultCmdIdx = subCmdDiscriminator.defaultSubCmd
     if defaultCmdIdx != -1:
       let defaultCmd = subCmdDiscriminator.subCmds[defaultCmdIdx]
-      help.describeOptions [defaultCmd], cmdInvocation, appInfo, defaultCmdOpts
+      help.describeOptions [defaultCmd], cmdInvocation, appInfo, excl, defaultCmdOpts
 
     helpOutput fgSection, "\pAvailable sub-commands:\p"
 
     for i, subCmd in subCmdDiscriminator.subCmds:
       if i != subCmdDiscriminator.defaultSubCmd:
         let subCmdInvocation = cmdInvocation & " " & subCmd.name
-        help.describeInvocation subCmd, subCmdInvocation, appInfo
-        help.describeOptions [subCmd], subCmdInvocation, appInfo
+        help.describeInvocation subCmd, subCmdInvocation, appInfo, excl
+        help.describeOptions [subCmd], subCmdInvocation, appInfo, excl
 
 proc showHelp(help: var string,
               appInfo: HelpAppInfo,
@@ -453,8 +473,12 @@ proc showHelp(help: var string,
 
   let cmd = activeCmds[^1]
 
-  appInfo.maxNameLen = activeCmds.maxNameLen
-  appInfo.hasAbbrs = activeCmds.hasAbbrs
+  var excl = {optHidden}
+  if hlpDebug notin appInfo.flags:
+    excl.incl optDebug
+
+  appInfo.maxNameLen = maxNameLen(activeCmds, excl)
+  appInfo.hasAbbrs = hasAbbrs(activeCmds, excl)
   let termWidth =
     try:
       terminalWidth()
@@ -471,8 +495,8 @@ proc showHelp(help: var string,
 
   # Write out the app or script name
   helpOutput fgSection, "Usage: \p"
-  help.describeInvocation cmd, cmdInvocation, appInfo, showBuiltIns = true
-  help.describeOptions activeCmds, cmdInvocation, appInfo, showBuiltIns = true
+  help.describeInvocation cmd, cmdInvocation, appInfo, excl, showBuiltIns = true
+  help.describeOptions activeCmds, cmdInvocation, appInfo, excl, showBuiltIns = true
   helpOutput "\p"
 
   flushOutputAndQuit QuitSuccess
@@ -833,6 +857,13 @@ func toText(n: NimNode): string =
   elif n.kind in {nnkStrLit..nnkTripleStrLit}: n.strVal
   else: repr(n)
 
+func readPragmaFlags(field: FieldDescription): set[OptFlag] =
+  result = {}
+  if field.readPragma("hidden") != nil:
+    result.incl optHidden
+  if field.readPragma("debug") != nil:
+    result.incl optDebug
+
 proc cmdInfoFromType(T: NimNode): CmdInfo =
   result = CmdInfo()
 
@@ -851,19 +882,18 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
       defaultInHelpText = toText(defaultInHelp)
       separator = field.readPragma"separator"
       longDesc = field.readPragma"longDesc"
-
-      isHidden = field.readPragma("hidden") != nil
       abbr = field.readPragma"abbr"
       name = field.readPragma"name"
       desc = field.readPragma"desc"
       optKind = if field.isDiscriminator: Discriminator
                 elif field.readPragma("argument") != nil: Arg
                 else: CliSwitch
+      optFlags = field.readPragmaFlags()
 
     var opt = OptInfo(kind: optKind,
                       idx: fieldIdx,
                       name: $field.name,
-                      isHidden: isHidden,
+                      flags: optFlags,
                       hasDefault: defaultValue != nil,
                       defaultInHelpText: defaultInHelpText,
                       typename: field.typ.repr)
@@ -1161,18 +1191,20 @@ proc loadImpl[C, SecondarySources](
 
       return
 
-  proc lazyHelpAppInfo: HelpAppInfo =
+  proc lazyHelpAppInfo(flags: set[HelpFlag]): HelpAppInfo =
     HelpAppInfo(
       copyrightBanner: copyrightBanner,
       appInvocation: appInvocation(),
       terminalWidth: termWidth,
-      hasVersion: version.len > 0
+      hasVersion: version.len > 0,
+      flags: flags
     )
 
-  template processHelpAndVersionOptions(optKey: string) =
+  template processHelpAndVersionOptions(optKey, optVal: string) =
     let key = optKey
+    let val = optVal
     if cmpIgnoreStyle(key, "help") == 0:
-      help.showHelp lazyHelpAppInfo(), activeCmds
+      help.showHelp(lazyHelpAppInfo(optVal.toHelpFlags), activeCmds)
     elif version.len > 0 and cmpIgnoreStyle(key, "version") == 0:
       help.helpOutput version, "\p"
       flushOutputAndQuit QuitSuccess
@@ -1182,7 +1214,7 @@ proc loadImpl[C, SecondarySources](
       let key = string(key)
     case kind
     of cmdLongOption, cmdShortOption:
-      processHelpAndVersionOptions key
+      processHelpAndVersionOptions(key, val)
 
       var opt = findOpt(activeCmds, key)
       if opt == nil:
@@ -1205,7 +1237,7 @@ proc loadImpl[C, SecondarySources](
 
     of cmdArgument:
       if lastCmd.hasSubCommands:
-        processHelpAndVersionOptions key
+        processHelpAndVersionOptions(key, val)
 
       block processArg:
         let subCmdDiscriminator = lastCmd.getSubCmdDiscriminator

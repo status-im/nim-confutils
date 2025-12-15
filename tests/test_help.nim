@@ -27,7 +27,10 @@ func cmdsToName(cmds: string): string =
   else:
     "_" & cmds.replace(" ", "_")
 
-proc cmdTest(cmdName: string, cmds = "") =
+func helpToName(help: string): string =
+  help.replace(":", "_")
+
+proc cmdTest(cmdName: string, cmds = "", help = "") =
   let fname = helpPath / cmdName
   var build = "nim c --verbosity:0 --hints:off -d:confutilsNoColors"
   if NimMajor < 2:
@@ -37,9 +40,9 @@ proc cmdTest(cmdName: string, cmds = "") =
     checkpoint "Build output: " & buildRes.output
     fail()
   else:
-    let res = execCmdEx(fname & " " & cmds & " --help")
+    let res = execCmdEx(fname & " " & cmds & " --help" & help)
     let output = res.output.normalizeHelp()
-    let snapshot = snapshotsPath / cmdName & cmds.cmdsToName() & ".txt"
+    let snapshot = snapshotsPath / cmdName & cmds.cmdsToName() & help.helpToName() & ".txt"
     if res.exitCode != 0:
       checkpoint "Run output: " & res.output
       fail()
@@ -92,3 +95,12 @@ suite "test --help":
 
   test "test test_builtins lvl1Cmd1":
     cmdTest("test_builtins", "lvl1Cmd1")
+
+  test "test test_debug --help":
+    cmdTest("test_debug", "")
+
+  test "test test_debug --help:debug":
+    cmdTest("test_debug", "", ":debug")
+
+  test "test test_debug lvl1Cmd1 --help:debug":
+    cmdTest("test_debug", "lvl1Cmd1", ":debug")
