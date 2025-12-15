@@ -1,0 +1,11 @@
+Simple program
+
+Usage: 
+
+test_dispatch [OPTIONS]...
+
+The following options are available:
+
+ --help     Show this help message and exit. Available arguments: debug.
+ --foo    
+ --bar
