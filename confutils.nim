@@ -360,7 +360,7 @@ proc describeOptionsList(
   appInfo: HelpAppInfo,
   excl: set[OptFlag]
 ) =
-  for opt in cmd.opts:
+  for opt in opts:
     if not opt.isOpt(excl):
       continue
 
@@ -397,8 +397,8 @@ proc describeOptions(
   cmds: openArray[CmdInfo],
   cmdInvocation: string,
   appInfo: HelpAppInfo,
-  optionsType = normalOpts,
   excl: set[OptFlag],
+  optionsType = normalOpts,
   showBuiltIns = false
 ) =
   if cmds.len == 0:
@@ -424,14 +424,14 @@ proc describeOptions(
         name: "help",
         desc: "Show this help message and exit. Available arguments: debug"
       )
-      describeOptionsList(help, [helpOpt], appInfo)
+      describeOptionsList(help, [helpOpt], appInfo, excl)
       if appInfo.hasVersion:
         let versionOpt = OptInfo(
           kind: CliSwitch,
           name: "version",
           desc: "Show program's version and exit"
         )
-        describeOptionsList(help, [versionOpt], appInfo)
+        describeOptionsList(help, [versionOpt], appInfo, excl)
 
     for c in cmds:
       describeOptionsList(help, c.opts, appInfo, excl)
