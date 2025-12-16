@@ -1,2 +1,10 @@
 outer-arg = "toml outer-arg"
-outerCmd1 = { outer-arg1 = "toml outer-arg1", innerCmd1 = { inner-arg1 = "toml inner-arg1" }, innerCmd2 = { inner-arg2 = "toml inner-arg2" } }
+outerCmd1 = {
+  outer-arg1 = "toml outer-arg1",
+  innerCmd1 = {
+    inner-arg1 = "toml inner-arg1"
+  },
+  innerCmd2 = {
+    inner-arg2 = "toml inner-arg2"
+  }
+}

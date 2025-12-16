@@ -15,7 +15,7 @@ template loadFile(T, file): untyped =
   proc (
     config: T, sources: ref SecondarySources
   ) {.raises: [ConfigurationError].} =
-    sources.addConfigFile(Toml, InputFile(configFilePath / file))
+    sources.addConfigFile(Toml, InputFile(configFilePath / file), flags = {TomlInlineTableNewline})
 
 type
   OuterCmd = enum
