@@ -237,65 +237,42 @@ iterator subCmds(cmd: CmdInfo): CmdInfo =
 template isSubCommand(cmd: CmdInfo): bool =
   cmd.name.len > 0
 
-func maxNameLen(cmd: CmdInfo, inclCmds: bool, excl: set[OptFlag]): int =
-  result = 0
-  for opt in cmd.opts:
-    if opt.isOpt(excl) or opt.kind == Arg:
-      result = max(result, opt.name.len)
-      if opt.kind == Discriminator:
+iterator helpOptsIt(cmd: CmdInfo, inclCmds: bool, excl: set[OptFlag]): OptInfo =
+  var q = @[cmd]
+  while q.len > 0:
+    let c = q.pop()
+    for opt in c.opts:
+      if opt.isOpt(excl) or opt.kind == Arg:
+        if opt.kind == Discriminator:
+          for subCmd in opt.subCmds:
+            q.add subCmd
+        yield opt
+      elif inclCmds and opt.kind == Discriminator and opt.isCommand:
         for subCmd in opt.subCmds:
-          result = max(result, maxNameLen(subCmd, inclCmds, excl))
-    elif inclCmds and opt.kind == Discriminator and opt.isCommand:
-      for subCmd in opt.subCmds:
-        result = max(result, maxNameLen(subCmd, inclCmds, excl))
+          q.add subCmd
 
 func maxNameLen(cmds: openArray[CmdInfo], excl: set[OptFlag]): int =
   result = 0
   for i, cmd in cmds:
     let inclCmds = i == cmds.high
-    result = max(result, maxNameLen(cmd, inclCmds, excl))
-
-func hasAbbrs(cmd: CmdInfo, inclCmds: bool, excl: set[OptFlag]): bool =
-  for opt in cmd.opts:
-    if opt.isOpt(excl):
-      if opt.abbr.len > 0:
-        return true
-      if opt.kind == Discriminator:
-        for subCmd in opt.subCmds:
-          if hasAbbrs(subCmd, inclCmds, excl):
-            return true
-    elif inclCmds and opt.kind == Discriminator and opt.isCommand:
-      for subCmd in opt.subCmds:
-        if hasAbbrs(subCmd, inclCmds, excl):
-          return true
+    for opt in helpOptsIt(cmd, inclCmds, excl):
+      result = max(result, opt.name.len)
 
 func hasAbbrs(cmds: openArray[CmdInfo], excl: set[OptFlag]): bool =
   for i, cmd in cmds:
     let inclCmds = i == cmds.high
-    if hasAbbrs(cmd, inclCmds, excl):
-      return true
+    for opt in helpOptsIt(cmd, inclCmds, excl):
+      if opt.abbr.len > 0:
+        return true
   false
 
-func hasDebugOpts(cmd: CmdInfo, inclCmds: bool): bool =
-  const excl: set[OptFlag] = {}
-  for opt in cmd.opts:
-    if opt.isOpt(excl):
-      if optDebug in opt.flags:
-        return true
-      if opt.kind == Discriminator:
-        for subCmd in opt.subCmds:
-          if hasDebugOpts(subCmd, inclCmds):
-            return true
-    elif inclCmds and opt.kind == Discriminator and opt.isCommand:
-      for subCmd in opt.subCmds:
-        if hasDebugOpts(subCmd, inclCmds):
-          return true
-
 func hasDebugOpts(cmds: openArray[CmdInfo]): bool =
+  let excl = {optHidden}
   for i, cmd in cmds:
     let inclCmds = i == cmds.high
-    if hasDebugOpts(cmd, inclCmds):
-      return true
+    for opt in helpOptsIt(cmd, inclCmds, excl):
+      if optDebug in opt.flags:
+        return true
   false
 
 func humaneName(opt: OptInfo): string =
