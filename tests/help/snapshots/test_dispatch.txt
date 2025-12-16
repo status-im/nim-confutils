@@ -6,6 +6,6 @@ test_dispatch [OPTIONS]...
 
 The following options are available:
 
- --help     Show this help message and exit. Available arguments: debug.
+ --help     Show this help message and exit.
  --foo    
  --bar

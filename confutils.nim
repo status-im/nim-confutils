@@ -44,6 +44,7 @@ type
     copyrightBanner: string
     hasAbbrs: bool
     hasVersion: bool
+    hasDebugOpts: bool
     maxNameLen: int
     terminalWidth: int
     namesWidth: int
@@ -186,6 +187,11 @@ template flushOutputAndQuit(exitCode: int) =
   flushOutput
   quit exitCode
 
+func helpOptDesc(appInfo: HelpAppInfo): string =
+  result = "Show this help message and exit"
+  if appInfo.hasDebugOpts:
+    result.add ". Available arguments: debug"
+
 func isCliSwitch(opt: OptInfo): bool =
   opt.kind == CliSwitch or
   (opt.kind == Discriminator and opt.isCommand == false)
@@ -231,42 +237,41 @@ iterator subCmds(cmd: CmdInfo): CmdInfo =
 template isSubCommand(cmd: CmdInfo): bool =
   cmd.name.len > 0
 
-func maxNameLen(cmd: CmdInfo, inclCmds: bool, excl: set[OptFlag]): int =
-  result = 0
-  for opt in cmd.opts:
-    if opt.isOpt(excl) or opt.kind == Arg:
-      result = max(result, opt.name.len)
-      if opt.kind == Discriminator:
+iterator helpOptsIt(cmd: CmdInfo, inclCmds: bool, excl: set[OptFlag]): OptInfo =
+  var q = @[cmd]
+  while q.len > 0:
+    let c = q.pop()
+    for opt in c.opts:
+      if opt.isOpt(excl) or opt.kind == Arg:
+        if opt.kind == Discriminator:
+          for subCmd in opt.subCmds:
+            q.add subCmd
+        yield opt
+      elif inclCmds and opt.kind == Discriminator and opt.isCommand:
         for subCmd in opt.subCmds:
-          result = max(result, maxNameLen(subCmd, inclCmds, excl))
-    elif inclCmds and opt.kind == Discriminator and opt.isCommand:
-      for subCmd in opt.subCmds:
-        result = max(result, maxNameLen(subCmd, inclCmds, excl))
+          q.add subCmd
+
+iterator helpOptsIt(cmds: openArray[CmdInfo], excl: set[OptFlag]): OptInfo =
+  for i, cmd in cmds:
+    let inclCmds = i == cmds.high
+    for opt in helpOptsIt(cmd, inclCmds, excl):
+      yield opt
 
 func maxNameLen(cmds: openArray[CmdInfo], excl: set[OptFlag]): int =
   result = 0
-  for i, cmd in cmds:
-    let inclCmds = i == cmds.high
-    result = max(result, maxNameLen(cmd, inclCmds, excl))
-
-func hasAbbrs(cmd: CmdInfo, inclCmds: bool, excl: set[OptFlag]): bool =
-  for opt in cmd.opts:
-    if opt.isOpt(excl):
-      if opt.abbr.len > 0:
-        return true
-      if opt.kind == Discriminator:
-        for subCmd in opt.subCmds:
-          if hasAbbrs(subCmd, inclCmds, excl):
-            return true
-    elif inclCmds and opt.kind == Discriminator and opt.isCommand:
-      for subCmd in opt.subCmds:
-        if hasAbbrs(subCmd, inclCmds, excl):
-          return true
+  for opt in helpOptsIt(cmds, excl):
+    result = max(result, opt.name.len)
 
 func hasAbbrs(cmds: openArray[CmdInfo], excl: set[OptFlag]): bool =
-  for i, cmd in cmds:
-    let inclCmds = i == cmds.high
-    if hasAbbrs(cmd, inclCmds, excl):
+  for opt in helpOptsIt(cmds, excl):
+    if opt.abbr.len > 0:
+      return true
+  false
+
+func hasDebugOpts(cmds: openArray[CmdInfo]): bool =
+  let excl = {optHidden}
+  for opt in helpOptsIt(cmds, excl):
+    if optDebug in opt.flags:
       return true
   false
 
@@ -422,7 +427,7 @@ proc describeOptions(
       let helpOpt = OptInfo(
         kind: CliSwitch,
         name: "help",
-        desc: "Show this help message and exit. Available arguments: debug"
+        desc: helpOptDesc(appInfo)
       )
       describeOptionsList(help, [helpOpt], appInfo, excl)
       if appInfo.hasVersion:
@@ -479,6 +484,7 @@ proc showHelp(help: var string,
 
   appInfo.maxNameLen = maxNameLen(activeCmds, excl)
   appInfo.hasAbbrs = hasAbbrs(activeCmds, excl)
+  appInfo.hasDebugOpts = hasDebugOpts(activeCmds)
   let termWidth =
     try:
       terminalWidth()

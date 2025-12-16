@@ -4,7 +4,7 @@ test_nested_cmd lvl1Cmd1 [OPTIONS]... command
 
 The following options are available:
 
- --help                Show this help message and exit. Available arguments: debug.
+ --help                Show this help message and exit.
  --top-arg1            topArg1 desc [=topArg1 default].
  --lvl1-cmd1-arg1      lvl1Cmd1Arg1 desc [=lvl1Cmd1Arg1 default].
 
