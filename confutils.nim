@@ -251,28 +251,28 @@ iterator helpOptsIt(cmd: CmdInfo, inclCmds: bool, excl: set[OptFlag]): OptInfo =
         for subCmd in opt.subCmds:
           q.add subCmd
 
+iterator helpOptsIt(cmds: openArray[CmdInfo], excl: set[OptFlag]): OptInfo =
+  for i, cmd in cmds:
+    let inclCmds = i == cmds.high
+    for opt in helpOptsIt(cmd, inclCmds, excl):
+      yield opt
+
 func maxNameLen(cmds: openArray[CmdInfo], excl: set[OptFlag]): int =
   result = 0
-  for i, cmd in cmds:
-    let inclCmds = i == cmds.high
-    for opt in helpOptsIt(cmd, inclCmds, excl):
-      result = max(result, opt.name.len)
+  for opt in helpOptsIt(cmds, excl):
+    result = max(result, opt.name.len)
 
 func hasAbbrs(cmds: openArray[CmdInfo], excl: set[OptFlag]): bool =
-  for i, cmd in cmds:
-    let inclCmds = i == cmds.high
-    for opt in helpOptsIt(cmd, inclCmds, excl):
-      if opt.abbr.len > 0:
-        return true
+  for opt in helpOptsIt(cmds, excl):
+    if opt.abbr.len > 0:
+      return true
   false
 
 func hasDebugOpts(cmds: openArray[CmdInfo]): bool =
   let excl = {optHidden}
-  for i, cmd in cmds:
-    let inclCmds = i == cmds.high
-    for opt in helpOptsIt(cmd, inclCmds, excl):
-      if optDebug in opt.flags:
-        return true
+  for opt in helpOptsIt(cmds, excl):
+    if optDebug in opt.flags:
+      return true
   false
 
 func humaneName(opt: OptInfo): string =
