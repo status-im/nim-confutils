@@ -4,7 +4,7 @@ test_argument [OPTIONS]... command
 
 The following options are available:
 
- --help                    Show this help message and exit. Available arguments: debug.
+ --help                    Show this help message and exit.
 
 Available sub-commands:
 

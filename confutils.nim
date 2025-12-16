@@ -44,6 +44,7 @@ type
     copyrightBanner: string
     hasAbbrs: bool
     hasVersion: bool
+    hasDebugOpts: bool
     maxNameLen: int
     terminalWidth: int
     namesWidth: int
@@ -186,6 +187,11 @@ template flushOutputAndQuit(exitCode: int) =
   flushOutput
   quit exitCode
 
+func helpOptDesc(appInfo: HelpAppInfo): string =
+  result = "Show this help message and exit"
+  if appInfo.hasDebugOpts:
+    result.add ". Available arguments: debug"
+
 func isCliSwitch(opt: OptInfo): bool =
   opt.kind == CliSwitch or
   (opt.kind == Discriminator and opt.isCommand == false)
@@ -267,6 +273,28 @@ func hasAbbrs(cmds: openArray[CmdInfo], excl: set[OptFlag]): bool =
   for i, cmd in cmds:
     let inclCmds = i == cmds.high
     if hasAbbrs(cmd, inclCmds, excl):
+      return true
+  false
+
+func hasDebugOpts(cmd: CmdInfo, inclCmds: bool): bool =
+  const excl: set[OptFlag] = {}
+  for opt in cmd.opts:
+    if opt.isOpt(excl):
+      if optDebug in opt.flags:
+        return true
+      if opt.kind == Discriminator:
+        for subCmd in opt.subCmds:
+          if hasDebugOpts(subCmd, inclCmds):
+            return true
+    elif inclCmds and opt.kind == Discriminator and opt.isCommand:
+      for subCmd in opt.subCmds:
+        if hasDebugOpts(subCmd, inclCmds):
+          return true
+
+func hasDebugOpts(cmds: openArray[CmdInfo]): bool =
+  for i, cmd in cmds:
+    let inclCmds = i == cmds.high
+    if hasDebugOpts(cmd, inclCmds):
       return true
   false
 
@@ -422,7 +450,7 @@ proc describeOptions(
       let helpOpt = OptInfo(
         kind: CliSwitch,
         name: "help",
-        desc: "Show this help message and exit. Available arguments: debug"
+        desc: helpOptDesc(appInfo)
       )
       describeOptionsList(help, [helpOpt], appInfo, excl)
       if appInfo.hasVersion:
@@ -479,6 +507,7 @@ proc showHelp(help: var string,
 
   appInfo.maxNameLen = maxNameLen(activeCmds, excl)
   appInfo.hasAbbrs = hasAbbrs(activeCmds, excl)
+  appInfo.hasDebugOpts = hasDebugOpts(activeCmds)
   let termWidth =
     try:
       terminalWidth()
