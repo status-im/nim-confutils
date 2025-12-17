@@ -34,6 +34,16 @@ type
       abbr: "d"
       name: "data-dir" }: OutDir
 
+    urlList* {.
+      envVarValueSep: ","
+      desc: "List of urls"
+      name: "url-list" }: seq[string]
+
+    numList* {.
+      envVarValueSep: ";"
+      desc: "List of numbers"
+      name: "num-list" }: seq[int]
+
 func completeCmdArg(T: type SomeObject, val: string): seq[string] =
   @[]
 
@@ -63,5 +73,25 @@ proc testEnvvar() =
       let conf = TestConf.load(envVarsPrefix=EnvVarPrefix)
       check conf.somObject.name.string == "helloObject"
       check conf.somObject.isNice.bool == true
+
+    test "list separator with single string item":
+      putEnv("NIMBUS_URL_LIST", "abc")
+      let conf = TestConf.load(envVarsPrefix=EnvVarPrefix)
+      check conf.urlList == @["abc"]
+
+    test "list separator with many string items":
+      putEnv("NIMBUS_URL_LIST", "abc, def,ghi")
+      let conf = TestConf.load(envVarsPrefix=EnvVarPrefix)
+      check conf.urlList == @["abc", "def", "ghi"]
+
+    test "list separator with single number item":
+      putEnv("NIMBUS_NUM_LIST", "123")
+      let conf = TestConf.load(envVarsPrefix=EnvVarPrefix)
+      check conf.numList == @[123]
+
+    test "list separator with many number items":
+      putEnv("NIMBUS_NUM_LIST", "123; 456; 789")
+      let conf = TestConf.load(envVarsPrefix=EnvVarPrefix)
+      check conf.numList == @[123, 456, 789]
 
 testEnvvar()
