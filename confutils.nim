@@ -1043,7 +1043,12 @@ when hasSerialization:
 func constructEnvKey*(prefix: string, key: string): string {.raises: [].} =
   ## Generates env. variable names from keys and prefix following the
   ## IEEE Open Group env. variable spec: https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
-  (prefix & "_" & key).toUpperAscii.multiReplace(("-", "_"), (" ", "_"))
+  let fullKey =
+    if prefix.len > 0:
+      prefix & "_" & key
+    else:
+      key
+  fullKey.toUpperAscii.multiReplace(("-", "_"), (" ", "_"))
 
 # On Posix there is no portable way to get the command
 # line from a DLL and thus the proc isn't defined in this environment.
