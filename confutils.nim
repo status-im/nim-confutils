@@ -129,7 +129,7 @@ when defined(nimscript):
     100000
 
 else:
-  template appInvocation: string =
+  proc appInvocation: string =
     try:
       getAppFilename().splitFile.name
     except OSError:
@@ -1056,6 +1056,11 @@ func constructEnvKey*(prefix: string, key: string): string {.raises: [].} =
 when not declared(commandLineParams):
   proc commandLineParams(): seq[string] = discard
 
+proc defaultEnvVarsPrefix(): string =
+  result = appInvocation()
+  if result.len == 0:
+    result = "_"
+
 proc loadImpl[C, SecondarySources](
     Configuration: typedesc[C],
     cmdLine = commandLineParams(),
@@ -1068,7 +1073,7 @@ proc loadImpl[C, SecondarySources](
     secondarySources: proc (
         config: Configuration, sources: ref SecondarySources
     ) {.gcsafe, raises: [ConfigurationError].} = nil,
-    envVarsPrefix = appInvocation(),
+    envVarsPrefix = defaultEnvVarsPrefix(),
     termWidth = 0
 ): Configuration {.raises: [ConfigurationError].} =
   ## Loads a program configuration by parsing command-line arguments
@@ -1354,7 +1359,7 @@ template load*(
     quitOnFailure = true,
     ignoreUnknown = false,
     secondarySources: untyped = nil,
-    envVarsPrefix = appInvocation(),
+    envVarsPrefix = defaultEnvVarsPrefix(),
     termWidth = 0): untyped =
   block:
     let secondarySourcesRef = generateSecondarySources(Configuration)
