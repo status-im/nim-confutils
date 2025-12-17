@@ -979,28 +979,66 @@ macro configurationRtti(RecordType: type): untyped =
   result = newTree(nnkPar, newLitFixed cmdInfo, fieldSetters)
 
 when hasSerialization:
-  proc addConfigFile*(secondarySources: auto,
-                      Format: type,
-                      path: InputFile) {.raises: [ConfigurationError].} =
+  template addConfigFileImpl(
+      secondarySources: auto,
+      Format: type SerializationFormat,
+      path: InputFile,
+      params: varargs[untyped]
+  ): untyped =
     try:
-      secondarySources.data.add loadFile(Format, string path,
-                                         type(secondarySources.data[0]))
+      secondarySources.data.add loadFile(
+        Format, string path, typeof(secondarySources.data[0]), params
+      )
     except SerializationError as err:
       raise newException(ConfigurationError, err.formatMsg(string path), err)
     except IOError as err:
       raise newException(ConfigurationError,
         "Failed to read config file at '" & string(path) & "': " & err.msg)
 
-  proc addConfigFileContent*(secondarySources: auto,
-                             Format: type,
-                             content: string) {.raises: [ConfigurationError].} =
+  template addConfigFileWithParams*(
+      secondarySources: auto,
+      Format: type SerializationFormat,
+      path: InputFile,
+      params: varargs[untyped]
+  ): untyped =
+    addConfigFileImpl(secondarySources, Format, path, params)
+
+  proc addConfigFile*(
+      secondarySources: auto,
+      Format: type SerializationFormat,
+      path: InputFile
+  ) {.raises: [ConfigurationError].} =
+    addConfigFileImpl(secondarySources, Format, path)
+
+  template addConfigFileContentImpl(
+      secondarySources: auto,
+      Format: type SerializationFormat,
+      content: string,
+      params: varargs[untyped]
+  ): untyped =
     try:
-      secondarySources.data.add decode(Format, content,
-                                       type(secondarySources.data[0]))
+      secondarySources.data.add decode(
+        Format, content, type(secondarySources.data[0], params)
+      )
     except SerializationError as err:
       raise newException(ConfigurationError, err.formatMsg("<content>"), err)
     except IOError:
       raiseAssert "This should not be possible"
+
+  template addConfigFileContentWithParams*(
+      secondarySources: auto,
+      Format: type SerializationFormat,
+      content: string,
+      params: varargs[untyped]
+  ): untyped =
+    addConfigFileContentImpl(secondarySources, Format, content, params)
+
+  proc addConfigFileContent*(
+      secondarySources: auto,
+      Format: type SerializationFormat,
+      content: string
+  ) {.raises: [ConfigurationError].} =
+    addConfigFileContentImpl(secondarySources, Format, content)
 
 func constructEnvKey*(prefix: string, key: string): string {.raises: [].} =
   ## Generates env. variable names from keys and prefix following the
