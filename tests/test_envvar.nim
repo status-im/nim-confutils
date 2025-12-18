@@ -65,7 +65,12 @@ proc testEnvvar() =
       check conf.somObject.isNice.bool == true
 
     test "default envVarsPrefix is app file name":
-      putEnv("TEST_ENVVAR_DATA_DIR", "ENV VAR DATADIR")
+      const prefix =
+        when isMainModule:
+          "TEST_ENVVAR"
+        else:
+          "TEST_ALL"
+      putEnv(prefix & "_DATA_DIR", "ENV VAR DATADIR")
       let conf = TestConf.load()
       check conf.dataDir.string == "ENV VAR DATADIR"
 
