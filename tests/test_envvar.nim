@@ -94,4 +94,14 @@ proc testEnvvar() =
       let conf = TestConf.load(envVarsPrefix=EnvVarPrefix)
       check conf.numList == @[123, 456, 789]
 
+    test "default envVarsPrefix is app file name":
+      const prefix =
+        when isMainModule:
+          "TEST_ENVVAR"
+        else:
+          "TEST_ALL"
+      putEnv(prefix & "_DATA_DIR", "ENV VAR DATADIR")
+      let conf = TestConf.load()
+      check conf.dataDir.string == "ENV VAR DATADIR"
+
 testEnvvar()

@@ -1,0 +1,10 @@
+Usage: 
+
+test_cli_example [OPTIONS]... <args>
+
+The following options are available:
+
+ --help         Show this help message and exit.
+ --foo        
+ --bar        
+ --withBaz
