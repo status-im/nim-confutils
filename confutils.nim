@@ -64,6 +64,7 @@ type
   OptFlag = enum
     optHidden
     optDebug
+    optObsolete
 
   OptInfo = ref object
     name, abbr, desc, typename: string
@@ -73,6 +74,7 @@ type
     flags: set[OptFlag]
     hasDefault: bool
     defaultInHelpText: string
+    obsoleteMsg: string
     case kind: OptKind
     of Discriminator:
       isCommand: bool
@@ -269,8 +271,7 @@ func hasAbbrs(cmds: openArray[CmdInfo], excl: set[OptFlag]): bool =
       return true
   false
 
-func hasDebugOpts(cmds: openArray[CmdInfo]): bool =
-  let excl = {optHidden}
+func hasDebugOpts(cmds: openArray[CmdInfo], excl: set[OptFlag]): bool =
   for opt in helpOptsIt(cmds, excl):
     if optDebug in opt.flags:
       return true
@@ -479,13 +480,13 @@ proc showHelp(help: var string,
 
   let cmd = activeCmds[^1]
 
-  var excl = {optHidden}
+  var excl = {optHidden, optObsolete}
   if hlpDebug notin appInfo.flags:
     excl.incl optDebug
 
   appInfo.maxNameLen = maxNameLen(activeCmds, excl)
   appInfo.hasAbbrs = hasAbbrs(activeCmds, excl)
-  appInfo.hasDebugOpts = hasDebugOpts(activeCmds)
+  appInfo.hasDebugOpts = hasDebugOpts(activeCmds, excl - {optDebug})
   let termWidth =
     try:
       terminalWidth()
@@ -769,6 +770,24 @@ func requiresInput*(T: type): bool =
 func acceptsMultipleValues*(T: type): bool =
   T is seq
 
+when defined(nimscript):
+  template warnOutput(args: varargs[string]) =
+    writeLine(stderr, "Warning: " & join(@args))
+else:
+  template warnOutput(args: varargs[untyped]) =
+    errorOutput(styleBright, fgYellow, "Warning: ", resetStyle, args)
+    errorOutput("\p")
+
+proc obsoleteCmdOpt(T: type, opt, msg: string) =
+  if msg.len > 0:
+    warnOutput(msg, "; ", opt, " is deprecated")
+  else:
+    warnOutput(opt, " is deprecated")
+
+proc obsoleteCmdOptAux(T: type, opt, msg: string) =
+  mixin obsoleteCmdOpt
+  obsoleteCmdOpt(T, opt, msg)
+
 template debugMacroResult(macroName: string) {.dirty.} =
   when defined(debugMacros) or defined(debugConfutils):
     echo "\n-------- ", macroName, " ----------------------"
@@ -877,6 +896,8 @@ func readPragmaFlags(field: FieldDescription): set[OptFlag] =
     result.incl optHidden
   if field.readPragma("debug") != nil:
     result.incl optDebug
+  if field.readPragma"obsolete" != nil:
+    result.incl optObsolete
 
 proc cmdInfoFromType(T: NimNode): CmdInfo =
   result = CmdInfo()
@@ -894,6 +915,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
       defaultInHelp = if defaultValueDesc != nil: defaultValueDesc
                       else: defaultValue
       defaultInHelpText = toText(defaultInHelp)
+      obsoleteMsg = field.readPragma"obsolete"
       separator = field.readPragma"separator"
       longDesc = field.readPragma"longDesc"
       abbr = field.readPragma"abbr"
@@ -917,6 +939,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     if abbr != nil: opt.abbr = abbr.strVal
     if separator != nil: opt.separator = separator.strVal
     if longDesc != nil: opt.longDesc = longDesc.strVal
+    if obsoleteMsg != nil: opt.obsoleteMsg = obsoleteMsg.strVal
 
     inc fieldIdx
 
@@ -1283,6 +1306,8 @@ proc loadImpl[C, SecondarySources](
 
       if opt != nil:
         result.applySetter(opt.idx, val)
+        if optObsolete in opt.flags:
+          obsoleteCmdOptAux(typeof(Configuration), key, opt.obsoleteMsg)
       elif not ignoreUnknown:
         fail "Unrecognized option '" & key & "'"
 
@@ -1333,10 +1358,13 @@ proc loadImpl[C, SecondarySources](
           if existsEnv(envKey):
             let envContent = getEnv(envKey)
             conf.applySetter(opt.idx, envContent)
+            if optObsolete in opt.flags:
+              obsoleteCmdOptAux(typeof(Configuration), envKey, opt.obsoleteMsg)
           elif secondarySourcesRef.setters[opt.idx](conf, secondarySourcesRef):
             # all work is done in the config file setter,
             # there is nothing left to do here.
-            discard
+            if optObsolete in opt.flags:
+              obsoleteCmdOptAux(typeof(Configuration), opt.name, opt.obsoleteMsg)
           elif opt.hasDefault:
             fieldSetters[opt.idx][1](conf, Opt.none(string))
           elif opt.required:

@@ -15,6 +15,7 @@ import
   test_envvar,
   test_ignore,
   test_nested_cmd,
+  test_obsolete,
   test_parsecmdarg,
   test_pragma,
   test_qualified_ident,
