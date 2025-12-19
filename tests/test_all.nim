@@ -16,6 +16,8 @@ import
   test_ignore,
   test_multi_case_values,
   test_nested_cmd,
+  test_obsolete_overload,
+  test_obsolete,
   test_parsecmdarg,
   test_pragma,
   test_qualified_ident,

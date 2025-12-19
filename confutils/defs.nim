@@ -60,7 +60,11 @@ template abbr*(v: string) {.pragma.}
 template separator*(v: string) {.pragma.}
 template defaultValue*(v: untyped) {.pragma.}
 template defaultValueDesc*(v: string) {.pragma.}
+<<<<<<< HEAD
 template envVarValueSep*(v = "") {.pragma.}
+=======
+template obsolete*(v = "") {.pragma.}
+>>>>>>> 67b3b70 (Fix #62; Add `obsolete` pragma)
 template required* {.pragma.}
 template command* {.pragma.}
 template argument* {.pragma.}

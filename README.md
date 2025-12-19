@@ -362,6 +362,34 @@ The `defaultValue` won't be set.
 -----------------
 
 ```nim
+template obsolete*(v: string = "") {.pragma.}
+```
+
+Apply this to a field to emit a deprecation warning when the option
+is set by the user through the CLI, an env-var, or a configuration file.
+
+The warning logger can be customized by overloading
+`proc obsoleteCmdOpt*(T: type, opt, msg: string)`.
+Where `T` is the config type, `opt` is the option name, and `msg`
+is the value of the `obsolete` pragma (which may be empty).
+
+If the logger requires initialization, it can be set through
+the `loggerSetup` parameter, for example:
+
+```nim
+type MyConf = object
+  # options
+
+proc myLogger(config: MyConf) {.gcsafe, raises: [ConfigurationError].} =
+  # set up logger
+  discard
+
+let c = MyConf.load(loggerSetup = myLogger)
+```
+
+-----------------
+
+```nim
 template implicitlySelectable* {.pragma.}
 ```
 
