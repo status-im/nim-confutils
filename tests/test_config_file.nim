@@ -185,15 +185,15 @@ proc testConfigFile() =
 
     test "basic config file":
       let conf = TestConf.load(
-          envVarsPrefix="prefix",
-          secondarySources = proc (
-            config: TestConf, sources: ref SecondarySources
-      ) {.raises: [ConfigurationError].} =
-        if config.configFile.isSome:
-          sources.addConfigFile(Toml, config.configFile.get)
-        else:
-          sources.addConfigFile(Toml, InputFile(confPathCurrUser / "testVendor" / "testApp.toml"))
-          sources.addConfigFile(Toml, InputFile(confPathSystemWide / "testVendor" / "testApp.toml"))
+        envVarsPrefix="prefix",
+        secondarySources = proc (
+          config: TestConf, sources: ref SecondarySources
+        ) {.raises: [ConfigurationError].} =
+          if config.configFile.isSome:
+            sources.addConfigFile(Toml, config.configFile.get)
+          else:
+            sources.addConfigFile(Toml, InputFile(confPathCurrUser / "testVendor" / "testApp.toml"))
+            sources.addConfigFile(Toml, InputFile(confPathSystemWide / "testVendor" / "testApp.toml"))
       )
 
       # dataDir is in env var
@@ -204,6 +204,23 @@ proc testConfigFile() =
       check conf.logFile.get().string == "TOML CU LOGFILE"
 
       # logLevel and rpcPort are in system wide config file
+      check conf.logLevel == "TOML SW DEBUG"
+      check conf.rpcPort.int == 1235
+
+    test "basic config file content":
+      let currUserCont = readFile(confPathCurrUser / "testVendor" / "testApp.toml")
+      let sysWideCont = readFile(confPathSystemWide / "testVendor" / "testApp.toml")
+      let conf = TestConf.load(
+        envVarsPrefix="prefix",
+        secondarySources = proc (
+            config: TestConf, sources: ref SecondarySources
+        ) {.raises: [ConfigurationError].} =
+          sources.addConfigFileContent(Toml, currUserCont)
+          sources.addConfigFileContent(Toml, sysWideCont)
+      )
+      check conf.dataDir.string == "ENV VAR DATADIR"
+      check conf.logFile.isSome()
+      check conf.logFile.get().string == "TOML CU LOGFILE"
       check conf.logLevel == "TOML SW DEBUG"
       check conf.rpcPort.int == 1235
 
