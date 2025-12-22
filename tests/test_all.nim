@@ -18,6 +18,7 @@ import
   test_parsecmdarg,
   test_pragma,
   test_qualified_ident,
+  test_results_opt,
   test_help
 
 when defined(windows):
