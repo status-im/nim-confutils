@@ -19,6 +19,14 @@ template loadFile(T, file): untyped =
       Toml, InputFile(configFilePath / file), flags = {TomlInlineTableNewline}
     )
 
+template loadContent(T, cont): untyped =
+  proc (
+    config: T, sources: ref SecondarySources
+  ) {.raises: [ConfigurationError].} =
+    sources.addConfigFileContentWithParams(
+      Toml, cont, flags = {TomlInlineTableNewline}
+    )
+
 type
   OuterCmd = enum
     noCommand
@@ -138,6 +146,21 @@ suite "test nested cmd toml":
   test "subcommand outerCmd1 innerCmd2":
     let conf = TestConf.load(
       secondarySources = loadFile(TestConf, "nested_cmd.toml"),
+      cmdLine = @[
+        "outerCmd1",
+        "innerCmd2"
+      ]
+    )
+    check:
+      conf.cmd == OuterCmd.outerCmd1
+      conf.innerCmd == InnerCmd.innerCmd2
+      conf.outerArg1 == "toml outer-arg1"
+      conf.innerArg2 == "toml inner-arg2"
+
+  test "subcommand outerCmd1 innerCmd2":
+    let tomlCont = readFile(configFilePath / "nested_cmd.toml")
+    let conf = TestConf.load(
+      secondarySources = loadContent(TestConf, tomlCont),
       cmdLine = @[
         "outerCmd1",
         "innerCmd2"

@@ -1026,7 +1026,7 @@ when hasSerialization:
   ): untyped =
     try:
       secondarySources.data.add decode(
-        Format, content, type(secondarySources.data[0], params)
+        Format, content, typeof(secondarySources.data[0]), params
       )
     except SerializationError as err:
       raise newException(ConfigurationError, err.formatMsg("<content>"), err)
@@ -1254,7 +1254,6 @@ proc loadImpl[C, SecondarySources](
 
   template processHelpAndVersionOptions(optKey, optVal: string) =
     let key = optKey
-    let val = optVal
     if cmpIgnoreStyle(key, "help") == 0:
       help.showHelp(lazyHelpAppInfo(optVal.toHelpFlags), activeCmds)
     elif version.len > 0 and cmpIgnoreStyle(key, "version") == 0:
