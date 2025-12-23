@@ -39,10 +39,41 @@ proc obsoleteCmdOpt(T: type OverloadConf, opt, msg: string) =
     registry.add msg
 
 suite "test obsolete option overload":
-  test "obsolete option set":
+  test "the overload is called if opt is set":
     registry.setLen 0
     let conf = OverloadConf.load(cmdLine = @[
       "--opt1=foo"
     ])
     check conf.opt1 == "foo"
     check registry == @["opt1"]
+
+  test "the overload is not called if opt not set":
+    registry.setLen 0
+    let conf = OverloadConf.load()
+    check conf.opt1 == "opt1 default"
+    check registry.len == 0
+
+  test "the logger setup is called":
+    proc loggerSetup(c: OverloadConf) =
+      doAssert c.opt1 == "opt1 default"
+      registry.add "logger"
+
+    registry.setLen 0
+    let conf = OverloadConf.load(loggerSetup = loggerSetup)
+    check conf.opt1 == "opt1 default"
+    check registry == @["logger"]
+
+  test "the logger setup is called before the overload":
+    proc loggerSetup(c: OverloadConf) =
+      doAssert c.opt1 == "foo"
+      registry.add "logger"
+
+    registry.setLen 0
+    let conf = OverloadConf.load(
+      cmdLine = @[
+        "--opt1=foo"
+      ],
+      loggerSetup = loggerSetup
+    )
+    check conf.opt1 == "foo"
+    check registry == @["logger", "opt1"]

@@ -1095,7 +1095,10 @@ proc loadImpl[C, SecondarySources](
         config: Configuration, sources: ref SecondarySources
     ) {.gcsafe, raises: [ConfigurationError].} = nil,
     envVarsPrefix = appInvocation(),
-    termWidth = 0
+    termWidth = 0,
+    loggerSetup: proc (
+        config: Configuration
+    ) {.gcsafe, raises: [ConfigurationError].} = nil,
 ): Configuration {.raises: [ConfigurationError].} =
   ## Loads a program configuration by parsing command-line arguments
   ## and a standard set of config files that can specify:
@@ -1306,8 +1309,6 @@ proc loadImpl[C, SecondarySources](
 
       if opt != nil:
         result.applySetter(opt.idx, val)
-        if optObsolete in opt.flags:
-          obsoleteCmdOptAux(typeof(Configuration), key, opt.obsoleteMsg)
       elif not ignoreUnknown:
         fail "Unrecognized option '" & key & "'"
 
@@ -1358,13 +1359,10 @@ proc loadImpl[C, SecondarySources](
           if existsEnv(envKey):
             let envContent = getEnv(envKey)
             conf.applySetter(opt.idx, envContent)
-            if optObsolete in opt.flags:
-              obsoleteCmdOptAux(typeof(Configuration), envKey, opt.obsoleteMsg)
           elif secondarySourcesRef.setters[opt.idx](conf, secondarySourcesRef):
             # all work is done in the config file setter,
             # there is nothing left to do here.
-            if optObsolete in opt.flags:
-              obsoleteCmdOptAux(typeof(Configuration), opt.name, opt.obsoleteMsg)
+            discard
           elif opt.hasDefault:
             fieldSetters[opt.idx][1](conf, Opt.none(string))
           elif opt.required:
@@ -1374,6 +1372,17 @@ proc loadImpl[C, SecondarySources](
 
   for cmd in activeCmds:
     result.processMissingOpts(cmd)
+
+  if not isNil(loggerSetup):
+    try:
+      loggerSetup(result)
+    except ConfigurationError as err:
+      fail "Failed to setup the logger: '" & err.msg & "'"
+
+  for cmd in activeCmds:
+    for opt in cmd.opts:
+      if optObsolete in opt.flags and fieldCounters[opt.idx] != 0:
+        obsoleteCmdOptAux(typeof(Configuration), opt.name, opt.obsoleteMsg)
 
 template load*(
     Configuration: type,
@@ -1385,12 +1394,14 @@ template load*(
     ignoreUnknown = false,
     secondarySources: untyped = nil,
     envVarsPrefix = appInvocation(),
-    termWidth = 0): untyped =
+    termWidth = 0,
+    loggerSetup: untyped = nil
+): untyped =
   block:
     let secondarySourcesRef = generateSecondarySources(Configuration)
     loadImpl(Configuration, cmdLine, version,
              copyrightBanner, printUsage, quitOnFailure, ignoreUnknown,
-             secondarySourcesRef, secondarySources, envVarsPrefix, termWidth)
+             secondarySourcesRef, secondarySources, envVarsPrefix, termWidth, loggerSetup)
 
 func defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
