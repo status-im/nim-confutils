@@ -351,7 +351,7 @@ The `defaultValue` won't be set.
 -----------------
 
 ```nim
-template obsolete*(v: string) {.pragma.}
+template obsolete*(v: string = "") {.pragma.}
 ```
 
 Apply this to a field to emit a deprecation warning when the option
