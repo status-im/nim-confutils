@@ -1,0 +1,10 @@
+Usage: 
+
+test_default_cmd_desc printCommand [OPTIONS]...
+
+Some description.
+
+The following options are available:
+
+ --help      Show this help message and exit.
+ --port      some port [=1].
