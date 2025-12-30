@@ -1,0 +1,10 @@
+Usage: 
+
+test_default_cmd_desc exportCommand [OPTIONS]...
+
+Some very important description, must read this!.
+
+The following options are available:
+
+ --help      Show this help message and exit.
+ --port      some port [=1].

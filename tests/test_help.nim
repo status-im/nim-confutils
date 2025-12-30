@@ -107,3 +107,12 @@ suite "test --help":
 
   test "test test_dispatch":
     cmdTest("test_dispatch", "")
+
+  test "test test_default_cmd_desc":
+    cmdTest("test_default_cmd_desc", "")
+
+  test "test test_default_cmd_desc exportCommand":
+    cmdTest("test_default_cmd_desc", "exportCommand")
+
+  test "test test_default_cmd_desc printCommand":
+    cmdTest("test_default_cmd_desc", "printCommand")

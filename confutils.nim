@@ -312,6 +312,14 @@ proc writeLongDesc(help: var string,
       helpOutput padding("", 5 + appInfo.namesWidth)
       help.writeDesc appInfo, line, ""
 
+proc defaultSubCmdDesc(cmd: CmdInfo): string =
+  let subCmdDiscriminator = cmd.getSubCmdDiscriminator
+  if subCmdDiscriminator != nil:
+    for i, subCmd in subCmdDiscriminator.subCmds:
+      if i == subCmdDiscriminator.defaultSubCmd:
+        return subCmd.desc
+  ""
+
 proc describeInvocation(
   help: var string,
   cmd: CmdInfo,
@@ -336,6 +344,10 @@ proc describeInvocation(
 
   if cmd.desc.len > 0:
     helpOutput "\p", cmd.desc, ".\p"
+
+  let defaultSubCmdDesc = cmd.defaultSubCmdDesc()
+  if defaultSubCmdDesc.len > 0:
+    helpOutput "\p", defaultSubCmdDesc, ".\p"
 
   var argsSectionStarted = false
 
