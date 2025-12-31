@@ -19,7 +19,7 @@ type
       "Multi lines with these " &
       "triple quoted strings work"
 
-# TODO: 
+# TODO: https://github.com/nim-lang/Nim/pull/25401
 #    printCommand = """Multi lines with these
 #  triple quoted strings work"""
 
