@@ -64,4 +64,9 @@ proc testEnvvar() =
       check conf.somObject.name.string == "helloObject"
       check conf.somObject.isNice.bool == true
 
+    test "env vars no prefix":
+      putEnv("DATA_DIR", "ENV VAR DATADIR")
+      let conf = TestConf.load(envVarsPrefix="")
+      check conf.dataDir.string == "ENV VAR DATADIR"
+
 testEnvvar()

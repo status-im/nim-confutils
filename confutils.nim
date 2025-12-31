@@ -130,7 +130,7 @@ when defined(nimscript):
     100000
 
 else:
-  template appInvocation: string =
+  proc appInvocation: string =
     try:
       getAppFilename().splitFile.name
     except OSError:
@@ -1063,13 +1063,23 @@ when hasSerialization:
 func constructEnvKey*(prefix: string, key: string): string {.raises: [].} =
   ## Generates env. variable names from keys and prefix following the
   ## IEEE Open Group env. variable spec: https://pubs.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html
-  (prefix & "_" & key).toUpperAscii.multiReplace(("-", "_"), (" ", "_"))
+  let fullKey =
+    if prefix.len > 0:
+      prefix & "_" & key
+    else:
+      key
+  fullKey.toUpperAscii.multiReplace(("-", "_"), (" ", "_"))
 
 # On Posix there is no portable way to get the command
 # line from a DLL and thus the proc isn't defined in this environment.
 # See https://nim-lang.org/docs/os.html#commandLineParams
 when not declared(commandLineParams):
   proc commandLineParams(): seq[string] = discard
+
+proc defaultEnvVarsPrefix(): string =
+  result = appInvocation()
+  if result.len == 0:
+    result = "_"
 
 proc loadImpl[C, SecondarySources](
     Configuration: typedesc[C],
@@ -1083,7 +1093,7 @@ proc loadImpl[C, SecondarySources](
     secondarySources: proc (
         config: Configuration, sources: ref SecondarySources
     ) {.gcsafe, raises: [ConfigurationError].} = nil,
-    envVarsPrefix = appInvocation(),
+    envVarsPrefix = defaultEnvVarsPrefix(),
     termWidth = 0
 ): Configuration {.raises: [ConfigurationError].} =
   ## Loads a program configuration by parsing command-line arguments
@@ -1368,7 +1378,7 @@ template load*(
     quitOnFailure = true,
     ignoreUnknown = false,
     secondarySources: untyped = nil,
-    envVarsPrefix = appInvocation(),
+    envVarsPrefix = defaultEnvVarsPrefix(),
     termWidth = 0): untyped =
   block:
     let secondarySourcesRef = generateSecondarySources(Configuration)
