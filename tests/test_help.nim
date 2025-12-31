@@ -116,3 +116,6 @@ suite "test --help":
 
   test "test test_default_cmd_desc printCommand":
     cmdTest("test_default_cmd_desc", "printCommand")
+
+  test "test test_default_cmd_desc_lines":
+    cmdTest("test_default_cmd_desc_lines", "")

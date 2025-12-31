@@ -1,0 +1,15 @@
+Usage: 
+
+test_default_cmd_desc_lines [OPTIONS]... command
+
+This multi line work.
+
+The following options are available:
+
+ --help  Show this help message and exit.
+
+Available sub-commands:
+
+test_default_cmd_desc_lines printCommand
+
+Multi lines with these triple quoted strings work.
