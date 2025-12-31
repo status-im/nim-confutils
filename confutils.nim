@@ -880,8 +880,35 @@ func findPath(parent, node: CmdInfo): seq[CmdInfo] =
 
 func toText(n: NimNode): string =
   if n == nil: ""
-  elif n.kind in {nnkStrLit..nnkTripleStrLit}: n.strVal
+  elif n.kind in {nnkStrLit .. nnkTripleStrLit}: n.strVal
   else: repr(n)
+
+func concatText(ret: var string, n: NimNode) =
+  expectKind(n, {nnkInfix, nnkStrLit .. nnkTripleStrLit})
+  if n.kind == nnkInfix:
+    let (left, op, right) = unpackInfix(n)
+    doAssert op == "&", "Invalid string concat"
+    expectKind(left, {nnkStrLit .. nnkTripleStrLit})
+    ret.add left.strVal
+    concatText(ret, right)
+  else:
+    ret.add n.strVal
+
+func concatText(n: NimNode): string =
+  ## Concat infixed string: "abc" & "def"
+  expectKind(n, nnkInfix)
+  result = ""
+  concatText(result, n)
+
+func enumText(n: NimNode): string =
+  expectKind(n, nnkEnumFieldDef)
+  if n[1].kind in {nnkStrLit .. nnkTripleStrLit}:
+    n[1].strVal
+  elif n[1].kind == nnkInfix:
+    concatText(n[1])
+  else:
+    # old behavior; most likely fails
+    $n[1]
 
 func readPragmaFlags(field: FieldDescription): set[OptFlag] =
   result = {}
@@ -946,7 +973,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
         var name, desc: string
         if enumVal.kind == nnkEnumFieldDef:
           name = $enumVal[0]
-          desc = $enumVal[1]
+          desc = enumText(enumVal)
         else:
           name = $enumVal
         if defaultValue != nil and eqIdent(name, defaultValue):
