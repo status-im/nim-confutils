@@ -1,0 +1,21 @@
+Usage: 
+
+test_multi_case_values [OPTIONS]... command
+
+The following options are available:
+
+ --help      Show this help message and exit.
+
+Available sub-commands:
+
+test_multi_case_values cmd1 [OPTIONS]...
+
+The following options are available:
+
+ --opt1      opt1 desc [=opt1 default].
+
+test_multi_case_values cmd2 [OPTIONS]...
+
+The following options are available:
+
+ --opt1      opt1 desc [=opt1 default].

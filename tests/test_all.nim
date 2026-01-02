@@ -14,6 +14,7 @@ import
   test_duplicates,
   test_envvar,
   test_ignore,
+  test_multi_case_values,
   test_nested_cmd,
   test_parsecmdarg,
   test_pragma,
