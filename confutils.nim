@@ -970,19 +970,22 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
         error "Sub-command parameters cannot appear in an else branch. " &
               "Please specify the sub-command branch precisely", field.caseBranch[0]
 
-      var branchEnumVal = field.caseBranch[0]
-      if branchEnumVal.kind == nnkDotExpr:
-        branchEnumVal = branchEnumVal[1]
-      var cmd = findCmd(discriminator.subCmds, $branchEnumVal)
-      # we respect subcommand hierarchy when looking for duplicate
-      let path = findPath(result, cmd)
-      for n in path:
-        checkDuplicate(n, opt, field.name)
+      # support multiple subcommands in the same branch; skip branch body
+      for enumValIdx in 0 .. field.caseBranch.len - 2:
+        var branchEnumVal = field.caseBranch[enumValIdx]
+        if branchEnumVal.kind == nnkDotExpr:
+          branchEnumVal = branchEnumVal[1]
+        let cmd = findCmd(discriminator.subCmds, $branchEnumVal)
+        doAssert cmd != nil
+        # we respect subcommand hierarchy when looking for duplicate
+        let path = findPath(result, cmd)
+        for n in path:
+          checkDuplicate(n, opt, field.name)
 
-      # the reason we check for `ignore` pragma here and not using `continue` statement
-      # is we do respect option hierarchy of subcommands
-      if field.readPragma("ignore") == nil:
-        cmd.opts.add opt
+        # the reason we check for `ignore` pragma here and not using `continue` statement
+        # is we do respect option hierarchy of subcommands
+        if field.readPragma("ignore") == nil:
+          cmd.opts.add opt
 
     else:
       checkDuplicate(result, opt, field.name)
