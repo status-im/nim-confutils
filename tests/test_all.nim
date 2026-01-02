@@ -9,6 +9,7 @@
 
 import
   test_argument,
+  test_case_opt,
   test_config_file,
   test_dispatch,
   test_duplicates,
