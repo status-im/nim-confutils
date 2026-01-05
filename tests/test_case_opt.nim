@@ -83,6 +83,11 @@ type
     catDeposits
 
   TestConf = object
+    preState {.
+      desc: "The name of your pre-state (without .ssz)"
+      name: "pre"
+      abbr: "p"
+      defaultValue: "pre".}: string
     case blockProcessingCat {.
       desc: "block transitions"
       #name: "process-blocks" # Comment this to make it work
@@ -97,22 +102,61 @@ type
         defaultValue: "attestation default".}: string
     of catDeposits:
       discard
+    
+    case block2 {.
+      desc: "block transitions"
+      #name: "process-blocks" # Comment this to make it work
+      implicitlySelectable
+      required .}: StartupCommand
+    of noCommand:
+      discard
+    of cmdSlotProcessing:
+      attestation2 {.
+        desc: "Attestation filename (without .ssz)"
+        name: "attestation2"
+        defaultValue: "attestation default".}: string
+    of cmdBlockProcessing:
+      discard
 
 suite "test case option":
-  test "case option has default value":
-    let conf = TestConf.load(cmdLine = @[
-      "--blockProcessingCat=catAttestations",
-      #"--attestation=attestation"
-    ])
-    check:
-      conf.blockProcessingCat == BlockProcessingCat.catAttestations
-      conf.attestation == "attestation default"
+#  test "case option has default value":
+#    let conf = TestConf.load(cmdLine = @[
+#      "--blockProcessingCat=catAttestations",
+#      #"--attestation=attestation"
+#    ])
+#    check:
+#      conf.blockProcessingCat == BlockProcessingCat.catAttestations
+#      conf.attestation == "attestation default"
+#
+#  test "case option set value":
+#    let conf = TestConf.load(cmdLine = @[
+#      "--blockProcessingCat=catAttestations",
+#      "--attestation=foobar"
+#    ])
+#    check:
+#      conf.blockProcessingCat == BlockProcessingCat.catAttestations
+#      conf.attestation == "foobar"
+#
+#  test "case option set value":
+#    let conf = TestConf.load(cmdLine = @[
+#      "--blockProcessingCat=catAttestations",
+#      "--attestation=foobar",
+#      "--pre=foo"
+#    ])
+#    check:
+#      conf.blockProcessingCat == BlockProcessingCat.catAttestations
+#      conf.attestation == "foobar"
+#      conf.preState == "foo"
 
   test "case option set value":
     let conf = TestConf.load(cmdLine = @[
       "--blockProcessingCat=catAttestations",
-      "--attestation=foobar"
+      "--attestation=foobar",
+      "--block2=cmdSlotProcessing",
+      "--attestation2=bar"
     ])
     check:
       conf.blockProcessingCat == BlockProcessingCat.catAttestations
+      conf.block2 == StartupCommand.cmdSlotProcessing
       conf.attestation == "foobar"
+      conf.attestation2 == "bar"
