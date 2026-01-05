@@ -61,6 +61,7 @@ template separator*(v: string) {.pragma.}
 template defaultValue*(v: untyped) {.pragma.}
 template defaultValueDesc*(v: string) {.pragma.}
 template envVarValueSep*(v = "") {.pragma.}
+template obsolete*(v = "") {.pragma.}
 template required* {.pragma.}
 template command* {.pragma.}
 template argument* {.pragma.}

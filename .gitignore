@@ -9,3 +9,4 @@ tests/test_nested_cmd
 tests/test_help
 tests/test_argument
 tests/test_parsecmdarg
+tests/test_obsolete

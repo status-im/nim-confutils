@@ -64,6 +64,7 @@ type
   OptFlag = enum
     optHidden
     optDebug
+    optObsolete
 
   OptInfo = ref object
     name, abbr, desc, typename: string
@@ -74,6 +75,7 @@ type
     flags: set[OptFlag]
     hasDefault: bool
     defaultInHelpText: string
+    obsoleteMsg: string
     case kind: OptKind
     of Discriminator:
       isCommand: bool
@@ -270,8 +272,7 @@ func hasAbbrs(cmds: openArray[CmdInfo], excl: set[OptFlag]): bool =
       return true
   false
 
-func hasDebugOpts(cmds: openArray[CmdInfo]): bool =
-  let excl = {optHidden}
+func hasDebugOpts(cmds: openArray[CmdInfo], excl: set[OptFlag]): bool =
   for opt in helpOptsIt(cmds, excl):
     if optDebug in opt.flags:
       return true
@@ -492,13 +493,13 @@ proc showHelp(help: var string,
 
   let cmd = activeCmds[^1]
 
-  var excl = {optHidden}
+  var excl = {optHidden, optObsolete}
   if hlpDebug notin appInfo.flags:
     excl.incl optDebug
 
   appInfo.maxNameLen = maxNameLen(activeCmds, excl)
   appInfo.hasAbbrs = hasAbbrs(activeCmds, excl)
-  appInfo.hasDebugOpts = hasDebugOpts(activeCmds)
+  appInfo.hasDebugOpts = hasDebugOpts(activeCmds, excl - {optDebug})
   let termWidth =
     try:
       terminalWidth()
@@ -782,6 +783,24 @@ func requiresInput*(T: type): bool =
 func acceptsMultipleValues*(T: type): bool =
   T is seq
 
+when defined(nimscript):
+  template warnOutput(args: varargs[string]) =
+    writeLine(stderr, "Warning: " & join(@args))
+else:
+  template warnOutput(args: varargs[untyped]) =
+    errorOutput(styleBright, fgYellow, "Warning: ", resetStyle, args)
+    errorOutput("\p")
+
+proc obsoleteCmdOpt(T: type, opt, msg: string) =
+  if msg.len > 0:
+    warnOutput(msg, "; ", opt, " is deprecated")
+  else:
+    warnOutput(opt, " is deprecated")
+
+proc obsoleteCmdOptAux(T: type, opt, msg: string) =
+  mixin obsoleteCmdOpt
+  obsoleteCmdOpt(T, opt, msg)
+
 template debugMacroResult(macroName: string) {.dirty.} =
   when defined(debugMacros) or defined(debugConfutils):
     echo "\n-------- ", macroName, " ----------------------"
@@ -890,6 +909,8 @@ func readPragmaFlags(field: FieldDescription): set[OptFlag] =
     result.incl optHidden
   if field.readPragma("debug") != nil:
     result.incl optDebug
+  if field.readPragma"obsolete" != nil:
+    result.incl optObsolete
 
 proc cmdInfoFromType(T: NimNode): CmdInfo =
   result = CmdInfo()
@@ -907,6 +928,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
       defaultInHelp = if defaultValueDesc != nil: defaultValueDesc
                       else: defaultValue
       defaultInHelpText = toText(defaultInHelp)
+      obsoleteMsg = field.readPragma"obsolete"
       separator = field.readPragma"separator"
       longDesc = field.readPragma"longDesc"
       envVarValueSep = field.readPragma"envVarValueSep"
@@ -932,6 +954,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     if separator != nil: opt.separator = separator.strVal
     if longDesc != nil: opt.longDesc = longDesc.strVal
     if envVarValueSep != nil: opt.envVarValueSep = envVarValueSep.strVal
+    if obsoleteMsg != nil: opt.obsoleteMsg = obsoleteMsg.strVal
 
     inc fieldIdx
 
@@ -1090,7 +1113,10 @@ proc loadImpl[C, SecondarySources](
         config: Configuration, sources: ref SecondarySources
     ) {.gcsafe, raises: [ConfigurationError].} = nil,
     envVarsPrefix = appInvocation(),
-    termWidth = 0
+    termWidth = 0,
+    loggerSetup: proc (
+        config: Configuration
+    ) {.gcsafe, raises: [ConfigurationError].} = nil,
 ): Configuration {.raises: [ConfigurationError].} =
   ## Loads a program configuration by parsing command-line arguments
   ## and a standard set of config files that can specify:
@@ -1369,6 +1395,17 @@ proc loadImpl[C, SecondarySources](
   for cmd in activeCmds:
     result.processMissingOpts(cmd)
 
+  if not isNil(loggerSetup):
+    try:
+      loggerSetup(result)
+    except ConfigurationError as err:
+      fail "Failed to setup the logger: '" & err.msg & "'"
+
+  for cmd in activeCmds:
+    for opt in cmd.opts:
+      if optObsolete in opt.flags and fieldCounters[opt.idx] != 0:
+        obsoleteCmdOptAux(typeof(Configuration), opt.humaneName(), opt.obsoleteMsg)
+
 template load*(
     Configuration: type,
     cmdLine = commandLineParams(),
@@ -1379,12 +1416,14 @@ template load*(
     ignoreUnknown = false,
     secondarySources: untyped = nil,
     envVarsPrefix = appInvocation(),
-    termWidth = 0): untyped =
+    termWidth = 0,
+    loggerSetup: untyped = nil
+): untyped =
   block:
     let secondarySourcesRef = generateSecondarySources(Configuration)
     loadImpl(Configuration, cmdLine, version,
              copyrightBanner, printUsage, quitOnFailure, ignoreUnknown,
-             secondarySourcesRef, secondarySources, envVarsPrefix, termWidth)
+             secondarySourcesRef, secondarySources, envVarsPrefix, termWidth, loggerSetup)
 
 func defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
