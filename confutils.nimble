@@ -67,7 +67,6 @@ task test, "Run all tests":
       foo = 1
       bar = 2
       baz = true
-      arg ./tests/cli_example.nim
       arg 42"""
   if actualOutput.strip() == expectedOutput:
     echo "  [OK] tests/cli_example.nim"

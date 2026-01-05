@@ -30,9 +30,28 @@ func cmdsToName(cmds: string): string =
 func helpToName(help: string): string =
   help.replace(":", "_")
 
+proc execCmdTest(fname, cmdName: string, cmds = "", help = "") =
+  let res = execCmdEx(fname & " " & cmds & " --help" & help)
+  let output = res.output.normalizeHelp()
+  let snapshot = snapshotsPath / cmdName & cmds.cmdsToName() & help.helpToName() & ".txt"
+  if res.exitCode != 0:
+    checkpoint "Run output: " & res.output
+    fail()
+  elif not fileExists(snapshot):
+    writeFile(snapshot, output)
+    checkpoint "Snapshot created: " & snapshot
+    fail()
+  else:
+    let expected = readFile(snapshot).normalizeHelp()
+    checkpoint "Cmd output: " & $output.toBytes()
+    checkpoint "Snapshot: " & $expected.toBytes()
+    check output == expected
+
+const cmdFlags = "--verbosity:0 --hints:off -d:confutilsNoColors"
+
 proc cmdTest(cmdName: string, cmds = "", help = "") =
   let fname = helpPath / cmdName
-  var build = "nim c --verbosity:0 --hints:off -d:confutilsNoColors"
+  var build = "nim c " & cmdFlags
   if NimMajor < 2:
     build.add " -d:nimOldCaseObjects"
   let buildRes = execCmdEx(build & " " & fname & ".nim")
@@ -40,72 +59,58 @@ proc cmdTest(cmdName: string, cmds = "", help = "") =
     checkpoint "Build output: " & buildRes.output
     fail()
   else:
-    let res = execCmdEx(fname & " " & cmds & " --help" & help)
-    let output = res.output.normalizeHelp()
-    let snapshot = snapshotsPath / cmdName & cmds.cmdsToName() & help.helpToName() & ".txt"
-    if res.exitCode != 0:
-      checkpoint "Run output: " & res.output
-      fail()
-    elif not fileExists(snapshot):
-      writeFile(snapshot, output)
-      checkpoint "Snapshot created: " & snapshot
-      fail()
-    else:
-      let expected = readFile(snapshot).normalizeHelp()
-      checkpoint "Cmd output: " & $output.toBytes()
-      checkpoint "Snapshot: " & $expected.toBytes()
-      check output == expected
+    execCmdTest(fname, cmdName, cmds, help)
 
-suite "test --help":
-  test "test test_nested_cmd":
+suite "help message":
+  test "test_nested_cmd":
     cmdTest("test_nested_cmd", "")
 
-  test "test test_nested_cmd lvl1Cmd1":
+  test "test_nested_cmd lvl1Cmd1":
     cmdTest("test_nested_cmd", "lvl1Cmd1")
 
-  test "test test_nested_cmd lvl1Cmd1 lvl2Cmd2":
+  test "test_nested_cmd lvl1Cmd1 lvl2Cmd2":
     cmdTest("test_nested_cmd", "lvl1Cmd1 lvl2Cmd2")
 
-  test "test test_argument":
+  test "test_argument":
     cmdTest("test_argument", "")
 
-  test "test test_argument_abbr":
+  test "test_argument_abbr":
     cmdTest("test_argument_abbr", "")
 
-  test "test test_default_value_desc":
+  test "test_default_value_desc":
     cmdTest("test_default_value_desc", "")
 
-  test "test test_separator":
+  test "test_separator":
     cmdTest("test_separator", "")
 
-  test "test test_longdesc":
+  test "test_longdesc":
     cmdTest("test_longdesc", "")
 
-  test "test test_longdesc lvl1Cmd1":
+  test "test_longdesc lvl1Cmd1":
     cmdTest("test_longdesc", "lvl1Cmd1")
 
-  test "test test_case_opt":
+  test "test_case_opt":
     cmdTest("test_case_opt", "")
 
-  test "test test_case_opt cmdBlockProcessing":
+  test "test_case_opt cmdBlockProcessing":
     cmdTest("test_case_opt", "cmdBlockProcessing")
 
-  test "test test_builtins":
+  test "test_builtins":
     cmdTest("test_builtins", "")
 
-  test "test test_builtins lvl1Cmd1":
+  test "test_builtins lvl1Cmd1":
     cmdTest("test_builtins", "lvl1Cmd1")
 
-  test "test test_debug --help":
+  test "test_debug --help":
     cmdTest("test_debug", "")
 
-  test "test test_debug --help:debug":
+  test "test_debug --help:debug":
     cmdTest("test_debug", "", ":debug")
 
-  test "test test_debug lvl1Cmd1 --help:debug":
+  test "test_debug lvl1Cmd1 --help:debug":
     cmdTest("test_debug", "lvl1Cmd1", ":debug")
 
-  test "test test_dispatch":
+  test "test_dispatch":
     cmdTest("test_dispatch", "")
 
   test "test test_default_cmd_desc":
@@ -119,3 +124,9 @@ suite "test --help":
 
   test "test test_multi_case_values":
     cmdTest("test_multi_case_values")
+
+  test "nims test_cli_example":
+    execCmdTest("nim " & cmdFlags & " " & helpPath / "test_cli_example.nims", "test_cli_example_nims")
+
+  test "nims test_cli_example":
+    execCmdTest("nim e " & cmdFlags & " " & helpPath / "test_cli_example.nim", "test_cli_example")

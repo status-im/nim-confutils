@@ -109,12 +109,15 @@ when defined(nimscript):
   func scriptNameParamIdx: int =
     for i in 1 ..< paramCount():
       var param = paramStr(i)
-      if param.len > 0 and param[0] != '-':
+      if param.len > 0 and param[0] != '-' and param != "e":
         return i
 
   proc appInvocation: string =
     let scriptNameIdx = scriptNameParamIdx()
-    "nim " & (if paramCount() > scriptNameIdx: paramStr(scriptNameIdx) else: "<nims-script>")
+    if paramCount() > scriptNameIdx:
+      paramStr(scriptNameIdx).splitFile.name
+    else:
+      ""
 
   type stderr = object
 
