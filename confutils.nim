@@ -1404,7 +1404,7 @@ proc loadImpl[C, SecondarySources](
   for cmd in activeCmds:
     for opt in cmd.opts:
       if optObsolete in opt.flags and fieldCounters[opt.idx] != 0:
-        obsoleteCmdOptAux(typeof(Configuration), opt.name, opt.obsoleteMsg)
+        obsoleteCmdOptAux(typeof(Configuration), opt.humaneName(), opt.obsoleteMsg)
 
 template load*(
     Configuration: type,
