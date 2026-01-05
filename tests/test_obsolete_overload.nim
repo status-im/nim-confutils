@@ -1,6 +1,7 @@
 import
   unittest2,
-  ../confutils
+  ../confutils,
+  ./test_obsolete_overload_def
 
 type
   TestConf = object
@@ -8,11 +9,6 @@ type
       obsolete
       defaultValue: "opt1 default"
       name: "opt1"}: string
-
-var registry {.threadvar.}: seq[string]
-
-proc obsoleteCmdOpt(T: type, opt, msg: string) =
-  registry.add opt
 
 suite "test obsolete overload for type":
   test "obsolete option default":
