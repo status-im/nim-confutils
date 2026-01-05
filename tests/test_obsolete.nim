@@ -34,15 +34,18 @@ type
       defaultValue: "opt2 default"
       name: "opt2"}: string
     opt3 {.
+      obsolete: "opt3 obsolete msg"
       defaultValue: "opt3 default"
       name: "opt3"}: string
+    opt4 {.
+      defaultValue: "opt4 default"
+      name: "opt4"}: string
 
 var registry {.threadvar.}: seq[string]
 
 proc obsoleteCmdOpt(T: type OverloadConf, opt, msg: string) =
   registry.add opt
   if msg.len > 0:
-    registry.add " "
     registry.add msg
 
 suite "test obsolete option overload":
@@ -69,6 +72,14 @@ suite "test obsolete option overload":
     check conf.opt1 == "foo"
     check conf.opt2 == "bar"
     check registry == @["opt1", "opt2"]
+
+  test "the overload is called with obsolete msg":
+    registry.setLen 0
+    let conf = OverloadConf.load(cmdLine = @[
+      "--opt3=foo"
+    ])
+    check conf.opt3 == "foo"
+    check registry == @["opt3", "opt3 obsolete msg"]
 
   test "the logger setup is called":
     proc loggerSetup(c: OverloadConf) =
