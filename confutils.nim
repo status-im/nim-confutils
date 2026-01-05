@@ -196,7 +196,7 @@ func helpOptDesc(appInfo: HelpAppInfo): string =
 
 func isCliSwitch(opt: OptInfo): bool =
   opt.kind == CliSwitch or
-  (opt.kind == Discriminator and opt.isCommand == false)
+  (opt.kind == Discriminator and not opt.isCommand)
 
 func isOpt(opt: OptInfo, excl: set[OptFlag]): bool =
   opt.isCliSwitch and excl * opt.flags == {}
@@ -1286,6 +1286,8 @@ proc loadImpl[C, SecondarySources](
       processHelpAndVersionOptions(key, val)
 
       var opt = findOpt(activeCmds, key)
+      #for x in activeCmds:
+      #  debugEcho repr x
       if opt == nil:
         # We didn't find the option.
         # Check if it's from the default command and activate it if necessary:
@@ -1300,7 +1302,14 @@ proc loadImpl[C, SecondarySources](
             discard
 
       if opt != nil:
-        result.applySetter(opt.idx, val)
+        if opt.kind == Discriminator and not opt.isCommand:
+          let subCmd = findCmd(opt.subCmds, val)
+          if subCmd == nil:
+            fail "Unrecognized value '" & val & "'" & " for option '" & key & "'"
+          result.applySetter(opt.idx, if subCmd.desc.len > 0: subCmd.desc else: subCmd.name)
+          activeCmds.add subCmd
+        else:
+          result.applySetter(opt.idx, val)
       elif not ignoreUnknown:
         fail "Unrecognized option '" & key & "'"
 
