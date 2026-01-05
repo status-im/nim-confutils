@@ -69,6 +69,7 @@ type
     name, abbr, desc, typename: string
     separator: string
     longDesc: string
+    envVarValueSep: string
     idx: int
     flags: set[OptFlag]
     hasDefault: bool
@@ -908,6 +909,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
       defaultInHelpText = toText(defaultInHelp)
       separator = field.readPragma"separator"
       longDesc = field.readPragma"longDesc"
+      envVarValueSep = field.readPragma"envVarValueSep"
       abbr = field.readPragma"abbr"
       name = field.readPragma"name"
       desc = field.readPragma"desc"
@@ -929,6 +931,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     if abbr != nil: opt.abbr = abbr.strVal
     if separator != nil: opt.separator = separator.strVal
     if longDesc != nil: opt.longDesc = longDesc.strVal
+    if envVarValueSep != nil: opt.envVarValueSep = envVarValueSep.strVal
 
     inc fieldIdx
 
@@ -1347,7 +1350,11 @@ proc loadImpl[C, SecondarySources](
         try:
           if existsEnv(envKey):
             let envContent = getEnv(envKey)
-            conf.applySetter(opt.idx, envContent)
+            if opt.envVarValueSep.len == 0:
+              conf.applySetter(opt.idx, envContent)
+            else:
+              for v in envContent.split(opt.envVarValueSep):
+                conf.applySetter(opt.idx, v.strip(chars = {'\t', ' '}))
           elif secondarySourcesRef.setters[opt.idx](conf, secondarySourcesRef):
             # all work is done in the config file setter,
             # there is nothing left to do here.

@@ -265,6 +265,17 @@ it must be prefixed with `$` (i.e: converted to string).
 -----------------
 
 ```nim
+template envVarValueSep*(v: string = "") {.pragma.}
+```
+
+Apply to a field to get its environment variable value split by
+the set delimiter. Use it with collection types such as `seq[T]`
+and `distinct seq[T]`. The following leading and trailing
+characters are stripped from each individual item: `{'\t', ' '}`.
+
+-----------------
+
+```nim
 template required* {.pragma.}
 ```
 
