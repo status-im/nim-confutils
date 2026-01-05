@@ -4,5 +4,5 @@
 
 var registry* {.threadvar.}: seq[string]
 
-proc obsoleteCmdOpt*(T: type object, opt, msg: string) =
+proc obsoleteCmdOpt*(T: type[object], opt, msg: string) =
   registry.add opt
