@@ -13,6 +13,7 @@ import
   test_dispatch,
   test_duplicates,
   test_envvar,
+  test_flatten_pragma,
   test_ignore,
   test_multi_case_values,
   test_nested_cmd,
