@@ -23,7 +23,6 @@ import
   test_pragma,
   test_qualified_ident,
   test_results_opt,
-  test_nested_cmd,
   test_help
 
 when defined(windows):
