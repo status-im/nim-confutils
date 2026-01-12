@@ -36,3 +36,14 @@ suite "test onLoaded parameter":
     )
     check conf.opt1 == "foo modified"
     check registry == @["modified"]
+
+  test "use a callback closure":
+    var message = "closure"
+    proc onLoaded(c: var TestConf) {.closure.} =
+      doAssert c.opt1 == "opt1 default"
+      registry.add message
+
+    registry.setLen 0
+    let conf = TestConf.load(onLoaded = onLoaded)
+    check conf.opt1 == "opt1 default"
+    check registry == @["closure"]
