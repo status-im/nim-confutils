@@ -82,17 +82,17 @@ suite "test obsolete option overload":
     check registry == @["opt3", "opt3 obsolete msg"]
 
   test "the logger setup is called":
-    proc loggerSetup(c: OverloadConf) =
+    proc onLoaded(c: var OverloadConf) =
       doAssert c.opt1 == "opt1 default"
       registry.add "logger"
 
     registry.setLen 0
-    let conf = OverloadConf.load(loggerSetup = loggerSetup)
+    let conf = OverloadConf.load(onLoaded = onLoaded)
     check conf.opt1 == "opt1 default"
     check registry == @["logger"]
 
   test "the logger setup is called before the overload":
-    proc loggerSetup(c: OverloadConf) =
+    proc onLoaded(c: var OverloadConf) =
       doAssert c.opt1 == "foo"
       registry.add "logger"
 
@@ -101,7 +101,7 @@ suite "test obsolete option overload":
       cmdLine = @[
         "--opt1=foo"
       ],
-      loggerSetup = loggerSetup
+      onLoaded = onLoaded
     )
     check conf.opt1 == "foo"
     check registry == @["logger", "opt1"]

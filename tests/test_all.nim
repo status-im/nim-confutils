@@ -18,6 +18,7 @@ import
   test_nested_cmd,
   test_obsolete_overload,
   test_obsolete,
+  test_onloaded,
   test_parsecmdarg,
   test_pragma,
   test_qualified_ident,

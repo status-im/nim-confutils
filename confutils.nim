@@ -1117,8 +1117,8 @@ proc loadImpl[C, SecondarySources](
     ) {.gcsafe, raises: [ConfigurationError].} = nil,
     envVarsPrefix = appInvocation(),
     termWidth = 0,
-    loggerSetup: proc (
-        config: Configuration
+    onLoaded: proc (
+        config: var Configuration
     ) {.gcsafe, raises: [ConfigurationError].} = nil,
 ): Configuration {.raises: [ConfigurationError].} =
   ## Loads a program configuration by parsing command-line arguments
@@ -1398,9 +1398,9 @@ proc loadImpl[C, SecondarySources](
   for cmd in activeCmds:
     result.processMissingOpts(cmd)
 
-  if not isNil(loggerSetup):
+  if not isNil(onLoaded):
     try:
-      loggerSetup(result)
+      onLoaded(result)
     except ConfigurationError as err:
       fail "Failed to setup the logger: '" & err.msg & "'"
 
@@ -1420,13 +1420,13 @@ template load*(
     secondarySources: untyped = nil,
     envVarsPrefix = appInvocation(),
     termWidth = 0,
-    loggerSetup: untyped = nil
+    onLoaded: untyped = nil
 ): untyped =
   block:
     let secondarySourcesRef = generateSecondarySources(Configuration)
     loadImpl(Configuration, cmdLine, version,
              copyrightBanner, printUsage, quitOnFailure, ignoreUnknown,
-             secondarySourcesRef, secondarySources, envVarsPrefix, termWidth, loggerSetup)
+             secondarySourcesRef, secondarySources, envVarsPrefix, termWidth, onLoaded)
 
 func defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
