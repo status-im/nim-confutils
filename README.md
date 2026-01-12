@@ -374,17 +374,17 @@ Where `T` is the config type, `opt` is the option name, and `msg`
 is the value of the `obsolete` pragma (which may be empty).
 
 If the logger requires initialization, it can be set through
-the `loggerSetup` parameter, for example:
+the `onLoaded` parameter, for example:
 
 ```nim
 type MyConf = object
   # options
 
-proc myLogger(config: MyConf) {.gcsafe, raises: [ConfigurationError].} =
+proc myLogger(config: var MyConf) {.gcsafe, raises: [ConfigurationError].} =
   # set up logger
   discard
 
-let c = MyConf.load(loggerSetup = myLogger)
+let c = MyConf.load(onLoaded = myLogger)
 ```
 
 -----------------
@@ -499,6 +499,24 @@ automatically generated help messages.
 If you provide this parameter, Confutils will automatically respond
 to the standard `--version` switch. If sub-commands are used, an
 additional `version` top-level command will be inserted as well.
+
+## Post processing
+
+The `onLoaded` parameter in `load` can be used for post-processing
+the configuration after it's fully populated from CLI, files, env vars, etc.
+For example it can be used to setup a logger as shown in the `obsolete` [pragma
+doc](#configuration-field-pragmas).
+
+```nim
+type MyConf = object
+  # options
+
+proc onLoaded(config: var MyConf) {.gcsafe, raises: [ConfigurationError].} =
+  # Modify the config or do something else
+  discard
+
+let c = MyConf.load(onLoaded = onLoaded)
+```
 
 ## Compile-time options
 
