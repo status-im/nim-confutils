@@ -868,17 +868,13 @@ proc fieldCaseFieldFullName(cf: ConfFieldDesc): string =
     fieldCaseFieldFullName(cf.parent[])
 
 proc extractTypedValue(n: NimNode): NimNode =
-  ## Extract const value; return fresh ident
-  ## node of `n` if it cannot be extracted
   case n.kind
   of nnkSym:
     let impl = n.getImpl
     if impl.kind == nnkConstDef:
       extractTypedValue(impl[2])
     else:
-      ident($n)
-  of nnkIdent:
-    ident($n)
+      n
   else:
     n
 
