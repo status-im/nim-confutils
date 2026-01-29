@@ -867,6 +867,21 @@ proc fieldCaseFieldFullName(cf: ConfFieldDesc): string =
     doAssert cf.parent != nil, "caseField not found"
     fieldCaseFieldFullName(cf.parent[])
 
+proc extractTypedValue(n: NimNode): NimNode =
+  ## Extract const value; return fresh ident
+  ## node of `n` if it cannot be extracted
+  case n.kind
+  of nnkSym:
+    let impl = n.getImpl
+    if impl.kind == nnkConstDef:
+      extractTypedValue(impl[2])
+    else:
+      ident($n)
+  of nnkIdent:
+    ident($n)
+  else:
+    n
+
 proc flattenDefaultValue(cf: ConfFieldDesc): NimNode =
   if cf.parent == nil:
     return nil
@@ -881,7 +896,7 @@ proc flattenDefaultValue(cf: ConfFieldDesc): NimNode =
     var ret: NimNode = nil
     for x in ftn:
       if eqIdent(x[0], cf.field.name):
-        ret = x[1]
+        ret = extractTypedValue(x[1])
     ret
   else:
     error "Bad flatten pragma", ftn
@@ -996,9 +1011,6 @@ func findPath(parent, node: CmdInfo): seq[CmdInfo] =
 func toText(n: NimNode): string =
   if n == nil: ""
   elif n.kind in {nnkStrLit..nnkTripleStrLit}: n.strVal
-  elif n.kind == nnkSym and n.getImpl.kind == nnkConstDef:
-    # this works for `flatten(v: typed)`
-    toText(n.getImpl[2])
   else: repr(n)
 
 func readPragmaFlags(field: FieldDescription): set[OptFlag] =
