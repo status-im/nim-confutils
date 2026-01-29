@@ -10,3 +10,4 @@ The following options are available:
  --opt3      some str [=abc].
  --opt4      some str [=abc].
  --opt5      some str [=abc].
+ --opt6      some bool [=true].

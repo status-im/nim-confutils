@@ -43,13 +43,19 @@ type
       desc: "some str"
       name: "opt5" }: string
 
+    opt6 {.
+      defaultValue: false
+      desc: "some bool"
+      name: "opt6" }: bool
+
   TestConf = object
     opts {.flatten: (
         opt1: intConst,
         opt2: 8000,
         opt3: strConst,
         opt4: strProc(),
-        opt5: strTpl()
+        opt5: strTpl(),
+        opt6: true
       ).}: TestOptsConf
 
 let c = TestConf.load(termWidth = int.high)

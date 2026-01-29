@@ -871,10 +871,10 @@ proc extractTypedValue(n: NimNode): NimNode =
   case n.kind
   of nnkSym:
     let impl = n.getImpl
-    if impl.kind == nnkConstDef:
-      extractTypedValue(impl[2])
-    else:
-      n
+    case impl.kind
+    of nnkConstDef: extractTypedValue(impl[2])
+    of nnkStrLit .. nnkTripleStrLit: impl  # Nim 1.6 compat
+    else: n
   else:
     n
 
