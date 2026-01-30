@@ -462,8 +462,14 @@ suite "test flatten default value override":
     TestDefaultNestedConf = object
       opts {.flatten: (opt1: "nested").}: TestDefaultLitConf
 
-    TestDefaultFile = object
+    TestDefaultFileConf = object
       opts {.flatten: (opt1: "file").}: TopOptsConf
+
+    TestDefaultOptNotFoundConf = object
+      opts {.flatten: (invalid: "invalid").}: OptsConf
+
+    TestDefaultInvalidTupleConf = object
+      opts {.flatten: (1, 2, 3).}: OptsConf
 
   test "override with literals":
     let conf = TestDefaultLitConf.load(cmdLine = @[])
@@ -497,7 +503,13 @@ suite "test flatten default value override":
       conf.opts.opts.opt3 == 123
 
   test "defaults from file":
-    let conf = TestDefaultFile.load(secondarySources = loadFile(TestDefaultFile, "flatten.toml"))
+    let conf = TestDefaultFileConf.load(secondarySources = loadFile(TestDefaultFileConf, "flatten.toml"))
     check:
       conf.opts.opt1 == "foo"
       conf.opts.opt2 == true
+
+  test "defaults with option not found errors out":
+    check not compiles(TestDefaultOptNotFoundConf.load(cmdLine = @[]))
+
+  test "defaults with invalid tuple errors out":
+    check not compiles(TestDefaultInvalidTupleConf.load(cmdLine = @[]))

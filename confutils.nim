@@ -836,12 +836,31 @@ proc fieldCaseField(cf: ConfFieldDesc): NimNode =
   else:
     nil
 
+proc validateFlattenOptions(field: FieldDescription, children: openArray[ConfFieldDesc]) =
+  ## Validate flatten tuple options exist
+  doAssert field.readPragma"flatten" != nil
+  let ftn = field.readPragma"flatten"
+  if ftn.kind == nnkTupleConstr:
+    if ftn.len > 0 and ftn[0].kind != nnkExprColonExpr:
+      error "invalid flatten options, expected tuple of (k: v)", ftn
+    var found = newSeq[NimNode]()
+    for cf in children:
+      for x in ftn:
+        if eqIdent(x[0], cf.field.name):
+          found.add x[0]
+    for x in ftn:
+      if x[0] notin found:
+        error "invalid flatten option: " & $x[0], ftn
+
 proc confFields(typeImpl: NimNode, parent: ConfFieldDescRef = nil): seq[ConfFieldDesc] =
   result = newSeq[ConfFieldDesc]()
   for field in recordFields(typeImpl):
-    if field.readPragma"flatten" != nil:
+    let ftn = field.readPragma"flatten"
+    if ftn != nil:
+      let firstChildIdx = result.len
       for cf in confFields(getImpl(field.typ), newConfFieldDesc(field, parent)):
         result.add cf
+      validateFlattenOptions(field, toOpenArray(result, firstChildIdx, result.len-1))
     else:
       result.add ConfFieldDesc(field: field, parent: parent)
 
@@ -888,7 +907,6 @@ proc flattenDefaultValue(field: FieldDescription, parent: ConfFieldDescRef): Nim
   case ftn.kind
   of nnkSym: nil
   of nnkTupleConstr:
-    # XXX validate tuple fields are valid opts
     var ret: NimNode = nil
     for x in ftn:
       if eqIdent(x[0], field.name):
