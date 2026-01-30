@@ -433,22 +433,71 @@ suite "test flatten default value override":
   proc opt1Str: string = "override"
 
   const opt1Const = opt1Str()
+  const opt2Const = true
+  const opt3Const = 123
 
   type
+    OptsConf = object
+      opt1 {.
+        desc: "top opt 1"
+        defaultValue: "top_opt_1"
+        name: "top-opt1" .}: string
+
+      opt2 {.
+        desc: "top opt 2"
+        defaultValue: false
+        name: "top-opt2" .}: bool
+
+      opt3 {.
+        desc: "top opt 3"
+        defaultValue: 111
+        name: "top-opt3" .}: int
+
     TestDefaultLitConf = object
-      topOpts {.flatten: (opt1: "override", opt2: true).}: TopOptsConf
+      opts {.flatten: (opt1: "override", opt2: true, opt3: 123).}: OptsConf
 
     TestDefaultConstConf = object
-      topOpts {.flatten: (opt1: opt1Const).}: TopOptsConf
+      opts {.flatten: (opt1: opt1Const, opt2: opt2Const, opt3: opt3Const).}: OptsConf
+
+    TestDefaultNestedConf = object
+      opts {.flatten: (opt1: "nested").}: TestDefaultLitConf
+
+    TestDefaultFile = object
+      opts {.flatten: (opt1: "file").}: TopOptsConf
 
   test "override with literals":
     let conf = TestDefaultLitConf.load(cmdLine = @[])
     check:
-      conf.topOpts.opt1 == "override"
-      conf.topOpts.opt2 == true
+      conf.opts.opt1 == "override"
+      conf.opts.opt2 == true
+      conf.opts.opt3 == 123
+
+  test "override with literals set opts":
+    let conf = TestDefaultLitConf.load(cmdLine = @[
+      "--top-opt1=foo",
+      "--top-opt2=false"
+    ])
+    check:
+      conf.opts.opt1 == "foo"
+      conf.opts.opt2 == false
+      conf.opts.opt3 == 123
 
   test "override with const":
     let conf = TestDefaultConstConf.load(cmdLine = @[])
     check:
-      conf.topOpts.opt1 == opt1Const
-      conf.topOpts.opt2 == false
+      conf.opts.opt1 == opt1Const
+      conf.opts.opt2 == opt2Const
+      conf.opts.opt3 == opt3Const
+
+  test "override deeply nested":
+    let conf = TestDefaultNestedConf.load(cmdLine = @[])
+    check:
+      conf.opts.opts.opt1 == "nested"
+      conf.opts.opts.opt2 == true
+      conf.opts.opts.opt3 == 123
+
+  test "defaults from file":
+    let conf = TestDefaultFile.load(secondarySources = loadFile(TestDefaultFile, "flatten.toml"))
+    check:
+      conf.opts.opt1 == "foo"
+      conf.opts.opt2 == true

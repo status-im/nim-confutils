@@ -878,20 +878,20 @@ proc extractTypedValue(n: NimNode): NimNode =
   else:
     n
 
-proc flattenDefaultValue(cf: ConfFieldDesc): NimNode =
-  if cf.parent == nil:
+proc flattenDefaultValue(field: FieldDescription, parent: ConfFieldDescRef): NimNode =
+  if parent == nil:
     return nil
-  let ancestorVal = flattenDefaultValue(cf.parent[])
+  let ancestorVal = flattenDefaultValue(field, parent[].parent)
   if ancestorVal != nil:
     return ancestorVal
-  let ftn = cf.parent[].field.readPragma"flatten"
+  let ftn = parent[].field.readPragma"flatten"
   case ftn.kind
   of nnkSym: nil
   of nnkTupleConstr:
     # XXX validate tuple fields are valid opts
     var ret: NimNode = nil
     for x in ftn:
-      if eqIdent(x[0], cf.field.name):
+      if eqIdent(x[0], field.name):
         ret = extractTypedValue(x[1])
     ret
   else:
@@ -899,7 +899,7 @@ proc flattenDefaultValue(cf: ConfFieldDesc): NimNode =
     nil
 
 proc readDefaultValueOverride(cf: ConfFieldDesc): NimNode =
-  cf.flattenDefaultValue()
+  flattenDefaultValue(cf.field, cf.parent)
 
 proc readDefaultValue(cf: ConfFieldDesc): NimNode =
   result = cf.readDefaultValueOverride()
