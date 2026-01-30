@@ -468,6 +468,9 @@ suite "test flatten default value override":
     TestDefaultOptNotFoundConf = object
       opts {.flatten: (invalid: "invalid").}: OptsConf
 
+    TestDefaultOptExtraConf = object
+      opts {.flatten: (opt1: "override", opt2: true, opt3: 123, optExtra: 123).}: OptsConf
+
     TestDefaultInvalidTupleConf = object
       opts {.flatten: (1, 2, 3).}: OptsConf
 
@@ -510,6 +513,9 @@ suite "test flatten default value override":
 
   test "defaults with option not found errors out":
     check not compiles(TestDefaultOptNotFoundConf.load(cmdLine = @[]))
+
+  test "defaults with option not found errors out":
+    check not compiles(TestDefaultOptExtraConf.load(cmdLine = @[]))
 
   test "defaults with invalid tuple errors out":
     check not compiles(TestDefaultInvalidTupleConf.load(cmdLine = @[]))
