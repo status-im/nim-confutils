@@ -1,0 +1,4 @@
+top-opt1 = "foo"
+top-opt2 = true
+outer-arg1 = "bar"
+top-opt3 = "baz"

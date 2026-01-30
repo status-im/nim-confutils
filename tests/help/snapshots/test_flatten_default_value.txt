@@ -1,0 +1,13 @@
+Usage: 
+
+test_flatten_default_value [OPTIONS]...
+
+The following options are available:
+
+ --help      Show this help message and exit.
+ --opt1      some int [=9000].
+ --opt2      some int [=8000].
+ --opt3      some str [=abc].
+ --opt4      some str [=abc].
+ --opt5      some str [=abc].
+ --opt6      some bool [=true].
