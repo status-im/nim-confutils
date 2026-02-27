@@ -837,11 +837,17 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
       defaultValue = field.readPragma"defaultValue"
       completerName = ident($field.name & "Complete")
       isFieldDiscriminator = newLit field.isDiscriminator
+      defaultValueDesc = field.readPragma"defaultValueDesc"
       defaultValueHelp =
-        if field.readPragma"defaultValueDesc" != nil:
-          field.readPragma"defaultValueDesc"
+        if defaultValueDesc != nil:
+          defaultValueDesc
         elif defaultValue != nil:
           defaultValue
+        else:
+          newLit("")
+      defaultValueHelpRepr =
+        if defaultValueDesc == nil and defaultValue != nil:
+          newLit(repr defaultValue)
         else:
           newLit("")
       defaultValueHelpName = ident($field.name & "DefaultValueHelp")
@@ -893,24 +899,18 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
         nimcall
         gcsafe
         sideEffect
-        raises: [ConfigurationError]
+        raises: []
       .} =
-        try:
-          when `defaultValueHelp` is string:
-            `defaultValueHelp`
-          else:
-            when compiles($`defaultValueHelp`):
-              when typeof($`defaultValueHelp`) is string:
-                $`defaultValueHelp`
-              else:
-                repr(`defaultValueHelp`)
+        when `defaultValueHelp` is string:
+          `defaultValueHelp`
+        else:
+          when compiles($`defaultValueHelp`):
+            when typeof($`defaultValueHelp`) is string:
+              $`defaultValueHelp`
             else:
-              repr(`defaultValueHelp`)
-        except CatchableError as err:
-          raise (ref ConfigurationError)(
-            msg: "Failed to evaluate defaultValue help text; error: " & err.msg,
-            parent: err
-          )
+              `defaultValueHelpRepr`
+          else:
+            `defaultValueHelpRepr`
 
     result.add quote do:
       {.pop.}
