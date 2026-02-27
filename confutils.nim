@@ -893,18 +893,24 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
         nimcall
         gcsafe
         sideEffect
-        raises: []
+        raises: [ConfigurationError]
       .} =
-        when `defaultValueHelp` is string:
-          `defaultValueHelp`
-        else:
-          when compiles($`defaultValueHelp`):
-            when typeof($`defaultValueHelp`) is string:
-              $`defaultValueHelp`
+        try:
+          when `defaultValueHelp` is string:
+            `defaultValueHelp`
+          else:
+            when compiles($`defaultValueHelp`):
+              when typeof($`defaultValueHelp`) is string:
+                $`defaultValueHelp`
+              else:
+                repr(`defaultValueHelp`)
             else:
               repr(`defaultValueHelp`)
-          else:
-            repr(`defaultValueHelp`)
+        except CatchableError as err:
+          raise (ref ConfigurationError)(
+            msg: "Failed to evaluate defaultValue help text; error: " & err.msg,
+            parent: err
+          )
 
     result.add quote do:
       {.pop.}
