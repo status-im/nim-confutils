@@ -10,6 +10,7 @@
 import ../../confutils
 
 const defaultEth2TcpPort = 9000
+const defaultDescOverride = "overridden"
 
 type DisString = distinct string
 
@@ -38,8 +39,20 @@ type
       name: "opt2" }: int
 
     opt3 {.
+      defaultValue: defaultEth2TcpPort
+      defaultValueDesc: defaultDescOverride
+      desc: "tcp port 3"
+      name: "opt3" }: int
+
+    opt4 {.
+      defaultValue: defaultEth2TcpPort
+      defaultValueDesc: "overridden"
+      desc: "tcp port 4"
+      name: "opt4" }: int
+
+    opt5 {.
       defaultValue: DisString("this should not show in the help message")
       desc: "distinct string"
-      name: "opt3" }: DisString
+      name: "opt5" }: DisString
 
 let c = TestConf.load(termWidth = int.high)
