@@ -50,6 +50,7 @@ type
     terminalWidth: int
     namesWidth: int
     flags: set[HelpFlag]
+    defaultValueDescs: seq[string]
 
   CmdInfo = ref object
     name: string
@@ -193,6 +194,12 @@ const
 template flushOutputAndQuit(exitCode: int) =
   flushOutput
   quit exitCode
+
+func defaultValueDesc(appInfo: HelpAppInfo, optIdx: int): string =
+  if optIdx == -1:
+    ""
+  else:
+    appInfo.defaultValueDescs[optIdx]
 
 func helpOptDesc(appInfo: HelpAppInfo): string =
   result = "Show this help message and exit"
@@ -367,7 +374,7 @@ proc describeInvocation(
       let cliArg = "<" & arg.name & ">"
       helpOutput fgArg, styleBright, cliArg
       helpOutput padding(cliArg, appInfo.namesWidth)
-      help.writeDesc appInfo, arg.desc, arg.defaultInHelpText
+      help.writeDesc appInfo, arg.desc, appInfo.defaultValueDesc(arg.idx)
       help.writeLongDesc appInfo, arg.longDesc
       helpOutput "\p"
 
@@ -410,7 +417,7 @@ proc describeOptionsList(
     if opt.desc.len > 0:
       help.writeDesc appInfo,
                       opt.desc.replace("%t", opt.typename),
-                      opt.defaultInHelpText
+                      appInfo.defaultValueDesc(opt.idx)
       help.writeLongDesc appInfo, opt.longDesc
 
     helpOutput "\p"
@@ -445,14 +452,16 @@ proc describeOptions(
       let helpOpt = OptInfo(
         kind: CliSwitch,
         name: "help",
-        desc: helpOptDesc(appInfo)
+        desc: helpOptDesc(appInfo),
+        idx: -1
       )
       describeOptionsList(help, [helpOpt], appInfo, excl)
       if appInfo.hasVersion:
         let versionOpt = OptInfo(
           kind: CliSwitch,
           name: "version",
-          desc: "Show program's version and exit"
+          desc: "Show program's version and exit",
+          idx: -1
         )
         describeOptionsList(help, [versionOpt], appInfo, excl)
 
@@ -828,6 +837,14 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
       defaultValue = field.readPragma"defaultValue"
       completerName = ident($field.name & "Complete")
       isFieldDiscriminator = newLit field.isDiscriminator
+      defaultValueHelp =
+        if field.readPragma"defaultValueDesc" != nil:
+          field.readPragma"defaultValueDesc"
+        elif defaultValue != nil:
+          defaultValue
+        else:
+          newLit("")
+      defaultValueHelpName = ident($field.name & "DefaultValueHelp")
 
     if defaultValue == nil:
       defaultValue = newCall(makeDefaultValue, newTree(nnkTypeOfExpr, configField))
@@ -838,9 +855,11 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
 
     settersArray.add newTree(nnkTupleConstr,
                              newLit($paramName),
-                             setterName, completerName,
+                             setterName,
+                             completerName,
                              newCall(bindSym"requiresInput", fixedFieldType),
-                             newCall(bindSym"acceptsMultipleValues", fixedFieldType))
+                             newCall(bindSym"acceptsMultipleValues", fixedFieldType),
+                             defaultValueHelpName)
 
     result.add quote do:
       {.push hint[XCannotRaiseY]: off.}
@@ -869,6 +888,23 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
             setField(`configField`, val, `defaultValue`)
         else:
           setField(`configField`, val, `defaultValue`)
+
+      proc `defaultValueHelpName`(`configVar`: `RecordType`): string {.
+        nimcall
+        gcsafe
+        sideEffect
+        raises: []
+      .} =
+        when `defaultValueHelp` is string:
+          `defaultValueHelp`
+        else:
+          when compiles($`defaultValueHelp`):
+            when typeof($`defaultValueHelp`) is string:
+              $`defaultValueHelp`
+            else:
+              repr(`defaultValueHelp`)
+          else:
+            repr(`defaultValueHelp`)
 
     result.add quote do:
       {.pop.}
@@ -1290,19 +1326,27 @@ proc loadImpl[C, SecondarySources](
 
       return
 
-  proc lazyHelpAppInfo(flags: set[HelpFlag]): HelpAppInfo =
+  proc lazyHelpAppInfo(flags: set[HelpFlag], defaultValueDescs: seq[string]): HelpAppInfo =
     HelpAppInfo(
       copyrightBanner: copyrightBanner,
       appInvocation: appInvocation(),
       terminalWidth: termWidth,
       hasVersion: version.len > 0,
-      flags: flags
+      flags: flags,
+      defaultValueDescs: defaultValueDescs
     )
+
+  template getDefaultValueDescs(): seq[string] =
+    var defaultValueDescs = newSeq[string](fieldSetters.len)
+    for i in 0 ..< fieldSetters.len:
+      defaultValueDescs[i] = fieldSetters[i][5](result)
+    defaultValueDescs
 
   template processHelpAndVersionOptions(optKey, optVal: string) =
     let key = optKey
     if cmpIgnoreStyle(key, "help") == 0:
-      help.showHelp(lazyHelpAppInfo(optVal.toHelpFlags), activeCmds)
+      let defaultValueDescs = getDefaultValueDescs()
+      help.showHelp(lazyHelpAppInfo(optVal.toHelpFlags, defaultValueDescs), activeCmds)
     elif version.len > 0 and cmpIgnoreStyle(key, "version") == 0:
       help.helpOutput version, "\p"
       flushOutputAndQuit QuitSuccess

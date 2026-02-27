@@ -19,4 +19,10 @@ type
       desc: "tcp port"
       name: "opt1" }: int
 
+    opt2 {.
+      defaultValue: defaultEth2TcpPort
+      #defaultValueDesc: $defaultEth2TcpPort
+      desc: "tcp port 2"
+      name: "opt2" }: int
+
 let c = TestConf.load(termWidth = int.high)
