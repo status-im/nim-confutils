@@ -10,3 +10,5 @@ The following options are available:
  --opt3      tcp port 3 [=overridden].
  --opt4      tcp port 4 [=overridden].
  --opt5      distinct string [=foobar].
+ --opt6      no dollar func defined [=NoDollar("default")].
+ --opt7      no dollar func defined [=overridden].

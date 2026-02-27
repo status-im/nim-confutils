@@ -13,6 +13,7 @@ const defaultEth2TcpPort = 9000
 const defaultDescOverride = "overridden"
 
 type DisString = distinct string
+type NoDollar = distinct string
 
 proc `$`(s: DisString): string =
   # this should show in the help message
@@ -23,6 +24,12 @@ proc completeCmdArg(T: type DisString, val: string): seq[string] =
 
 proc parseCmdArg(T: type DisString, s: string): T =
   parseCmdArg(string, s).DisString
+
+proc completeCmdArg(T: type NoDollar, val: string): seq[string] =
+  completeCmdArg(string, val)
+
+proc parseCmdArg(T: type NoDollar, s: string): T =
+  parseCmdArg(string, s).NoDollar
 
 type
   TestConf = object
@@ -54,5 +61,16 @@ type
       defaultValue: DisString("this should not show in the help message")
       desc: "distinct string"
       name: "opt5" }: DisString
+
+    opt6 {.
+      defaultValue: NoDollar("default")
+      desc: "no dollar func defined"
+      name: "opt6" }: NoDollar
+
+    opt7 {.
+      defaultValue: NoDollar("default")
+      defaultValueDesc: "overridden"
+      desc: "no dollar func defined"
+      name: "opt7" }: NoDollar
 
 let c = TestConf.load(termWidth = int.high)
