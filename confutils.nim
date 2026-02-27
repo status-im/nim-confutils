@@ -865,7 +865,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
                              completerName,
                              newCall(bindSym"requiresInput", fixedFieldType),
                              newCall(bindSym"acceptsMultipleValues", fixedFieldType),
-                             defaultValueHelpName)
+                             newCall(defaultValueHelpName))
 
     result.add quote do:
       {.push hint[XCannotRaiseY]: off.}
@@ -895,22 +895,21 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
         else:
           setField(`configField`, val, `defaultValue`)
 
-      proc `defaultValueHelpName`(`configVar`: `RecordType`): string {.
-        nimcall
-        gcsafe
-        sideEffect
-        raises: []
-      .} =
-        when `defaultValueHelp` is string:
-          `defaultValueHelp`
-        else:
-          when compiles($`defaultValueHelp`):
-            when typeof($`defaultValueHelp`) is string:
-              $`defaultValueHelp`
+      proc `defaultValueHelpName`(): string {.compileTime.} =
+        # defaultValue can be `config.otherField` which won't compile
+        when compiles(`defaultValueHelp` is string):
+          when `defaultValueHelp` is string:
+            `defaultValueHelp`
+          else:
+            when compiles($`defaultValueHelp`):
+              when typeof($`defaultValueHelp`) is string:
+                $`defaultValueHelp`
+              else:
+                `defaultValueHelpRepr`
             else:
               `defaultValueHelpRepr`
-          else:
-            `defaultValueHelpRepr`
+        else:
+          `defaultValueHelpRepr`
 
     result.add quote do:
       {.pop.}
@@ -1345,7 +1344,7 @@ proc loadImpl[C, SecondarySources](
   template getDefaultValueDescs(): seq[string] =
     var defaultValueDescs = newSeq[string](fieldSetters.len)
     for i in 0 ..< fieldSetters.len:
-      defaultValueDescs[i] = fieldSetters[i][5](result)
+      defaultValueDescs[i] = fieldSetters[i][5]
     defaultValueDescs
 
   template processHelpAndVersionOptions(optKey, optVal: string) =
