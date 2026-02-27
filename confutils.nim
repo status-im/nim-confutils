@@ -75,7 +75,6 @@ type
     idx: int
     flags: set[OptFlag]
     hasDefault: bool
-    defaultInHelpText: string
     obsoleteMsg: string
     case kind: OptKind
     of Discriminator:
@@ -942,11 +941,6 @@ func findPath(parent, node: CmdInfo): seq[CmdInfo] =
   doAssert validPath(result, parent, node)
   result.add parent
 
-func toText(n: NimNode): string =
-  if n == nil: ""
-  elif n.kind in {nnkStrLit..nnkTripleStrLit}: n.strVal
-  else: repr(n)
-
 func readPragmaFlags(field: FieldDescription): set[OptFlag] =
   result = {}
   if field.readPragma("hidden") != nil:
@@ -968,10 +962,6 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
     let
       isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
       defaultValue = field.readPragma"defaultValue"
-      defaultValueDesc = field.readPragma"defaultValueDesc"
-      defaultInHelp = if defaultValueDesc != nil: defaultValueDesc
-                      else: defaultValue
-      defaultInHelpText = toText(defaultInHelp)
       obsoleteMsg = field.readPragma"obsolete"
       separator = field.readPragma"separator"
       longDesc = field.readPragma"longDesc"
@@ -989,7 +979,6 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
                       name: $field.name,
                       flags: optFlags,
                       hasDefault: defaultValue != nil,
-                      defaultInHelpText: defaultInHelpText,
                       typename: field.typ.repr)
 
     if desc != nil: opt.desc = desc.strVal
