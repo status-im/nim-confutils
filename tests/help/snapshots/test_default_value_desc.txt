@@ -7,3 +7,4 @@ The following options are available:
  --help      Show this help message and exit.
  --opt1      tcp port [=9000].
  --opt2      tcp port 2 [=9000].
+ --opt3      distinct string [=foobar].
