@@ -896,7 +896,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
 
       proc `defaultValueHelpName`(): string {.compileTime.} =
         # this runs at comptime so gcsafe cast is ok
-        {.cast(gcsafe).}
+        {.cast(gcsafe).}:
           # defaultValue can be `config.otherField` which won't compile
           # `$` may not be defined for this type
           when compiles($`defaultValueHelp`):
