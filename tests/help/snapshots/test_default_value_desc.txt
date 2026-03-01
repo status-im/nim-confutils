@@ -18,3 +18,4 @@ The following options are available:
  --opt11      default value can raise but default desc won't [=ok].
  --opt12      default is config.opt11 [=config.opt11].
  --opt13      default is config.opt11 with default desc [=ok].
+ --opt14      default enum is TestEnum.OK [=OK].

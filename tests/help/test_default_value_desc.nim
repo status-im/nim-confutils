@@ -13,6 +13,10 @@ import ../../confutils
 const defaultEth2TcpPort = 9000
 const defaultDescOverride = "ok"
 
+type TestEnum {.pure.} = enum
+  BAD
+  OK
+
 type DisString = distinct string
 type NoDollar = distinct string
 
@@ -118,5 +122,10 @@ type
       defaultValueDesc: "ok"
       desc: "default is config.opt11 with default desc"
       name: "opt13" }: string
+
+    opt14 {.
+      defaultValue: TestEnum.OK
+      desc: "default enum is TestEnum.OK"
+      name: "opt14" }: TestEnum
 
 let c = TestConf.load(termWidth = int.high)
