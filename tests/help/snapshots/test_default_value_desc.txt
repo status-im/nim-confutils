@@ -4,11 +4,17 @@ test_default_value_desc [OPTIONS]...
 
 The following options are available:
 
- --help      Show this help message and exit.
- --opt1      tcp port [=9000].
- --opt2      tcp port 2 [=9000].
- --opt3      tcp port 3 [=overridden].
- --opt4      tcp port 4 [=overridden].
- --opt5      distinct string [=foobar].
- --opt6      no dollar func defined [=NoDollar("default")].
- --opt7      no dollar func defined [=overridden].
+ --help       Show this help message and exit.
+ --opt1       tcp port [=9000].
+ --opt2       tcp port 2 [=9000].
+ --opt3       const default value desc [=ok].
+ --opt4       literal default value desc [=ok].
+ --opt5       distinct string [=ok].
+ --opt6       no dollar func defined [=NoDollar("default")].
+ --opt7       no dollar func defined with default desc [=ok].
+ --opt8       runtime value [=ok].
+ --opt9       runtime value [=ok].
+ --opt10      runtime value [=ok concat].
+ --opt11      default value can raise but default desc won't [=ok].
+ --opt12      default is config.opt11 [=config.opt11].
+ --opt13      default is config.opt11 with default desc [=ok].
