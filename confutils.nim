@@ -864,7 +864,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
                              completerName,
                              newCall(bindSym"requiresInput", fixedFieldType),
                              newCall(bindSym"acceptsMultipleValues", fixedFieldType),
-                             newCall(defaultValueHelpName))
+                             defaultValueHelpName)
 
     result.add quote do:
       {.push hint[XCannotRaiseY]: off.}
@@ -894,18 +894,21 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
         else:
           setField(`configField`, val, `defaultValue`)
 
-      proc `defaultValueHelpName`(): string {.compileTime.} =
-        # this runs at comptime so gcsafe cast is ok
-        {.cast(gcsafe).}:
-          # defaultValue can be `config.otherField` which won't compile
-          # `$` may not be defined for this type
-          when compiles($`defaultValueHelp`):
-            when typeof($`defaultValueHelp`) is string:
-              $`defaultValueHelp`
-            else:
-              `defaultValueHelpRepr`
+      proc `defaultValueHelpName`(): string {.
+        nimcall
+        gcsafe
+        sideEffect
+        raises: []
+      .} =
+        # defaultValue can be `config.otherField` which won't compile
+        # `$` may not be defined for this type
+        when compiles($`defaultValueHelp`):
+          when typeof($`defaultValueHelp`) is string:
+            $`defaultValueHelp`
           else:
             `defaultValueHelpRepr`
+        else:
+          `defaultValueHelpRepr`
 
     result.add quote do:
       {.pop.}
@@ -1330,7 +1333,7 @@ proc loadImpl[C, SecondarySources](
   template getDefaultValueDescs(): seq[string] =
     var defaultValueDescs = newSeq[string](fieldSetters.len)
     for i in 0 ..< fieldSetters.len:
-      defaultValueDescs[i] = fieldSetters[i][5]
+      defaultValueDescs[i] = fieldSetters[i][5]()
     defaultValueDescs
 
   template processHelpAndVersionOptions(optKey, optVal: string) =
