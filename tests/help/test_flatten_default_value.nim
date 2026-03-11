@@ -19,7 +19,6 @@ type
   TestOptsConf = object
     opt1 {.
       defaultValue: 123
-      defaultValueDesc: "123"
       desc: "some int"
       name: "opt1" }: int
 

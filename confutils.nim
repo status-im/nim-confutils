@@ -894,17 +894,6 @@ proc fieldCaseFieldFullName(cf: ConfFieldDesc): string =
     doAssert cf.parent != nil, "caseField not found"
     fieldCaseFieldFullName(cf.parent[])
 
-proc extractTypedValue(n: NimNode): NimNode =
-  case n.kind
-  of nnkSym:
-    let impl = n.getImpl
-    case impl.kind
-    of nnkConstDef: extractTypedValue(impl[2])
-    of nnkStrLit .. nnkTripleStrLit: impl  # Nim 1.6 compat
-    else: n
-  else:
-    n
-
 proc flattenDefaultValue(field: FieldDescription, parent: ConfFieldDescRef): NimNode =
   if parent == nil:
     return nil
@@ -918,7 +907,7 @@ proc flattenDefaultValue(field: FieldDescription, parent: ConfFieldDescRef): Nim
     var ret: NimNode = nil
     for x in ftn:
       if eqIdent(x[0], field.name):
-        ret = extractTypedValue(x[1])
+        ret = x[1]
     ret
   else:
     error "Bad flatten pragma", ftn
@@ -968,7 +957,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
           newLit(repr defaultValue)
         else:
           newLit("")
-      defaultValueHelpName = ident($field.name & "DefaultValueHelp")
+      defaultValueHelpName = ident(cf.fullFieldName() & "DefaultValueHelp")
 
     if defaultValue == nil:
       defaultValue = newCall(makeDefaultValue, newTree(nnkTypeOfExpr, configField))
@@ -1084,15 +1073,6 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
       field = cf.field
       isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
       defaultValue = cf.readDefaultValue()
-      defaultValueDesc = field.readPragma"defaultValueDesc"
-      defaultInHelp =
-        if cf.readDefaultValueOverride() != nil:
-          defaultValue
-        elif defaultValueDesc != nil:
-          defaultValueDesc
-        else:
-          defaultValue
-      defaultInHelpText = toText(defaultInHelp)
       obsoleteMsg = field.readPragma"obsolete"
       separator = field.readPragma"separator"
       longDesc = field.readPragma"longDesc"
