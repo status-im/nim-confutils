@@ -9,7 +9,8 @@
 
 import
   std/[tables, macrocache],
-  stew/shims/macros
+  stew/shims/macros,
+  ./utils
 
 {.warning[UnusedImport]:off.}
 import
@@ -39,21 +40,25 @@ type
     isCaseBranch: bool
     isDiscriminator: bool
     isIgnore: bool
+    isFlatten: bool
 
-  GeneratedFieldInfo = object
-    isIgnore: bool
-    isCommandOrArgument: bool
-    path: seq[string]
-
-  OriginalToGeneratedFields = OrderedTable[string, GeneratedFieldInfo]
+  ConfFileSectionTail = object
+    node: ConfFileSection
+    path: seq[ConfFileSection]
 
   SectionParam = object
     isCommandOrArgument: bool
     isIgnore: bool
     defaultValue: string
     namePragma: string
+    isFlatten: bool
 
 {.push gcsafe, raises: [].}
+
+template debugMacroResult(macroName: string) {.dirty.} =
+  when defined(debugMacros) or defined(debugConfutils):
+    echo "\n-------- ", macroName, " ----------------------"
+    echo result.repr
 
 func isOption(n: NimNode): bool =
   if n.kind != nnkBracketExpr: return false
@@ -77,15 +82,27 @@ proc generateOptionalField(fieldName: NimNode, fieldType: NimNode): NimNode =
   let right = if isOption(fieldType): fieldType else: makeOption(fieldType)
   newIdentDefs(fieldName, right)
 
+proc traverseRecList(recList: NimNode, parent: ConfFileSection): seq[ConfFileSection]
+
 proc traverseIdent(ident: NimNode, typ: NimNode,
                    isDiscriminator: bool, param = SectionParam()): ConfFileSection =
   ident.expectKind nnkIdent
-  ConfFileSection(fieldName: $ident,
-                  namePragma: param.namePragma, typ: typ,
-                  defaultValue: param.defaultValue,
-                  isCommandOrArgument: param.isCommandOrArgument,
-                  isDiscriminator: isDiscriminator,
-                  isIgnore: param.isIgnore)
+  if param.isFlatten:
+    let confTypeImpl = typ.getImpl
+    let conf = ConfFileSection(
+      fieldName: $ident, typ: typ, isFlatten: param.isFlatten
+    )
+    conf.children = traverseRecList(confTypeImpl[2][2], conf)
+    conf
+  else:
+    ConfFileSection(
+      fieldName: $ident,
+      namePragma: param.namePragma, typ: typ,
+      defaultValue: param.defaultValue,
+      isCommandOrArgument: param.isCommandOrArgument,
+      isDiscriminator: isDiscriminator,
+      isIgnore: param.isIgnore
+    )
 
 proc traversePostfix(postfix: NimNode, typ: NimNode, isDiscriminator: bool,
                      param = SectionParam()): ConfFileSection =
@@ -128,12 +145,16 @@ proc traversePragma(pragma: NimNode): SectionParam =
         result.isCommandOrArgument = true
       elif sym == "ignore":
         result.isIgnore = true
+      elif sym == "flatten":
+        result.isFlatten = true
     of nnkExprColonExpr:
       let pragma = $child[0]
       if pragma == "defaultValue":
         result.defaultValue = repr(shortEnumName(child[1]))
       elif pragma == "name":
         result.namePragma = $child[1]
+      elif pragma == "flatten":
+        result.isFlatten = true
     else:
       raiseAssert "[Pragma] Unsupported child node:\n" & child.treeRepr
 
@@ -171,8 +192,6 @@ proc traverseIdentDefs(identDefs: NimNode, parent: ConfFileSection,
       discard
     else:
       raiseAssert "[IdentDefs] Unsupported child node:\n" & child.treeRepr
-
-proc traverseRecList(recList: NimNode, parent: ConfFileSection): seq[ConfFileSection]
 
 proc traverseOfBranch(ofBranch: NimNode, parent: ConfFileSection): ConfFileSection =
   ofBranch.expectKind nnkOfBranch
@@ -250,28 +269,43 @@ proc generateTypes(root: ConfFileSection): seq[NimNode] =
         var types = generateTypes(child)
         recList.add generateOptionalField(child.fieldName.ident, types[0][0])
         result.add types
+    elif child.isFlatten:
+      var types = generateTypes(child)
+      types[0][2][2].expectKind nnkRecList
+      recList.add types[0][2][2]
+      for i in 1 ..< types.len:
+        result.add types[i]
     else:
       recList.add generateOptionalField(child.getRenamedName.ident, child.typ)
   result[index].putRecList(recList)
 
-proc generateSettersPaths(node: ConfFileSection,
-                          result: var OriginalToGeneratedFields,
-                          pathsCache: var seq[string]) =
-  pathsCache.add node.getRenamedName
+proc generateConfTails(
+  node: ConfFileSection,
+  result: var seq[ConfFileSectionTail],
+  pathsCache: var seq[ConfFileSection]
+) =
+  pathsCache.add node
   if node.children.len == 0:
-    result[node.fieldName] = GeneratedFieldInfo(
-      isIgnore: node.isIgnore,
-      isCommandOrArgument: node.isCommandOrArgument,
+    result.add ConfFileSectionTail(
+      node: node,
       path: pathsCache,
     )
   else:
     for child in node.children:
-      generateSettersPaths(child, result, pathsCache)
-  pathsCache.del pathsCache.len - 1
+      generateConfTails(child, result, pathsCache)
+  pathsCache.setLen pathsCache.len - 1
 
-proc generateSettersPaths(root: ConfFileSection, pathsCache: var seq[string]): OriginalToGeneratedFields =
+proc generateConfTails(root: ConfFileSection, pathsCache: var seq[ConfFileSection]): seq[ConfFileSectionTail] =
   for child in root.children:
-    generateSettersPaths(child, result, pathsCache)
+    generateConfTails(child, result, pathsCache)
+
+proc fullFieldName(cft: ConfFileSectionTail): string =
+  result = ""
+  for cf in cft.path:
+    if cf.isFlatten:
+      result.add cf.fieldName
+      result.add "Dot"
+  result.add cft.node.fieldName
 
 template cfSetter(a, b: untyped): untyped =
   when a is Option:
@@ -279,7 +313,7 @@ template cfSetter(a, b: untyped): untyped =
   else:
     a = b
 
-proc generateSetters(confType, CF: NimNode, fieldsPaths: OriginalToGeneratedFields):
+proc generateSetters(confType, CF: NimNode, cfst: seq[ConfFileSectionTail]):
     (NimNode, NimNode, int) =
   var
     procs = newStmtList()
@@ -287,8 +321,8 @@ proc generateSetters(confType, CF: NimNode, fieldsPaths: OriginalToGeneratedFiel
     numSetters = 0
 
   let c = "c".ident
-  for field, param in fieldsPaths:
-    if param.isCommandOrArgument or param.isIgnore:
+  for cf in cfst:
+    if cf.node.isCommandOrArgument or cf.node.isIgnore:
       assignments.add quote do:
         result.setters[`numSetters`] = defaultConfigFileSetter
       inc numSetters
@@ -296,22 +330,27 @@ proc generateSetters(confType, CF: NimNode, fieldsPaths: OriginalToGeneratedFiel
 
     var fieldPath = c
     var condition: NimNode
-    for fld in param.path:
-      fieldPath = newDotExpr(fieldPath, fld.ident)
-      let fieldChecker = newDotExpr(fieldPath, "isSome".ident)
-      if condition == nil:
-        condition = fieldChecker
+    let configVar = ident "config"
+    var configField = configVar
+    for node in cf.path:
+      if node.isFlatten:
+        configField = dotExpr(configField, ident node.fieldName)
       else:
-        condition = newNimNode(nnkInfix).add("and".ident).add(condition).add(fieldChecker)
-      fieldPath = newDotExpr(fieldPath, "get".ident)
+        fieldPath = newDotExpr(fieldPath, node.getRenamedName.ident)
+        let fieldChecker = newDotExpr(fieldPath, "isSome".ident)
+        if condition == nil:
+          condition = fieldChecker
+        else:
+          condition = newNimNode(nnkInfix).add("and".ident).add(condition).add(fieldChecker)
+        fieldPath = newDotExpr(fieldPath, "get".ident)
+    configField = dotExpr(configField, ident cf.node.fieldName)
 
-    let setterName = genSym(nskProc, field & "CFSetter")
-    let fieldIdent = field.ident
+    let setterName = genSym(nskProc, cf.fullFieldName() & "CFSetter")
     procs.add quote do:
-      proc `setterName`(s: var `confType`, cf: ref `CF`): bool {.nimcall, gcsafe.} =
+      proc `setterName`(`configVar`: var `confType`, cf: ref `CF`): bool {.nimcall, gcsafe.} =
         for `c` in cf.data:
           if `condition`:
-            cfSetter(s.`fieldIdent`, `fieldPath`)
+            cfSetter(`configField`, `fieldPath`)
             return true
 
     assignments.add quote do:
@@ -321,13 +360,13 @@ proc generateSetters(confType, CF: NimNode, fieldsPaths: OriginalToGeneratedFiel
   result = (procs, assignments, numSetters)
 
 proc generateConfigFileSetters(confType, optType: NimNode,
-                               fieldsPaths: OriginalToGeneratedFields): NimNode =
+                               cfs: seq[ConfFileSectionTail]): NimNode =
   let
     CF = ident "SecondarySources"
     T = confType.getType[1]
     optT = optType[0][0]
     SetterProcType = genSym(nskType, "SetterProcType")
-    (setterProcs, assignments, numSetters) = generateSetters(T, CF, fieldsPaths)
+    (setterProcs, assignments, numSetters) = generateSetters(T, CF, cfs)
     stmtList = quote do:
       type
         `SetterProcType` = proc(
@@ -358,12 +397,14 @@ macro generateSecondarySources*(ConfType: type): untyped =
     model = generateConfigFileModel(ConfType)
     modelType = generateTypes(model)
   var
-    pathsCache: seq[string]
+    pathsCache: seq[ConfFileSection]
 
   result = newTree(nnkStmtList)
   result.add newTree(nnkTypeSection, modelType)
 
-  let settersPaths = model.generateSettersPaths(pathsCache)
-  result.add generateConfigFileSetters(ConfType, result[^1], settersPaths)
+  let confTails = model.generateConfTails(pathsCache)
+  result.add generateConfigFileSetters(ConfType, result[^1], confTails)
+
+  debugMacroResult "ConfigFile SecondarySources"
 
 {.pop.}
