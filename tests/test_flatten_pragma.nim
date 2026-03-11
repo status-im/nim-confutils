@@ -429,13 +429,11 @@ suite "test nested flatten subcommands":
       conf.topCmd1.lvl1Arg1 == "foo"
       conf.topCmd1.topCmd2.lvl2Arg1 == "bar"
 
+const opt1Const = "override"
+const opt2Const = true
+const opt3Const = 123
+
 suite "test flatten default value override":
-  proc opt1Str: string = "override"
-
-  const opt1Const = opt1Str()
-  const opt2Const = true
-  const opt3Const = 123
-
   type
     OptsConf = object
       opt1 {.

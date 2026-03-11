@@ -397,7 +397,7 @@ Apply it to an object field to traverse the object options as if they were "top-
 This allows the object options to be reused in various configurations.
 
 ```nim
-template flatten*(v: typed) {.pragma.}
+template flatten*(v: untyped) {.pragma.}
 ```
 
 The default values for the object options can be overridden
