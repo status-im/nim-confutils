@@ -23,13 +23,13 @@ func completeCmdArg*(T: type IpAddress, val: string): seq[string] =
 func parseCmdArg*(T: type Port, s: string): T {.gcsafe, raises: [ValueError].} =
   template fail =
     raise newException(ValueError,
-      "The supplied port must be an integer value in the range 1-65535")
+      "The supplied port must be an integer value in the range 0-65535")
 
   var intVal: int
   let parsedChars = try: parseInt(s, intVal)
                     except CatchableError: fail()
 
-  if parsedChars != len(s) or intVal < 1 or intVal > 65535:
+  if parsedChars != len(s) or intVal < 0 or intVal > 65535:
     fail()
 
   return Port(intVal)
