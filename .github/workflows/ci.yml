@@ -11,7 +11,7 @@ jobs:
   build:
     uses: status-im/nimbus-common-workflow/.github/workflows/common.yml@main
     with:
-      nimble-version: #02baf22243761272116d4393a80f693a439163f2
+      nimble-version: 02baf22243761272116d4393a80f693a439163f2
       test-command: |
         nimble --useSystemNim install -y --depsOnly toml_serialization json_serialization unittest2
         nimble list --installed --version
