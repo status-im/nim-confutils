@@ -11,16 +11,16 @@ import os, strutils
 mode = ScriptMode.Verbose
 
 packageName   = "confutils"
-version       = "0.1.0"
+version       = "0.1.1"
 author        = "Status Research & Development GmbH"
 description   = "Simplified handling of command line options and config files"
 license       = "Apache License 2.0"
 skipDirs      = @["tests"]
 
-requires "nim >= 1.6.0",
-         "stew",
-         "serialization",
-         "results"
+requires "nim >= 1.6.18",
+         "stew >= 0.5.0",
+         "serialization >= 0.5.4",
+         "results >= 0.5.0"
 
 let nimc = getEnv("NIMC", "nim") # Which nim compiler to use
 let lang = getEnv("NIMLANG", "c") # Which backend (c/cpp/js)
