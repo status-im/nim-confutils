@@ -17,7 +17,7 @@ description   = "Simplified handling of command line options and config files"
 license       = "Apache License 2.0"
 skipDirs      = @["tests"]
 
-requires "nim >= 1.6.18",
+requires "nim >= 2.0.10",
          "stew >= 0.5.0",
          "serialization >= 0.5.4",
          "results >= 0.5.0"
@@ -30,16 +30,14 @@ let verbose = getEnv("V", "") notin ["", "0"]
 let cfg =
   " --styleCheck:usages --styleCheck:error" &
   (if verbose: "" else: " --verbosity:0 --hints:off") &
-  " --skipParentCfg --skipUserCfg --outdir:build --nimcache:build/nimcache -f" &
-  (if NimMajor >= 2: "" else: " -d:nimOldCaseObjects")
+  " --skipParentCfg --skipUserCfg --outdir:build --nimcache:build/nimcache -f"
 
 proc build(args, path: string) =
   exec nimc & " " & lang & " " & cfg & " " & flags & " " & args & " " & path
 
 proc run(args, path: string) =
   build args & " --mm:refc -r", path
-  if (NimMajor, NimMinor) > (1, 6):
-    build args & " --mm:orc -r", path
+  build args & " --mm:orc -r", path
 
 task test, "Run all tests":
   for threads in ["--threads:off", "--threads:on"]:

@@ -52,8 +52,6 @@ const cmdFlags = "--verbosity:0 --hints:off -d:confutilsNoColors"
 proc cmdTest(cmdName: string, cmds = "", help = "") =
   let fname = helpPath / cmdName
   var build = "nim c " & cmdFlags
-  if NimMajor < 2:
-    build.add " -d:nimOldCaseObjects"
   let buildRes = execCmdEx(build & " " & fname & ".nim")
   if buildRes.exitCode != 0:
     checkpoint "Build output: " & buildRes.output
