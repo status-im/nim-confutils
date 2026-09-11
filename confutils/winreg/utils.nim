@@ -1,5 +1,5 @@
 # confutils
-# Copyright (c) 2018-2024 Status Research & Development GmbH
+# Copyright (c) 2018-2026 Status Research & Development GmbH
 # Licensed under either of
 #  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
 #  * MIT license ([LICENSE-MIT](LICENSE-MIT))
@@ -57,7 +57,7 @@ proc setValue*(hKey: HKEY, path, key: string, val: SomePrimitives): bool =
   result = true
 
 proc setValue*[T: SomePrimitives](hKey: HKEY, path, key: string, val: openArray[T]): bool =
-  call regSetValue(hKey, path, key, REG_BINARY, val[0].unsafeAddr, int32(val.len * sizeof(T)))
+  call regSetValue(hKey, path, key, REG_BINARY, val[0].addr, int32(val.len * sizeof(T)))
   result = true
 
 proc getValue*(hKey: HKEY, path, key: string, outVal: var string): bool =
