@@ -14,4 +14,5 @@ jobs:
         nimble --useSystemNim install -y --depsOnly toml_serialization json_serialization unittest2
         nimble list --installed --version
         rm -f nimble.lock
+        nimble test_asan
         nimble test
