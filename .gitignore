@@ -11,3 +11,4 @@ tests/test_argument
 tests/test_parsecmdarg
 tests/test_obsolete
 tests/test_flatten_pragma
+
