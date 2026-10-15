@@ -18,7 +18,7 @@ license       = "Apache License 2.0"
 skipDirs      = @["tests"]
 
 requires "nim >= 2.0.10",
-         "stew >= 0.5.0",
+         "https://github.com/nitely/nim-stew#d44df99dbce0b3b7d1f237d41b4cd23b4926d369",
          "serialization >= 0.5.4",
          "results >= 0.5.0"
 
