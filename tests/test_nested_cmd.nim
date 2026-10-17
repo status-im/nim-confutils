@@ -1,5 +1,5 @@
 # confutils
-# Copyright (c) 2018-2025 Status Research & Development GmbH
+# Copyright (c) 2018-2026 Status Research & Development GmbH
 # Licensed under either of
 #  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
 #  * MIT license ([LICENSE-MIT](LICENSE-MIT))
@@ -62,6 +62,21 @@ type
           desc: "innerArg2 desc"
           name: "inner-arg2" }: string
 
+  TestConfNonFirstDefault = object
+    case cmd {.
+      command
+      defaultValue: OuterCmd.outerCmd1 }: OuterCmd
+    of OuterCmd.noCommand:
+      outerArg {.
+        defaultValue: "outerArg default"
+        desc: "outerArg desc"
+        name: "outer-arg" }: string
+    of OuterCmd.outerCmd1:
+      outerArg1 {.
+        defaultValue: "outerArg1 default"
+        desc: "outerArg1 desc"
+        name: "outer-arg1" }: string
+
 suite "test nested cmd":
   test "no command":
     let conf = TestConf.load(cmdLine = @[
@@ -121,6 +136,21 @@ suite "test nested cmd default args":
       conf.innerCmd == InnerCmd.innerCmd2
       conf.outerArg1 == "outerArg1 default"
       conf.innerArg2 == "innerArg2 default"
+
+suite "test nested cmd non-first default":
+  test "no command":
+    let conf = TestConfNonFirstDefault.load(cmdLine = @[
+      "--outer-arg1=foobar"
+    ])
+    check:
+      conf.cmd == OuterCmd.outerCmd1
+      conf.outerArg1 == "foobar"
+
+  test "no command default":
+    let conf = TestConfNonFirstDefault.load(cmdLine = newSeq[string]())
+    check:
+      conf.cmd == OuterCmd.outerCmd1
+      conf.outerArg1 == "outerArg1 default"
 
 suite "test nested cmd toml":
   test "no command default":

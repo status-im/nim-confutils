@@ -1,5 +1,5 @@
 # confutils
-# Copyright (c) 2018-2025 Status Research & Development GmbH
+# Copyright (c) 2018-2026 Status Research & Development GmbH
 # Licensed under either of
 #  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
 #  * MIT license ([LICENSE-MIT](LICENSE-MIT))
@@ -16,3 +16,9 @@ proc dotExpr*(a, b: NimNode): NimNode =
     dotExpr(dotExpr(a, b[0]), b[1])
   else:
     newDotExpr(a, b)
+
+func shortEnumName*(n: NimNode): NimNode =
+  if n.kind == nnkDotExpr:
+    n[1]
+  else:
+    n
