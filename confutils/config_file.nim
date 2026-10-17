@@ -1,5 +1,5 @@
 # confutils
-# Copyright (c) 2018-2024 Status Research & Development GmbH
+# Copyright (c) 2018-2026 Status Research & Development GmbH
 # Licensed under either of
 #  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
 #  * MIT license ([LICENSE-MIT](LICENSE-MIT))
@@ -115,12 +115,6 @@ proc traversePostfix(postfix: NimNode, typ: NimNode, isDiscriminator: bool,
     traverseIdent(postfix[1][0], typ, isDiscriminator, param)
   else:
     raiseAssert "[Postfix] Unsupported child node:\n" & postfix[1].treeRepr
-
-proc shortEnumName(n: NimNode): NimNode =
-  if n.kind == nnkDotExpr:
-    n[1]
-  else:
-    n
 
 proc traversePragma(pragma: NimNode): SectionParam =
   pragma.expectKind nnkPragma

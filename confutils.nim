@@ -1112,6 +1112,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
 
       opt.isImplicitlySelectable = isImplicitlySelectable
       opt.isCommand = field.readPragma"command" != nil
+      opt.defaultSubCmd = -1
 
       for i in 1 ..< cmdType.len:
         let enumVal = cmdType[i]
@@ -1121,15 +1122,12 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
           desc = $enumVal[1]
         else:
           name = $enumVal
-        if defaultValue != nil and eqIdent(name, defaultValue):
+        if defaultValue != nil and eqIdent(name, shortEnumName(defaultValue)):
           opt.defaultSubCmd = i - 1
         opt.subCmds.add CmdInfo(name: name, desc: desc)
 
-      if defaultValue == nil:
-        opt.defaultSubCmd = -1
-      else:
-        if opt.defaultSubCmd == -1:
-          error "The default value is not a valid enum value", defaultValue
+      if defaultValue != nil and opt.defaultSubCmd == -1:
+        error "The default value is not a valid enum value", defaultValue
 
     let caseField = cf.fieldCaseField()
     let caseBranch = cf.fieldCaseBranch()
