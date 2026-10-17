@@ -1667,11 +1667,6 @@ macro cli*(args: varargs[untyped]): untyped =
   # Generate the final code
   result = newStmtList(cliProc, dispatchImpl(cliProcName, cliProc.params, args))
 
-  # TODO: remove this once Nim supports custom pragmas on proc params
-  for p in cliProc.params:
-    if p.kind == nnkEmpty: continue
-    p[0] = skipPragma p[0]
-
   debugMacroResult "CLI Code"
 
 func load*(f: TypedInputFile): f.ContentType =

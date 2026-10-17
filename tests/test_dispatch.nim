@@ -1,5 +1,5 @@
 # confutils
-# Copyright (c) 2018-2025 Status Research & Development GmbH
+# Copyright (c) 2018-2026 Status Research & Development GmbH
 # Licensed under either of
 #  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
 #  * MIT license ([LICENSE-MIT](LICENSE-MIT))
@@ -77,6 +77,13 @@ suite "test dispatch":
     check:
       a == 123
       b == "def"
+
+  test "cli return value":
+    let a = cli(cmdLine = @[
+      "--foo=123"
+    ]) do (foo: int) -> int:
+      foo + 1
+    check a == 124
 
   # proc param pragmas are ignored in older versions
   when (NimMajor, NimMinor) >= (2, 2):
