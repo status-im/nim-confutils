@@ -1,5 +1,5 @@
 # nim-confutils
-# Copyright (c) 2022-2023 Status Research & Development GmbH
+# Copyright (c) 2022-2026 Status Research & Development GmbH
 # Licensed and distributed under either of
 #   * MIT license: [LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT
 #   * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
@@ -148,3 +148,21 @@ suite "parseCmdArg":
       parseCmdArg(TestEnumArg, "aRG3") == TestEnumArg.Arg3
     expect ValueError:
       discard parseCmdArg(TestEnumArg, "Arg123")
+
+  test "holey enum":
+    type
+      TestHoleyEnumArg = enum
+        holey1 = 1
+        holey3 = 3
+        holey4 = (4, "Holey4")
+
+      TestHoleyEnumConf = object
+        value: TestHoleyEnumArg
+
+    check:
+      parseCmdArg(TestHoleyEnumArg, "holey3") == holey3
+      parseCmdArg(TestHoleyEnumArg, "holey4") == holey4
+      completeCmdArg(TestHoleyEnumArg, "") == @["holey1", "holey3", "Holey4"]
+      completeCmdArg(TestHoleyEnumArg, "holey3") == @["holey3"]
+      TestHoleyEnumConf.load(cmdLine = @["--value=holey3"]).value == holey3
+      TestHoleyEnumConf.load(cmdLine = @["--value=Holey4"]).value == holey4

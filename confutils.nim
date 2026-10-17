@@ -1,5 +1,5 @@
 # confutils
-# Copyright (c) 2018-2024 Status Research & Development GmbH
+# Copyright (c) 2018-2026 Status Research & Development GmbH
 # Licensed under either of
 #  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
 #  * MIT license ([LICENSE-MIT](LICENSE-MIT))
@@ -710,7 +710,7 @@ proc parseCmdArgAux(T: type, s: string): T {.raises: [ValueError].} =
     raise newException(ValueError, exc.msg)
 
 func completeCmdArg*(T: type enum, val: string): seq[string] =
-  for e in low(T)..high(T):
+  for e in items(T):
     let as_str = $e
     if startsWithIgnoreStyle(as_str, val):
       result.add($e)
