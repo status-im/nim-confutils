@@ -1659,7 +1659,7 @@ macro cli*(args: varargs[untyped]): untyped =
   args.del(args.len - 1)
 
   # Create a new anonymous proc we'll dispatch to
-  let cliProcName = genSym(nskProc, "CLI")
+  let cliProcName = genSym(nskProc, "cli")
   var cliProc = newTree(nnkProcDef, cliProcName)
   # Copy everything but the name from the do block:
   for i in 1 ..< doBlock.len: cliProc.add doBlock[i]
