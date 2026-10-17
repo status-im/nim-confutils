@@ -75,6 +75,7 @@ type
     idx: int
     flags: set[OptFlag]
     hasDefault: bool
+    isBool: bool
     obsoleteMsg: string
     case kind: OptKind
     of Discriminator:
@@ -1090,6 +1091,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
                       name: $field.name,
                       flags: optFlags,
                       hasDefault: defaultValue != nil,
+                      isBool: sameType(field.typ, bindSym"bool"),
                       typename: field.typ.repr)
 
     if desc != nil: opt.desc = desc.strVal
@@ -1360,7 +1362,7 @@ proc loadImpl[C, SecondarySources](
 
       for opt in matchingOptions:
         # The trailing '=' means the switch accepts an argument
-        let trailing = if opt.typename != "bool": "=" else: ""
+        let trailing = if opt.isBool: "" else: "="
 
         if argName in filterKind and len(opt.name) > 0:
           try:
