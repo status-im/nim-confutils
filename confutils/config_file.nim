@@ -8,7 +8,7 @@
 # those terms.
 
 import
-  std/[tables, macrocache],
+  std/[tables, macrocache, options],
   stew/shims/macros,
   ./utils
 
@@ -60,12 +60,8 @@ template debugMacroResult(macroName: string) {.dirty.} =
     echo "\n-------- ", macroName, " ----------------------"
     echo result.repr
 
-func isOption(n: NimNode): bool =
-  if n.kind != nnkBracketExpr: return false
-  eqIdent(n[0], "Option")
-
-func makeOption(n: NimNode): NimNode =
-  newNimNode(nnkBracketExpr).add(ident("Option"), n)
+template optionalType(typ: untyped): type =
+  when typ is Option: typ else: Option[typ]
 
 template objectDecl(a): untyped =
   type a = object
@@ -78,9 +74,8 @@ proc putRecList(n: NimNode, recList: NimNode) =
   for z in n:
     putRecList(z, recList)
 
-proc generateOptionalField(fieldName: NimNode, fieldType: NimNode): NimNode =
-  let right = if isOption(fieldType): fieldType else: makeOption(fieldType)
-  newIdentDefs(fieldName, right)
+func generateOptionalField(fieldName: NimNode, fieldType: NimNode): NimNode =
+  newIdentDefs(fieldName, newCall(bindSym"optionalType", fieldType))
 
 proc traverseRecList(recList: NimNode, parent: ConfFileSection): seq[ConfFileSection]
 
