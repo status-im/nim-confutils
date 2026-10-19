@@ -1,5 +1,5 @@
 # confutils
-# Copyright (c) 2018-2024 Status Research & Development GmbH
+# Copyright (c) 2018-2026 Status Research & Development GmbH
 # Licensed under either of
 #  * Apache License, version 2.0, ([LICENSE-APACHE](LICENSE-APACHE))
 #  * MIT license ([LICENSE-MIT](LICENSE-MIT))
@@ -18,7 +18,7 @@ license       = "Apache License 2.0"
 skipDirs      = @["tests"]
 
 requires "nim >= 2.0.10",
-         "stew >= 0.5.0",
+         "stew >= 0.6.4",
          "serialization >= 0.5.4",
          "results >= 0.5.0"
 

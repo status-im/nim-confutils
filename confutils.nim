@@ -847,9 +847,9 @@ proc fieldCaseField(cf: ConfFieldDesc): NimNode =
 
 proc validateFlattenOptions(field: FieldDescription, children: openArray[ConfFieldDesc]) =
   ## Validate flatten tuple options exist
-  doAssert field.readPragma"flatten" != nil
-  let ftn = field.readPragma"flatten"
-  if ftn.kind == nnkTupleConstr:
+  doAssert field.hasPragma"flatten"
+  let ftn = field.readPragmaValue"flatten"
+  if ftn != nil and ftn.kind == nnkTupleConstr:
     if ftn.len > 0 and ftn[0].kind != nnkExprColonExpr:
       error "invalid flatten options, expected tuple of (k: v)", ftn
     var found = newSeq[NimNode]()
@@ -864,8 +864,7 @@ proc validateFlattenOptions(field: FieldDescription, children: openArray[ConfFie
 proc confFields(typeImpl: NimNode, parent: ConfFieldDescRef = nil): seq[ConfFieldDesc] =
   result = newSeq[ConfFieldDesc]()
   for field in recordFields(typeImpl):
-    let ftn = field.readPragma"flatten"
-    if ftn != nil:
+    if field.hasPragma"flatten":
       let firstChildIdx = result.len
       for cf in confFields(getImpl(field.typ), newConfFieldDesc(field, parent)):
         result.add cf
@@ -901,7 +900,9 @@ proc flattenDefaultValue(field: FieldDescription, parent: ConfFieldDescRef): Nim
   let ancestorVal = flattenDefaultValue(field, parent[].parent)
   if ancestorVal != nil:
     return ancestorVal
-  let ftn = parent[].field.readPragma"flatten"
+  let ftn = parent[].field.readPragmaValue"flatten"
+  if ftn == nil:
+    return nil
   case ftn.kind
   of nnkSym: nil
   of nnkTupleConstr:
@@ -920,7 +921,7 @@ proc readDefaultValueOverride(cf: ConfFieldDesc): NimNode =
 proc readDefaultValue(cf: ConfFieldDesc): NimNode =
   result = cf.readDefaultValueOverride()
   if result == nil:
-    result = cf.field.readPragma"defaultValue"
+    result = cf.field.readPragmaValue"defaultValue"
 
 proc generateFieldSetters(RecordType: NimNode): NimNode =
   var recordDef = getImpl(RecordType)
@@ -934,7 +935,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
     var
       setterName = ident(cf.fullFieldName() & "Setter")
       fieldName = field.name
-      namePragma = field.readPragma"name"
+      namePragma = field.readPragmaValue"name"
       paramName =
         if namePragma != nil:
           namePragma
@@ -945,7 +946,7 @@ proc generateFieldSetters(RecordType: NimNode): NimNode =
       defaultValue = cf.readDefaultValue()
       completerName = ident(cf.fullFieldName() & "Complete")
       isFieldDiscriminator = newLit field.isDiscriminator
-      defaultValueDesc = field.readPragma"defaultValueDesc"
+      defaultValueDesc = field.readPragmaValue"defaultValueDesc"
       defaultValueHelp =
         if defaultValueDesc != nil:
           defaultValueDesc
@@ -1054,11 +1055,11 @@ func findPath(parent, node: CmdInfo): seq[CmdInfo] =
 
 func readPragmaFlags(field: FieldDescription): set[OptFlag] =
   result = {}
-  if field.readPragma("hidden") != nil:
+  if field.hasPragma("hidden"):
     result.incl optHidden
-  if field.readPragma("debug") != nil:
+  if field.hasPragma("debug"):
     result.incl optDebug
-  if field.readPragma"obsolete" != nil:
+  if field.hasPragma"obsolete":
     result.incl optObsolete
 
 proc cmdInfoFromType(T: NimNode): CmdInfo =
@@ -1072,17 +1073,17 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
   for cf in confFields(recordDef):
     let
       field = cf.field
-      isImplicitlySelectable = field.readPragma"implicitlySelectable" != nil
+      isImplicitlySelectable = field.hasPragma"implicitlySelectable"
       defaultValue = cf.readDefaultValue()
-      obsoleteMsg = field.readPragma"obsolete"
-      separator = field.readPragma"separator"
-      longDesc = field.readPragma"longDesc"
-      envVarValueSep = field.readPragma"envVarValueSep"
-      abbr = field.readPragma"abbr"
-      name = field.readPragma"name"
-      desc = field.readPragma"desc"
+      obsoleteMsg = field.readPragmaValue"obsolete"
+      separator = field.readPragmaValue"separator"
+      longDesc = field.readPragmaValue"longDesc"
+      envVarValueSep = field.readPragmaValue"envVarValueSep"
+      abbr = field.readPragmaValue"abbr"
+      name = field.readPragmaValue"name"
+      desc = field.readPragmaValue"desc"
       optKind = if field.isDiscriminator: Discriminator
-                elif field.readPragma("argument") != nil: Arg
+                elif field.hasPragma("argument"): Arg
                 else: CliSwitch
       optFlags = field.readPragmaFlags()
 
@@ -1111,7 +1112,7 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
         error "Only enums are supported as case object discriminators", field.name
 
       opt.isImplicitlySelectable = isImplicitlySelectable
-      opt.isCommand = field.readPragma"command" != nil
+      opt.isCommand = field.hasPragma"command"
       opt.defaultSubCmd = -1
 
       for i in 1 ..< cmdType.len:
@@ -1159,13 +1160,13 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
 
         # the reason we check for `ignore` pragma here and not using `continue` statement
         # is we do respect option hierarchy of subcommands
-        if field.readPragma("ignore") == nil:
+        if not field.hasPragma("ignore"):
           cmd.opts.add opt
 
     else:
       checkDuplicate(result, opt, field.name)
 
-      if field.readPragma("ignore") == nil:
+      if not field.hasPragma("ignore"):
         result.opts.add opt
 
 macro configurationRtti(RecordType: type): untyped =
