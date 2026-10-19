@@ -845,12 +845,12 @@ proc validateFlattenOptions(field: FieldDescription, children: openArray[ConfFie
       if x[0] notin found:
         error "invalid flatten option: " & $x[0], ftn
 
-proc confFields(typeImpl: NimNode, parent: ConfFieldDescRef = nil): seq[ConfFieldDesc] =
+proc confFields(typ: NimNode, parent: ConfFieldDescRef = nil): seq[ConfFieldDesc] =
   result = newSeq[ConfFieldDesc]()
-  for field in recordFields(typeImpl):
+  for field in recordFields(typ):
     if field.hasPragma"flatten":
       let firstChildIdx = result.len
-      for cf in confFields(getImpl(field.typ), newConfFieldDesc(field, parent)):
+      for cf in confFields(field.typ, newConfFieldDesc(field, parent)):
         result.add cf
       validateFlattenOptions(field, toOpenArray(result, firstChildIdx, result.len-1))
     else:
@@ -908,13 +908,12 @@ proc readDefaultValue(cf: ConfFieldDesc): NimNode =
     result = cf.field.readPragmaValue"defaultValue"
 
 proc generateFieldSetters(RecordType: NimNode): NimNode =
-  var recordDef = getImpl(RecordType)
   let makeDefaultValue = bindSym"makeDefaultValue"
 
   result = newTree(nnkStmtListExpr)
   var settersArray = newTree(nnkBracket)
 
-  for cf in confFields(recordDef):
+  for cf in confFields(RecordType):
     let field = cf.field
     var
       setterName = ident(cf.fullFieldName() & "Setter")
@@ -1046,15 +1045,14 @@ func readPragmaFlags(field: FieldDescription): set[OptFlag] =
   if field.hasPragma"obsolete":
     result.incl optObsolete
 
-proc cmdInfoFromType(T: NimNode): CmdInfo =
+func cmdInfoFromType(T: NimNode): CmdInfo =
   result = CmdInfo()
 
   var
-    recordDef = getImpl(T)
     discriminatorFields = newSeq[(string, OptInfo)]()
     fieldIdx = 0
 
-  for cf in confFields(recordDef):
+  for cf in confFields(T):
     let
       field = cf.field
       isImplicitlySelectable = field.hasPragma"implicitlySelectable"
@@ -1155,9 +1153,8 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
 
 macro configurationRtti(RecordType: type): untyped =
   let
-    T = RecordType.getType[1]
-    cmdInfo = cmdInfoFromType T
-    fieldSetters = generateFieldSetters T
+    cmdInfo = cmdInfoFromType RecordType
+    fieldSetters = generateFieldSetters RecordType
 
   result = newTree(nnkPar, newLitFixed cmdInfo, fieldSetters)
 
