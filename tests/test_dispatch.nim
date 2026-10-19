@@ -112,6 +112,30 @@ suite "test dispatch":
       foo + 1
     check a == 124
 
+  test "proc declared in template":
+    var a: int
+    var b: string
+    template declareAndDispatch() =
+      proc simple(foo: int, bar = "abc") =
+        a = foo
+        b = bar
+      dispatch(simple, cmdLine = @[
+        "--foo=123",
+        "--bar=def"
+      ])
+    declareAndDispatch()
+    check:
+      a == 123
+      b == "def"
+
+  test "cli in template":
+    template cliInTemplate(): int =
+      cli(cmdLine = @[
+        "--foo=123"
+      ]) do (foo: int) -> int:
+        foo + 1
+    check cliInTemplate() == 124
+
   # proc param pragmas are ignored in older versions
   when (NimMajor, NimMinor) >= (2, 2):
     test "default pragma":
