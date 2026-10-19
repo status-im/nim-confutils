@@ -1562,7 +1562,7 @@ template load*(
 func defaults*(Configuration: type): Configuration =
   load(Configuration, cmdLine = @[], printUsage = false, quitOnFailure = false)
 
-proc dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
+func dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
   # Here, we'll create a configuration object with fields matching
   # the CLI proc params. We'll also generate a call to the designated proc
   let configType = genSym(nskType, "CliConfig")
@@ -1570,31 +1570,32 @@ proc dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
   let configVar = genSym(nskLet, "config")
   var dispatchCall = newCall(cliProcSym)
 
-  # The return type of the proc is skipped over
-  for i in 1 ..< cliArgs.len:
-    var arg = copy cliArgs[i]
-
+  for param in cliArgs.routineParams:
     # Replace symbol with ident
-    let paramName = ident $skipPragma(arg[0])
-    if arg[0].kind == nnkPragmaExpr:
-      arg[0][0] = paramName
-    else:
-      arg[0] = paramName
+    let paramName = ident $param.name
+    var
+      fieldName =
+        if param.pragmas != nil:
+          newTree(nnkPragmaExpr, paramName, copy param.pragmas)
+        else:
+          paramName
+      fieldType = copy param.typ
 
     # If an argument doesn't specify a type, we infer it from the default value
-    if arg[1].kind == nnkEmpty:
-      if arg[2].kind == nnkEmpty:
-        error "Please provide either a default value or type of the parameter", arg
-      arg[1] = newCall(bindSym"typeof", arg[2])
+    if fieldType.kind == nnkEmpty:
+      if param.defaultValue.kind == nnkEmpty:
+        error "Please provide either a default value or type of the parameter",
+            param.name
+      fieldType = newCall(bindSym"typeof", copy param.defaultValue)
 
     # Turn any default parameters into the confutils's `defaultValue` pragma
-    if arg[2].kind != nnkEmpty:
-      if arg[0].kind != nnkPragmaExpr:
-        arg[0] = newTree(nnkPragmaExpr, arg[0], newTree(nnkPragma))
-      arg[0][1].add newColonExpr(bindSym"defaultValue", arg[2])
-      arg[2] = newEmptyNode()
+    if param.defaultValue.kind != nnkEmpty:
+      if fieldName.kind != nnkPragmaExpr:
+        fieldName = newTree(nnkPragmaExpr, fieldName, newTree(nnkPragma))
+      fieldName[1].add newColonExpr(
+        bindSym"defaultValue", copy param.defaultValue)
 
-    configFields.add arg
+    configFields.add newIdentDefs(fieldName, fieldType)
     dispatchCall.add newTree(nnkDotExpr, configVar, paramName)
 
   let cliConfigType = nnkTypeSection.newTree(
