@@ -77,6 +77,27 @@ type
         desc: "outerArg1 desc"
         name: "outer-arg1" }: string
 
+  NumberedCmd = enum
+    numberedCmd0 = 0
+    numberedCmd1 = (1, "Numbered cmd 1")
+
+  NumberedCmdAlias = NumberedCmd
+
+  TestConfNumbered = object
+    case cmd {.
+      command
+      defaultValue: NumberedCmd.numberedCmd0 }: NumberedCmdAlias
+    of NumberedCmd.numberedCmd0:
+      numberedArg0 {.
+        defaultValue: "numberedArg0 default"
+        desc: "numberedArg0 desc"
+        name: "numbered-arg0" }: string
+    of NumberedCmd.numberedCmd1:
+      numberedArg1 {.
+        defaultValue: "numberedArg1 default"
+        desc: "numberedArg1 desc"
+        name: "numbered-arg1" }: string
+
 suite "test nested cmd":
   test "no command":
     let conf = TestConf.load(cmdLine = @[
@@ -151,6 +172,22 @@ suite "test nested cmd non-first default":
     check:
       conf.cmd == OuterCmd.outerCmd1
       conf.outerArg1 == "outerArg1 default"
+
+suite "test nested cmd enum values":
+  test "no command default":
+    let conf = TestConfNumbered.load(cmdLine = newSeq[string]())
+    check:
+      conf.cmd == NumberedCmd.numberedCmd0
+      conf.numberedArg0 == "numberedArg0 default"
+
+  test "subcommand numberedCmd1":
+    let conf = TestConfNumbered.load(cmdLine = @[
+      "numberedCmd1",
+      "--numbered-arg1=foobar"
+    ])
+    check:
+      conf.cmd == NumberedCmd.numberedCmd1
+      conf.numberedArg1 == "foobar"
 
 suite "test nested cmd toml":
   test "no command default":
