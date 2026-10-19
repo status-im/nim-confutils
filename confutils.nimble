@@ -11,13 +11,13 @@ import os, strutils
 mode = ScriptMode.Verbose
 
 packageName   = "confutils"
-version       = "0.1.2"
+version       = "0.2.0"
 author        = "Status Research & Development GmbH"
 description   = "Simplified handling of command line options and config files"
 license       = "Apache License 2.0"
 skipDirs      = @["tests"]
 
-requires "nim >= 2.0.10",
+requires "nim >= 2.2.10",
          "stew >= 0.6.4",
          "serialization >= 0.5.4",
          "results >= 0.5.0"

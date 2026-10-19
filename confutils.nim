@@ -1089,24 +1089,17 @@ func cmdInfoFromType(T: NimNode): CmdInfo =
 
     if field.isDiscriminator:
       discriminatorFields.add (cf.fullFieldName(), opt)
-      let cmdType = field.typ.getImpl[^1]
-      if cmdType.kind != nnkEnumTy:
-        error "Only enums are supported as case object discriminators", field.name
 
       opt.isImplicitlySelectable = isImplicitlySelectable
       opt.isCommand = field.hasPragma"command"
       opt.defaultSubCmd = -1
 
-      for i in 1 ..< cmdType.len:
-        let enumVal = cmdType[i]
-        var name, desc: string
-        if enumVal.kind == nnkEnumFieldDef:
-          name = $enumVal[0]
-          desc = $enumVal[1]
-        else:
-          name = $enumVal
+      for i, enumField in field.typ.enumFields:
+        let
+          name = $enumField.name
+          desc = if enumField.strValue != name: enumField.strValue else: ""
         if defaultValue != nil and eqIdent(name, shortEnumName(defaultValue)):
-          opt.defaultSubCmd = i - 1
+          opt.defaultSubCmd = i
         opt.subCmds.add CmdInfo(name: name, desc: desc)
 
       if defaultValue != nil and opt.defaultSubCmd == -1:
