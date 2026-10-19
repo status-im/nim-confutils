@@ -352,7 +352,7 @@ proc generateConfigFileSetters(confType, optType: NimNode,
                                cfs: seq[ConfFileSectionTail]): NimNode =
   let
     CF = ident "SecondarySources"
-    T = confType.getType[1]
+    T = confType
     optT = optType[0][0]
     SetterProcType = genSym(nskType, "SetterProcType")
     (setterProcs, assignments, numSetters) = generateSetters(T, CF, cfs)
