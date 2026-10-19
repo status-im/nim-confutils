@@ -78,6 +78,33 @@ suite "test dispatch":
       a == 123
       b == "def"
 
+  test "grouped params":
+    var a: int
+    var b: int
+    proc simple(foo, bar: int) =
+      a = foo
+      b = bar
+    dispatch(simple, cmdLine = @[
+      "--foo=123",
+      "--bar=456"
+    ])
+    check:
+      a == 123
+      b == 456
+
+  test "cli grouped params":
+    var a: int
+    var b: int
+    cli(cmdLine = @[
+      "--foo=123",
+      "--bar=456"
+    ]) do (foo, bar: int):
+      a = foo
+      b = bar
+    check:
+      a == 123
+      b == 456
+
   test "cli return value":
     let a = cli(cmdLine = @[
       "--foo=123"
@@ -139,3 +166,14 @@ suite "test dispatch":
         b == "abc"
         c == true
         d == @["def", "hij"]
+
+  test "cli param pragmas":
+    let a = cli(cmdLine = @[
+      "--foo=1",
+      "--qux=2",
+      "x"
+    ]) do (
+        foo, bar {.defaultValue: 5.}: int, qux {.desc: "q".}: int,
+        args {.argument.}: seq[string]) -> string:
+      $foo & ":" & $bar & ":" & $qux & ":" & $args
+    check a == "1:5:2:@[\"x\"]"
