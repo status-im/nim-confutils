@@ -1585,7 +1585,7 @@ func dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
     if fieldType.kind == nnkEmpty:
       if param.defaultValue.kind == nnkEmpty:
         error "Please provide either a default value or type of the parameter",
-            param.name
+          param.name
       fieldType = newCall(bindSym"typeof", copy param.defaultValue)
 
     # Turn any default parameters into the confutils's `defaultValue` pragma
