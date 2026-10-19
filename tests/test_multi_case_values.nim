@@ -22,6 +22,45 @@ type
         desc: "opt1 desc"
         name: "opt1" }: string
 
+  RangeCmd = enum
+    rangeCmd1
+    rangeCmd2
+    rangeCmd3
+
+  TestRangeConf = object
+    case cmd {.command.}: RangeCmd
+    of rangeCmd1:
+      opt1 {.
+        defaultValue: "opt1 default"
+        desc: "opt1 desc"
+        name: "opt1" }: string
+    of RangeCmd.rangeCmd2 .. RangeCmd.rangeCmd3:
+      opt2 {.
+        defaultValue: "opt2 default"
+        desc: "opt2 desc"
+        name: "opt2" }: string
+
+  SetCmd = enum
+    setCmd1
+    setCmd2
+    setCmd3
+
+const setCmds = {SetCmd.setCmd2, SetCmd.setCmd3}
+
+type
+  TestSetConf = object
+    case cmd {.command.}: SetCmd
+    of setCmd1:
+      opt1 {.
+        defaultValue: "opt1 default"
+        desc: "opt1 desc"
+        name: "opt1" }: string
+    of setCmds:
+      opt2 {.
+        defaultValue: "opt2 default"
+        desc: "opt2 desc"
+        name: "opt2" }: string
+
 suite "test multi case subcommand values":
   test "options work for the first subcommand":
     let conf = TestConf.load(cmdLine = @[
@@ -54,3 +93,37 @@ suite "test multi case subcommand values":
     check:
       conf.cmd == Cmd.cmd2
       conf.opt1 == "foobar"
+
+suite "test range case subcommand values":
+  test "set option for first subcommand in range":
+    let conf = TestRangeConf.load(cmdLine = @[
+       "rangeCmd2", "--opt2=foobar"
+    ])
+    check:
+      conf.cmd == RangeCmd.rangeCmd2
+      conf.opt2 == "foobar"
+
+  test "set option for last subcommand in range":
+    let conf = TestRangeConf.load(cmdLine = @[
+       "rangeCmd3", "--opt2=foobar"
+    ])
+    check:
+      conf.cmd == RangeCmd.rangeCmd3
+      conf.opt2 == "foobar"
+
+suite "test set case subcommand values":
+  test "set option for first subcommand in set":
+    let conf = TestSetConf.load(cmdLine = @[
+       "setCmd2", "--opt2=foobar"
+    ])
+    check:
+      conf.cmd == SetCmd.setCmd2
+      conf.opt2 == "foobar"
+
+  test "set option for last subcommand in set":
+    let conf = TestSetConf.load(cmdLine = @[
+       "setCmd3", "--opt2=foobar"
+    ])
+    check:
+      conf.cmd == SetCmd.setCmd3
+      conf.opt2 == "foobar"

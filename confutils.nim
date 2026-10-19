@@ -1036,6 +1036,15 @@ func findPath(parent, node: CmdInfo): seq[CmdInfo] =
   doAssert validPath(result, parent, node)
   result.add parent
 
+func branchSubCmds(
+  discriminator: OptInfo, ordinals: seq[int64], values: NimNode
+): seq[CmdInfo] =
+  var subCmds: seq[CmdInfo]
+  for i, ordinal in ordinals:
+    if values.containsOrdinal(ordinal):
+      subCmds.add discriminator.subCmds[i]
+  subCmds
+
 func readPragmaFlags(field: FieldDescription): set[OptFlag] =
   result = {}
   if field.hasPragma("hidden"):
@@ -1049,7 +1058,7 @@ func cmdInfoFromType(T: NimNode): CmdInfo =
   result = CmdInfo()
 
   var
-    discriminatorFields = newSeq[(string, OptInfo)]()
+    discriminatorFields = newSeq[(string, OptInfo, seq[int64])]()
     fieldIdx = 0
 
   for cf in confFields(T):
@@ -1088,12 +1097,11 @@ func cmdInfoFromType(T: NimNode): CmdInfo =
     inc fieldIdx
 
     if field.isDiscriminator:
-      discriminatorFields.add (cf.fullFieldName(), opt)
-
       opt.isImplicitlySelectable = isImplicitlySelectable
       opt.isCommand = field.hasPragma"command"
       opt.defaultSubCmd = -1
 
+      var ordinals: seq[int64]
       for i, enumField in field.typ.enumFields:
         let
           name = $enumField.name
@@ -1101,17 +1109,23 @@ func cmdInfoFromType(T: NimNode): CmdInfo =
         if defaultValue != nil and eqIdent(name, shortEnumName(defaultValue)):
           opt.defaultSubCmd = i
         opt.subCmds.add CmdInfo(name: name, desc: desc)
+        ordinals.add enumField.ordinal
 
       if defaultValue != nil and opt.defaultSubCmd == -1:
         error "The default value is not a valid enum value", defaultValue
 
+      discriminatorFields.add (cf.fullFieldName(), opt, ordinals)
+
     let branchField = cf.caseBranchField()
     if branchField.caseField != nil:
       let fieldName = cf.fieldCaseFieldFullName()
-      var discriminator: OptInfo
-      for (name, opt) in discriminatorFields:
+      var
+        discriminator: OptInfo
+        ordinals: seq[int64]
+      for (name, opt, optOrdinals) in discriminatorFields:
         if fieldName == name:
           discriminator = opt
+          ordinals = optOrdinals
 
       if discriminator == nil:
         error "Unable to find " & $branchField.caseFieldName
@@ -1122,12 +1136,8 @@ func cmdInfoFromType(T: NimNode): CmdInfo =
               branchField.caseBranch[0]
 
       # support multiple subcommands in the same branch; skip branch body
-      for enumValIdx in 0 .. branchField.caseBranch.len - 2:
-        var branchEnumVal = branchField.caseBranch[enumValIdx]
-        if branchEnumVal.kind == nnkDotExpr:
-          branchEnumVal = branchEnumVal[1]
-        let cmd = findCmd(discriminator.subCmds, $branchEnumVal)
-        doAssert cmd != nil
+      for cmd in discriminator.branchSubCmds(
+          ordinals, branchField.caseBranchValues):
         # we respect subcommand hierarchy when looking for duplicate
         let path = findPath(result, cmd)
         for n in path:
