@@ -100,12 +100,6 @@ func toHelpFlags(s: string): set[HelpFlag] =
   else:
     discard
 
-func getFieldName(caseField: NimNode): NimNode =
-  result = caseField
-  if result.kind == nnkIdentDefs: result = result[0]
-  if result.kind == nnkPragmaExpr: result = result[0]
-  if result.kind == nnkPostfix: result = result[1]
-
 when defined(nimscript):
   func scriptNameParamIdx: int =
     for i in 1 ..< paramCount():
@@ -829,21 +823,11 @@ proc newConfFieldDesc(
 ): ConfFieldDescRef =
   ConfFieldDescRef(field: field, parent: parent)
 
-proc fieldCaseBranch(cf: ConfFieldDesc): NimNode =
-  if cf.field.caseBranch != nil:
-    cf.field.caseBranch
-  elif cf.parent != nil:
-    fieldCaseBranch(cf.parent[])
+func caseBranchField(cf: ConfFieldDesc): FieldDescription =
+  if cf.field.caseField != nil or cf.parent == nil:
+    cf.field
   else:
-    nil
-
-proc fieldCaseField(cf: ConfFieldDesc): NimNode =
-  if cf.field.caseField != nil:
-    cf.field.caseField
-  elif cf.parent != nil:
-    fieldCaseField(cf.parent[])
-  else:
-    nil
+    caseBranchField(cf.parent[])
 
 proc validateFlattenOptions(field: FieldDescription, children: openArray[ConfFieldDesc]) =
   ## Validate flatten tuple options exist
@@ -887,9 +871,9 @@ proc fullFieldName(cf: ConfFieldDesc): string =
 proc fieldCaseFieldFullName(cf: ConfFieldDesc): string =
   if cf.field.caseField != nil:
     if cf.parent != nil:
-      fullFieldName(cf.parent[]) & "Dot" & $cf.field.caseField.getFieldName
+      fullFieldName(cf.parent[]) & "Dot" & $cf.field.caseFieldName
     else:
-      $cf.field.caseField.getFieldName
+      $cf.field.caseFieldName
   else:
     doAssert cf.parent != nil, "caseField not found"
     fieldCaseFieldFullName(cf.parent[])
@@ -1130,9 +1114,8 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
       if defaultValue != nil and opt.defaultSubCmd == -1:
         error "The default value is not a valid enum value", defaultValue
 
-    let caseField = cf.fieldCaseField()
-    let caseBranch = cf.fieldCaseBranch()
-    if caseField != nil and caseBranch != nil:
+    let branchField = cf.caseBranchField()
+    if branchField.caseField != nil:
       let fieldName = cf.fieldCaseFieldFullName()
       var discriminator: OptInfo
       for (name, opt) in discriminatorFields:
@@ -1140,15 +1123,16 @@ proc cmdInfoFromType(T: NimNode): CmdInfo =
           discriminator = opt
 
       if discriminator == nil:
-        error "Unable to find " & $caseField.getFieldName
+        error "Unable to find " & $branchField.caseFieldName
 
-      if caseBranch.kind == nnkElse:
+      if branchField.caseBranch.kind == nnkElse:
         error "Sub-command parameters cannot appear in an else branch. " &
-              "Please specify the sub-command branch precisely", caseBranch[0]
+              "Please specify the sub-command branch precisely",
+              branchField.caseBranch[0]
 
       # support multiple subcommands in the same branch; skip branch body
-      for enumValIdx in 0 .. caseBranch.len - 2:
-        var branchEnumVal = caseBranch[enumValIdx]
+      for enumValIdx in 0 .. branchField.caseBranch.len - 2:
+        var branchEnumVal = branchField.caseBranch[enumValIdx]
         if branchEnumVal.kind == nnkDotExpr:
           branchEnumVal = branchEnumVal[1]
         let cmd = findCmd(discriminator.subCmds, $branchEnumVal)
