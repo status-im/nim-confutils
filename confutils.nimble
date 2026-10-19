@@ -11,7 +11,7 @@ import os, strutils
 mode = ScriptMode.Verbose
 
 packageName   = "confutils"
-version       = "0.1.1"
+version       = "0.1.2"
 author        = "Status Research & Development GmbH"
 description   = "Simplified handling of command line options and config files"
 license       = "Apache License 2.0"
