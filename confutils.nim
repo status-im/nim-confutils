@@ -829,7 +829,8 @@ func caseBranchField(cf: ConfFieldDesc): FieldDescription =
   else:
     caseBranchField(cf.parent[])
 
-proc validateFlattenOptions(field: FieldDescription, children: openArray[ConfFieldDesc]) =
+func validateFlattenOptions(
+    field: FieldDescription, children: openArray[ConfFieldDesc]) =
   ## Validate flatten tuple options exist
   doAssert field.hasPragma"flatten"
   let ftn = field.readPragmaValue"flatten"
@@ -845,7 +846,8 @@ proc validateFlattenOptions(field: FieldDescription, children: openArray[ConfFie
       if x[0] notin found:
         error "invalid flatten option: " & $x[0], ftn
 
-proc confFields(typ: NimNode, parent: ConfFieldDescRef = nil): seq[ConfFieldDesc] =
+func confFields(
+    typ: NimNode, parent: ConfFieldDescRef = nil): seq[ConfFieldDesc] =
   result = newSeq[ConfFieldDesc]()
   for field in recordFields(typ):
     if field.hasPragma"flatten":
@@ -868,7 +870,7 @@ proc fullFieldName(cf: ConfFieldDesc): string =
   else:
     $cf.field.name
 
-proc fieldCaseFieldFullName(cf: ConfFieldDesc): string =
+func fieldCaseFieldFullName(cf: ConfFieldDesc): string =
   if cf.field.caseField != nil:
     if cf.parent != nil:
       fullFieldName(cf.parent[]) & "Dot" & $cf.field.caseFieldName
@@ -878,7 +880,8 @@ proc fieldCaseFieldFullName(cf: ConfFieldDesc): string =
     doAssert cf.parent != nil, "caseField not found"
     fieldCaseFieldFullName(cf.parent[])
 
-proc flattenDefaultValue(field: FieldDescription, parent: ConfFieldDescRef): NimNode =
+func flattenDefaultValue(
+    field: FieldDescription, parent: ConfFieldDescRef): NimNode =
   if parent == nil:
     return nil
   let ancestorVal = flattenDefaultValue(field, parent[].parent)
@@ -902,10 +905,11 @@ proc flattenDefaultValue(field: FieldDescription, parent: ConfFieldDescRef): Nim
 proc readDefaultValueOverride(cf: ConfFieldDesc): NimNode =
   flattenDefaultValue(cf.field, cf.parent)
 
-proc readDefaultValue(cf: ConfFieldDesc): NimNode =
-  result = cf.readDefaultValueOverride()
-  if result == nil:
-    result = cf.field.readPragmaValue"defaultValue"
+func readDefaultValue(cf: ConfFieldDesc): NimNode =
+  let defaultValue = cf.readDefaultValueOverride()
+  if defaultValue != nil:
+    return defaultValue
+  cf.field.readPragmaValue"defaultValue"
 
 proc generateFieldSetters(RecordType: NimNode): NimNode =
   let makeDefaultValue = bindSym"makeDefaultValue"
@@ -1504,8 +1508,7 @@ proc loadImpl[C, SecondarySources](
     let defaultCmd = subCmdDiscriminator.subCmds[subCmdDiscriminator.defaultSubCmd]
     result.activateCmd(subCmdDiscriminator, defaultCmd)
 
-  # https://github.com/status-im/nim-confutils/pull/109#discussion_r1820076739
-  if not isNil(secondarySources):  # Nim v2.0.10: `!= nil` broken in nimscript
+  if secondarySources != nil:
     try:
       secondarySources(result, secondarySourcesRef)
     except ConfigurationError as err:

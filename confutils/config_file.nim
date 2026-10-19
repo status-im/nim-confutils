@@ -70,9 +70,9 @@ proc putRecList(n: NimNode, recList: NimNode) =
 func generateOptionalField(fieldName: NimNode, fieldType: NimNode): NimNode =
   newIdentDefs(fieldName, newCall(bindSym"optionalType", fieldType))
 
-proc addFieldSections(parent: ConfFileSection, typ: NimNode)
+func addFieldSections(parent: ConfFileSection, typ: NimNode)
 
-proc fieldSection(field: FieldDescription): ConfFileSection =
+func fieldSection(field: FieldDescription): ConfFileSection =
   if field.hasPragma"flatten":
     result = ConfFileSection(
       fieldName: $field.name, typ: field.typ, isFlatten: true)
@@ -96,7 +96,7 @@ func branchSection(field: FieldDescription): ConfFileSection =
   ConfFileSection(
     fieldName: repr(shortEnumName(field.caseBranch[0])), isCaseBranch: true)
 
-proc addFieldSections(parent: ConfFileSection, typ: NimNode) =
+func addFieldSections(parent: ConfFileSection, typ: NimNode) =
   var
     discriminatorParents: Table[string, ConfFileSection]
     branchSections: Table[(string, string), ConfFileSection]
@@ -117,7 +117,7 @@ proc addFieldSections(parent: ConfFileSection, typ: NimNode) =
     if field.isDiscriminator:
       discriminatorParents[$field.name] = section
 
-proc normalize(root: ConfFileSection) =
+func normalize(root: ConfFileSection) =
   ## Moves the default case branches children one level upper in the hierarchy.
   ## Also removes case branches without children.
   var children: seq[ConfFileSection]
@@ -136,15 +136,16 @@ proc normalize(root: ConfFileSection) =
       children.add child
   root.children = children
 
-proc generateConfigFileModel(ConfType: NimNode): ConfFileSection =
-  result = ConfFileSection(fieldName: ConfType.repr)
-  result.addFieldSections(ConfType)
-  result.normalize
+func generateConfigFileModel(ConfType: NimNode): ConfFileSection =
+  let model = ConfFileSection(fieldName: ConfType.repr)
+  model.addFieldSections(ConfType)
+  model.normalize
+  model
 
 proc getRenamedName(node: ConfFileSection): string =
   if node.namePragma.len == 0: node.fieldName else: node.namePragma
 
-proc generateTypes(root: ConfFileSection): seq[NimNode] =
+func generateTypes(root: ConfFileSection): seq[NimNode] =
   let index = result.len
   result.add getAst(objectDecl(genSym(nskType, root.fieldName)))[0]
   var recList = newNimNode(nnkRecList)
@@ -246,8 +247,9 @@ proc generateSetters(confType, CF: NimNode, cfst: seq[ConfFileSectionTail]):
 
   result = (procs, assignments, numSetters)
 
-proc generateConfigFileSetters(confType, optType: NimNode,
-                               cfs: seq[ConfFileSectionTail]): NimNode =
+func generateConfigFileSetters(
+    confType, optType: NimNode,
+    cfs: seq[ConfFileSectionTail]): NimNode =
   let
     CF = ident "SecondarySources"
     T = confType
