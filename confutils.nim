@@ -1572,7 +1572,7 @@ func dispatchImpl(cliProcSym, cliArgs, loadArgs: NimNode): NimNode =
 
   for param in cliArgs.routineParams:
     # Replace symbol with ident
-    let paramName = ident $param.name
+    let paramName = ident param.name.identName
     var
       fieldName =
         if param.pragmas != nil:
