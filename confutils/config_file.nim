@@ -46,13 +46,6 @@ type
     node: ConfFileSection
     path: seq[ConfFileSection]
 
-  SectionParam = object
-    isCommandOrArgument: bool
-    isIgnore: bool
-    defaultValue: string
-    namePragma: string
-    isFlatten: bool
-
 {.push gcsafe, raises: [].}
 
 template debugMacroResult(macroName: string) {.dirty.} =
@@ -77,146 +70,52 @@ proc putRecList(n: NimNode, recList: NimNode) =
 func generateOptionalField(fieldName: NimNode, fieldType: NimNode): NimNode =
   newIdentDefs(fieldName, newCall(bindSym"optionalType", fieldType))
 
-proc traverseRecList(recList: NimNode, parent: ConfFileSection): seq[ConfFileSection]
+proc addFieldSections(parent: ConfFileSection, typ: NimNode)
 
-proc traverseIdent(ident: NimNode, typ: NimNode,
-                   isDiscriminator: bool, param = SectionParam()): ConfFileSection =
-  ident.expectKind nnkIdent
-  if param.isFlatten:
-    let confTypeImpl = typ.getImpl
-    let conf = ConfFileSection(
-      fieldName: $ident, typ: typ, isFlatten: param.isFlatten
-    )
-    conf.children = traverseRecList(confTypeImpl[2][2], conf)
-    conf
+proc fieldSection(field: FieldDescription): ConfFileSection =
+  if field.hasPragma"flatten":
+    result = ConfFileSection(
+      fieldName: $field.name, typ: field.typ, isFlatten: true)
+    result.addFieldSections(field.typ)
   else:
-    ConfFileSection(
-      fieldName: $ident,
-      namePragma: param.namePragma, typ: typ,
-      defaultValue: param.defaultValue,
-      isCommandOrArgument: param.isCommandOrArgument,
-      isDiscriminator: isDiscriminator,
-      isIgnore: param.isIgnore
-    )
+    let
+      namePragma = field.readPragmaValue"name"
+      defaultValue = field.readPragmaValue"defaultValue"
+    result = ConfFileSection(
+      fieldName: $field.name,
+      namePragma: if namePragma != nil: $namePragma else: "",
+      typ: field.typ,
+      defaultValue:
+        if defaultValue != nil: repr(shortEnumName(defaultValue)) else: "",
+      isCommandOrArgument:
+        field.hasPragma"command" or field.hasPragma"argument",
+      isDiscriminator: field.isDiscriminator,
+      isIgnore: field.hasPragma"ignore")
 
-proc traversePostfix(postfix: NimNode, typ: NimNode, isDiscriminator: bool,
-                     param = SectionParam()): ConfFileSection =
-  postfix.expectKind nnkPostfix
+func branchSection(field: FieldDescription): ConfFileSection =
+  ConfFileSection(
+    fieldName: repr(shortEnumName(field.caseBranch[0])), isCaseBranch: true)
 
-  case postfix[1].kind
-  of nnkIdent:
-    traverseIdent(postfix[1], typ, isDiscriminator, param)
-  of nnkAccQuoted:
-    traverseIdent(postfix[1][0], typ, isDiscriminator, param)
-  else:
-    raiseAssert "[Postfix] Unsupported child node:\n" & postfix[1].treeRepr
-
-proc traversePragma(pragma: NimNode): SectionParam =
-  pragma.expectKind nnkPragma
-  var child: NimNode
-
-  for childNode in pragma:
-    child = childNode
-
-    if child.kind == nnkCall:
-      # A custom pragma was used more than once (e.g.: {.pragma: posixOnly, hidden.}) and the
-      # AST is now:
-      # ```
-      # Call
-      #   Sym "hidden"
-      # ```
-      child = child[0]
-
-    case child.kind
-    of nnkSym:
-      let sym = $child
-      if sym == "command" or sym == "argument":
-        result.isCommandOrArgument = true
-      elif sym == "ignore":
-        result.isIgnore = true
-      elif sym == "flatten":
-        result.isFlatten = true
-    of nnkExprColonExpr:
-      let pragma = $child[0]
-      if pragma == "defaultValue":
-        result.defaultValue = repr(shortEnumName(child[1]))
-      elif pragma == "name":
-        result.namePragma = $child[1]
-      elif pragma == "flatten":
-        result.isFlatten = true
-    else:
-      raiseAssert "[Pragma] Unsupported child node:\n" & child.treeRepr
-
-proc traversePragmaExpr(pragmaExpr: NimNode, typ: NimNode,
-                        isDiscriminator: bool): ConfFileSection =
-  pragmaExpr.expectKind nnkPragmaExpr
-  let param = traversePragma(pragmaExpr[1])
-
-  case pragmaExpr[0].kind
-  of nnkIdent:
-    traverseIdent(pragmaExpr[0], typ, isDiscriminator, param)
-  of nnkAccQuoted:
-    traverseIdent(pragmaExpr[0][0], typ, isDiscriminator, param)
-  of nnkPostfix:
-    traversePostfix(pragmaExpr[0], typ, isDiscriminator, param)
-  else:
-    raiseAssert "[PragmaExpr] Unsupported expression:\n" & pragmaExpr.treeRepr
-
-proc traverseIdentDefs(identDefs: NimNode, parent: ConfFileSection,
-                       isDiscriminator: bool): seq[ConfFileSection] =
-  identDefs.expectKind nnkIdentDefs
-  doAssert identDefs.len > 2, "This kind of node must have at least 3 children."
-  let typ = identDefs[^2]
-  for child in identDefs:
-    case child.kind
-    of nnkIdent:
-      result.add traverseIdent(child, typ, isDiscriminator)
-    of nnkAccQuoted:
-      result.add traverseIdent(child[0], typ, isDiscriminator)
-    of nnkPostfix:
-      result.add traversePostfix(child, typ, isDiscriminator)
-    of nnkPragmaExpr:
-      result.add traversePragmaExpr(child, typ, isDiscriminator)
-    of nnkBracketExpr, nnkSym, nnkEmpty, nnkInfix, nnkCall, nnkDotExpr:
-      discard
-    else:
-      raiseAssert "[IdentDefs] Unsupported child node:\n" & child.treeRepr
-
-proc traverseOfBranch(ofBranch: NimNode, parent: ConfFileSection): ConfFileSection =
-  ofBranch.expectKind nnkOfBranch
-  result = ConfFileSection(fieldName: repr(shortEnumName(ofBranch[0])), isCaseBranch: true)
-  for child in ofBranch:
-    case child.kind:
-    of nnkIdent, nnkDotExpr, nnkAccQuoted:
-      discard
-    of nnkRecList:
-      result.children.add traverseRecList(child, result)
-    else:
-      raiseAssert "[OfBranch] Unsupported child node:\n" & child.treeRepr
-
-proc traverseRecCase(recCase: NimNode, parent: ConfFileSection): seq[ConfFileSection] =
-  recCase.expectKind nnkRecCase
-  for child in recCase:
-    case child.kind
-    of nnkIdentDefs:
-      result.add traverseIdentDefs(child, parent, true)
-    of nnkOfBranch:
-      result.add traverseOfBranch(child, parent)
-    else:
-      raiseAssert "[RecCase] Unsupported child node:\n" & child.treeRepr
-
-proc traverseRecList(recList: NimNode, parent: ConfFileSection): seq[ConfFileSection] =
-  recList.expectKind nnkRecList
-  for child in recList:
-    case child.kind
-    of nnkIdentDefs:
-      result.add traverseIdentDefs(child, parent, false)
-    of nnkRecCase:
-      result.add traverseRecCase(child, parent)
-    of nnkNilLit:
-      discard
-    else:
-      raiseAssert "[RecList] Unsupported child node:\n" & child.treeRepr
+proc addFieldSections(parent: ConfFileSection, typ: NimNode) =
+  var
+    discriminatorParents: Table[string, ConfFileSection]
+    branchSections: Table[(string, string), ConfFileSection]
+  for field in recordFields(typ):
+    var section = parent
+    if field.caseField != nil:
+      if field.caseBranch.kind != nnkOfBranch:
+        error "Sub-command parameters cannot appear in an else branch. " &
+              "Please specify the sub-command branch precisely",
+              field.caseBranch[0]
+      let key = ($field.caseFieldName, repr(field.caseBranchValues))
+      section = branchSections.getOrDefault(key)
+      if section == nil:
+        section = field.branchSection()
+        discriminatorParents.getOrDefault(key[0]).children.add section
+        branchSections[key] = section
+    section.children.add fieldSection(field)
+    if field.isDiscriminator:
+      discriminatorParents[$field.name] = section
 
 proc normalize(root: ConfFileSection) =
   ## Moves the default case branches children one level upper in the hierarchy.
@@ -238,9 +137,8 @@ proc normalize(root: ConfFileSection) =
   root.children = children
 
 proc generateConfigFileModel(ConfType: NimNode): ConfFileSection =
-  let confTypeImpl = ConfType.getType[1].getImpl
-  result = ConfFileSection(fieldName: $confTypeImpl[0])
-  result.children = traverseRecList(confTypeImpl[2][2], result)
+  result = ConfFileSection(fieldName: ConfType.repr)
+  result.addFieldSections(ConfType)
   result.normalize
 
 proc getRenamedName(node: ConfFileSection): string =
