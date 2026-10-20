@@ -12,7 +12,7 @@ import
   ../confutils/[std/net]
 
 import
-  toml_serialization, json_serialization,
+  toml_serialization, toml_serialization/pkg/results, json_serialization,
   ../confutils/winreg/winreg_serialization
 
 type

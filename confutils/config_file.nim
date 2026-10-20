@@ -10,6 +10,7 @@
 import
   std/[tables, macrocache, options],
   stew/shims/macros,
+  results,
   ./utils
 
 {.warning[UnusedImport]:off.}
@@ -55,7 +56,9 @@ template debugMacroResult(macroName: string) {.dirty.} =
     echo result.repr
 
 template optionalType(typ: untyped): type =
-  when typ is Option: typ else: Option[typ]
+  when typ is Opt: typ
+  elif typ is Option: Opt[typeof((var v: typ; v.get()))]
+  else: Opt[typ]
 
 template objectDecl(a): untyped =
   type a = object
@@ -201,7 +204,9 @@ proc fullFieldName(cft: ConfFileSectionTail): string =
   result.add cft.node.fieldName
 
 template cfSetter(a, b: untyped): untyped =
-  when a is Option:
+  when a is Opt:
+    a = Opt.some(b)
+  elif a is Option:
     a = some(b)
   else:
     a = b

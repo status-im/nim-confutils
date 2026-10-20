@@ -12,9 +12,11 @@
 # Optional json support - add `requires "json_serialization"` to your package
 # dependencies before using
 
-import serialization, json_serialization, ../defs as confutilsDefs
+import
+  serialization, json_serialization,
+  json_serialization/pkg/results as jsonResults, ../defs as confutilsDefs
 
-export json_serialization, confutilsDefs
+export json_serialization, jsonResults, confutilsDefs
 
 type ConfTypes = InputFile | InputDir | OutPath | OutDir | OutFile
 serializesAsBase(ConfTypes, Json)

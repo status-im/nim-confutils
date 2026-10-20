@@ -1,6 +1,7 @@
 import
   std/[options, os],
   unittest2,
+  results,
   ../confutils/winreg/winreg_serialization,
   ../confutils/winreg/utils
 
@@ -87,6 +88,8 @@ type
     wheel: int
     suspension: array[3, Suspension]
     door: array[4, int]
+    spoiler: Opt[int]
+    mirror: Opt[string]
     antennae: Option[int]
     bumper: Option[string]
 
@@ -108,11 +111,14 @@ suite "winreg encoder test suite":
         Suspension(dist: 2, length: 6),
         Suspension(dist: 3, length: 7)
       ],
+      mirror: Opt.some("Chrome"),
       bumper: some("Chromium")
     )
 
     Winreg.encode(HKCU, commonPath, v)
     let x = Winreg.decode(HKCU, commonPath, Vehicle)
     check x == v
+    check x.spoiler.isNone
+    check x.mirror.get() == "Chrome"
     check x.antennae.isNone
     check x.bumper.get() == "Chromium"

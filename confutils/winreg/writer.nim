@@ -8,7 +8,8 @@
 # those terms.
 
 import
-  typetraits, options, tables,
+  std/[typetraits, options, tables],
+  results,
   serialization,
   ./utils, ./types
 
@@ -32,6 +33,9 @@ proc writeValue*(w: var WinregWriter, value: auto) {.raises: [IOError].} =
   when value is (SomePrimitives or range or string):
     let path = constructPath(w.path, w.key)
     discard setValue(w.hKey, path, w.key[^1], value)
+  elif value is Opt:
+    if value.isSome:
+      w.writeValue value.get
   elif value is Option:
     if value.isSome:
       w.writeValue value.get

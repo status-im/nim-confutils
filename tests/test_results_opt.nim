@@ -7,7 +7,7 @@
 # This file may not be copied, modified, or distributed except according to
 # those terms.
 
-import unittest2, ../confutils
+import unittest2, toml_serialization, toml_serialization/pkg/results, ../confutils
 
 type CustomString = distinct string
 
@@ -19,6 +19,9 @@ proc parseCmdArg(T: type CustomString, s: string): T {.raises: [ValueError].} =
 
 func completeCmdArg(T: type CustomString, val: string): seq[string] =
   @[]
+
+proc readValue(r: var TomlReader, value: var CustomString) =
+  value = CustomString(r.parseAsString() & "_toml")
 
 type
   Lvl1Cmd = enum
@@ -56,10 +59,10 @@ suite "test results Opt":
     check:
       conf.cmd == Lvl1Cmd.lvl1Cmd1
       conf.cmd2 == Lvl2Cmd.lvl2Cmd1
-      not conf.opt1.isOk
-      not conf.opt2.isOk
-      not conf.lvl1Opt1.isOk
-      not conf.lvl2Opt1.isOk
+      conf.opt1.isNone
+      conf.opt2.isNone
+      conf.lvl1Opt1.isNone
+      conf.lvl2Opt1.isNone
 
   test "all opts":
     let conf = TestConf.load(cmdLine = @[
@@ -77,3 +80,29 @@ suite "test results Opt":
       conf.opt2.get == "bar_cs_overridden".CustomString
       conf.lvl1Opt1.get == 123
       conf.lvl2Opt1.get == 456
+
+  test "config file":
+    let conf = TestConf.load(
+      cmdLine = @[
+        "--opt1=cli",
+        "lvl1Cmd1",
+        "lvl2Cmd1"
+      ],
+      secondarySources = proc(
+          config: TestConf, sources: ref SecondarySources
+      ) {.raises: [ConfigurationError].} =
+        sources.addConfigFileContent(Toml, """
+opt1 = "foo"
+opt2 = "bar"
+
+[lvl1Cmd1]
+lvl1-opt1 = 123
+""")
+    )
+    check:
+      conf.cmd == Lvl1Cmd.lvl1Cmd1
+      conf.cmd2 == Lvl2Cmd.lvl2Cmd1
+      conf.opt1.get == "cli"
+      conf.opt2.get == "bar_toml".CustomString
+      conf.lvl1Opt1.get == 123
+      conf.lvl2Opt1.isNone

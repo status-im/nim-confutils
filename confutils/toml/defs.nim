@@ -12,9 +12,11 @@
 # Optional toml support - add `requires "toml_serialization"` to your package
 # dependencies before using
 
-import toml_serialization, ../defs as confutilsDefs
+import
+  toml_serialization,
+  toml_serialization/pkg/results as tomlResults, ../defs as confutilsDefs
 
-export toml_serialization, confutilsDefs
+export toml_serialization, tomlResults, confutilsDefs
 
 type ConfTypes = InputFile | InputDir | OutPath | OutDir | OutFile
 serializesAsBase(ConfTypes, Toml)

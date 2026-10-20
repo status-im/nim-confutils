@@ -7,7 +7,7 @@
 # This file may not be copied, modified, or distributed except according to
 # those terms.
 
-import unittest2, toml_serialization, ../confutils
+import unittest2, toml_serialization, toml_serialization/pkg/results, ../confutils
 
 template loadContent(T, cont): untyped =
   proc (
