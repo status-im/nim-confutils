@@ -7,7 +7,9 @@
 # This file may not be copied, modified, or distributed except according to
 # those terms.
 
-import std/os, unittest2, toml_serialization, ../confutils
+import
+  std/os, unittest2, toml_serialization, toml_serialization/pkg/results,
+  ../confutils
 
 const configFilePath = "tests" / "config_files"
 

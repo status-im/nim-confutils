@@ -650,12 +650,12 @@ proc parseCmdArg*(
 func parseCmdArg*(T: type[OutDir|OutFile|OutPath], p: string): T =
   T(p)
 
+proc parseCmdArg*[T](_: type Opt[T], s: string): Opt[T] {.raises: [ValueError].} =
+  Opt.some(parseCmdArg(T, s))
+
 proc parseCmdArg*[T](
     _: type Option[T], s: string): Option[T] {.raises: [ValueError].} =
   some(parseCmdArg(T, s))
-
-proc parseCmdArg*[T](_: type Opt[T], s: string): Opt[T] {.raises: [ValueError].} =
-  Opt.some(parseCmdArg(T, s))
 
 template parseCmdArg*(T: type string, s: string): string =
   s
@@ -754,11 +754,11 @@ proc completeCmdArg*(T: type[InputFile|TypedInputFile|InputDir|OutFile|OutDir|Ou
 func completeCmdArg*[T](_: type seq[T], val: string): seq[string] =
   @[]
 
-proc completeCmdArg*[T](_: type Option[T], val: string): seq[string] =
+proc completeCmdArg*[T](_: type Opt[T], val: string): seq[string] =
   mixin completeCmdArg
   return completeCmdArg(type(T), val)
 
-proc completeCmdArg*[T](_: type Opt[T], val: string): seq[string] =
+proc completeCmdArg*[T](_: type Option[T], val: string): seq[string] =
   mixin completeCmdArg
   return completeCmdArg(type(T), val)
 
@@ -768,14 +768,14 @@ proc completeCmdArgAux(T: type, val: string): seq[string] =
 
 template setField[T](loc: var T, val: Opt[string], defaultVal: untyped): untyped =
   type FieldType = type(loc)
-  loc = if val.isOk:
+  loc = if val.isSome:
     parseCmdArgAux(FieldType, val.get)
   else:
     FieldType(defaultVal)
 
 template setField[T](loc: var seq[T], val: Opt[string], defaultVal: untyped): untyped =
   type FieldType = type(loc)
-  if val.isOk:
+  if val.isSome:
     loc.add parseCmdArgAux(type(loc[0]), val.get)
   else:
     loc = FieldType(defaultVal)
@@ -784,7 +784,7 @@ func makeDefaultValue*(T: type): T =
   default(T)
 
 func requiresInput*(T: type): bool =
-  not ((T is seq) or (T is Option) or (T is Opt) or (T is bool))
+  not ((T is seq) or (T is Opt) or (T is Option) or (T is bool))
 
 func acceptsMultipleValues*(T: type): bool =
   T is seq

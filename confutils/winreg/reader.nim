@@ -8,7 +8,8 @@
 # those terms.
 
 import
-  tables, typetraits, options,
+  std/[tables, typetraits, options],
+  results,
   serialization/[object_serialization, errors],
   ./utils, ./types
 
@@ -49,6 +50,12 @@ proc readValue*[T](r: var WinregReader, value: var T)
   when T is (SomePrimitives or range or string):
     let path = constructPath(r.path, r.key)
     discard getValue(r.hKey, path, r.key[^1], value)
+
+  elif T is Opt:
+    type UT = typeof(value.get())
+    let path = constructPath(r.path, r.key)
+    if pathExists(r.hKey, path, r.key[^1]):
+      value = Opt.some(r.readValue(UT))
 
   elif T is Option:
     template getUnderlyingType[T](_: Option[T]): untyped = T
