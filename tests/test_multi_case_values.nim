@@ -7,7 +7,13 @@
 # This file may not be copied, modified, or distributed except according to
 # those terms.
 
-import unittest2, ../confutils
+import unittest2, toml_serialization, ../confutils
+
+template loadContent(T, cont): untyped =
+  proc (
+      config: T, sources: ref SecondarySources
+  ) {.raises: [ConfigurationError].} =
+    sources.addConfigFileContent(Toml, cont)
 
 type
   Cmd = enum
@@ -60,6 +66,40 @@ type
         defaultValue: "opt2 default"
         desc: "opt2 desc"
         name: "opt2" }: string
+
+  TestDefaultConf = object
+    case cmd {.
+      command
+      defaultValue: Cmd.cmd1 }: Cmd
+    of Cmd.cmd1, Cmd.cmd2:
+      opt1 {.
+        defaultValue: "opt1 default"
+        desc: "opt1 desc"
+        name: "opt1" }: string
+
+const
+  multiCaseToml = """
+[cmd1]
+opt1 = "toml cmd1"
+
+[cmd2]
+opt1 = "toml cmd2"
+"""
+
+  rangeCaseToml = """
+[rangeCmd2]
+opt2 = "toml rangeCmd2"
+
+[rangeCmd3]
+opt2 = "toml rangeCmd3"
+"""
+
+  defaultCaseToml = """
+opt1 = "toml cmd1"
+
+[cmd2]
+opt1 = "toml cmd2"
+"""
 
 suite "test multi case subcommand values":
   test "options work for the first subcommand":
@@ -127,3 +167,69 @@ suite "test set case subcommand values":
     check:
       conf.cmd == SetCmd.setCmd3
       conf.opt2 == "foobar"
+
+suite "test multi case subcommand values toml":
+  test "options work for the first subcommand":
+    let conf = TestConf.load(
+      secondarySources = loadContent(TestConf, multiCaseToml),
+      cmdLine = @[
+        "cmd1"
+      ]
+    )
+    check:
+      conf.cmd == Cmd.cmd1
+      conf.opt1 == "toml cmd1"
+
+  test "options work for the second subcommand":
+    let conf = TestConf.load(
+      secondarySources = loadContent(TestConf, multiCaseToml),
+      cmdLine = @[
+        "cmd2"
+      ]
+    )
+    check:
+      conf.cmd == Cmd.cmd2
+      conf.opt1 == "toml cmd2"
+
+  test "options work for the default subcommand":
+    let conf = TestDefaultConf.load(
+      secondarySources = loadContent(TestDefaultConf, defaultCaseToml),
+      cmdLine = newSeq[string]()
+    )
+    check:
+      conf.cmd == Cmd.cmd1
+      conf.opt1 == "toml cmd1"
+
+  test "options work for the non-default subcommand":
+    let conf = TestDefaultConf.load(
+      secondarySources = loadContent(TestDefaultConf, defaultCaseToml),
+      cmdLine = @[
+        "cmd2"
+      ]
+    )
+    check:
+      conf.cmd == Cmd.cmd2
+      conf.opt1 == "toml cmd2"
+
+suite "test range case subcommand values toml":
+  test "options work for first subcommand in range":
+    let conf = TestRangeConf.load(
+      secondarySources = loadContent(TestRangeConf, rangeCaseToml),
+      cmdLine = @[
+        "rangeCmd2"
+      ]
+    )
+    check:
+      conf.cmd == RangeCmd.rangeCmd2
+      conf.opt2 == "toml rangeCmd2"
+
+  test "options work for last subcommand in range":
+    let conf = TestRangeConf.load(
+      secondarySources = loadContent(TestRangeConf, rangeCaseToml),
+      cmdLine = @[
+        "rangeCmd3"
+      ]
+    )
+    check:
+      conf.cmd == RangeCmd.rangeCmd3
+      conf.opt2 == "toml rangeCmd3"
