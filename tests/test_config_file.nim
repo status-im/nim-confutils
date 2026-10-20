@@ -226,4 +226,17 @@ proc testConfigFile() =
       check conf.logLevel == "TOML SW DEBUG"
       check conf.rpcPort.int == 1235
 
+    test "subcommand config file content":
+      let importCont = readFile(confPathCurrUser / "testVendor" / "import.toml")
+      let conf = TestConf.load(
+        cmdLine = @["import"],
+        envVarsPrefix="prefix",
+        secondarySources = proc (
+            config: TestConf, sources: ref SecondarySources
+        ) {.raises: [ConfigurationError].} =
+          sources.addConfigFileContent(Toml, importCont)
+      )
+      check conf.cmd == VCStartUpCmd.`import`
+      check conf.`type` == "TOML CU IMPORT TYPE"
+
 testConfigFile()

@@ -35,7 +35,8 @@ type
     fieldName: string
     namePragma: string
     typ: NimNode
-    defaultValue: string
+    discriminatorName: string
+    branchValues: seq[tuple[sectionName: string, enumSym: NimNode]]
     isCommandOrArgument: bool
     isCaseBranch: bool
     isDiscriminator: bool
@@ -74,31 +75,41 @@ func addFieldSections(parent: ConfFileSection, typ: NimNode)
 
 func fieldSection(field: FieldDescription): ConfFileSection =
   if field.hasPragma"flatten":
-    result = ConfFileSection(
+    let section = ConfFileSection(
       fieldName: $field.name, typ: field.typ, isFlatten: true)
-    result.addFieldSections(field.typ)
+    section.addFieldSections(field.typ)
+    section
   else:
-    let
-      namePragma = field.readPragmaValue"name"
-      defaultValue = field.readPragmaValue"defaultValue"
-    result = ConfFileSection(
+    let namePragma = field.readPragmaValue"name"
+    ConfFileSection(
       fieldName: $field.name,
       namePragma: if namePragma != nil: $namePragma else: "",
       typ: field.typ,
-      defaultValue:
-        if defaultValue != nil: repr(shortEnumName(defaultValue)) else: "",
       isCommandOrArgument:
         field.hasPragma"command" or field.hasPragma"argument",
       isDiscriminator: field.isDiscriminator,
       isIgnore: field.hasPragma"ignore")
 
-func branchSection(field: FieldDescription): ConfFileSection =
+func branchSection(field, discriminator: FieldDescription): ConfFileSection =
+  let defaultValue = discriminator.readPragmaValue"defaultValue"
+  var branchValues: seq[tuple[sectionName: string, enumSym: NimNode]]
+  for enumField in discriminator.typ.enumFields:
+    if field.caseBranchValues.containsOrdinal(enumField.ordinal):
+      if defaultValue != nil and
+          eqIdent(enumField.name, shortEnumName(defaultValue)):
+        branchValues.add (sectionName: "", enumSym: enumField.name)
+      else:
+        branchValues.add (sectionName: $enumField.name, enumSym: enumField.name)
   ConfFileSection(
-    fieldName: repr(shortEnumName(field.caseBranch[0])), isCaseBranch: true)
+    fieldName: if branchValues.len > 0: $branchValues[0].enumSym else: "",
+    discriminatorName: $discriminator.name,
+    branchValues: branchValues,
+    isCaseBranch: true)
 
 func addFieldSections(parent: ConfFileSection, typ: NimNode) =
   var
     discriminatorParents: Table[string, ConfFileSection]
+    discriminators: Table[string, FieldDescription]
     branchSections: Table[(string, string), ConfFileSection]
   for field in recordFields(typ):
     var section = parent
@@ -110,29 +121,20 @@ func addFieldSections(parent: ConfFileSection, typ: NimNode) =
       let key = ($field.caseFieldName, repr(field.caseBranchValues))
       section = branchSections.getOrDefault(key)
       if section == nil:
-        section = field.branchSection()
+        section = field.branchSection(discriminators.getOrDefault(key[0]))
         discriminatorParents.getOrDefault(key[0]).children.add section
         branchSections[key] = section
     section.children.add fieldSection(field)
     if field.isDiscriminator:
       discriminatorParents[$field.name] = section
+      discriminators[$field.name] = field
 
 func normalize(root: ConfFileSection) =
-  ## Moves the default case branches children one level upper in the hierarchy.
-  ## Also removes case branches without children.
+  ## Removes case branches without children.
   var children: seq[ConfFileSection]
-  var defaultValue = ""
   for child in root.children:
     normalize(child)
-    if child.isDiscriminator:
-      defaultValue = child.defaultValue
-    if child.isCaseBranch and child.fieldName == defaultValue:
-      for childChild in child.children:
-        children.add childChild
-      child.children = @[]
-    elif child.isCaseBranch and child.children.len == 0:
-      discard
-    else:
+    if not child.isCaseBranch or child.children.len > 0:
       children.add child
   root.children = children
 
@@ -155,7 +157,11 @@ func generateTypes(root: ConfFileSection): seq[NimNode] =
     if child.isCaseBranch:
       if child.children.len > 0:
         var types = generateTypes(child)
-        recList.add generateOptionalField(child.fieldName.ident, types[0][0])
+        for (sectionName, _) in child.branchValues:
+          if sectionName == "":
+            recList.add types[0][2][2].copyNimTree
+          else:
+            recList.add generateOptionalField(sectionName.ident, types[0][0])
         result.add types
     elif child.isFlatten:
       var types = generateTypes(child)
@@ -168,10 +174,9 @@ func generateTypes(root: ConfFileSection): seq[NimNode] =
   result[index].putRecList(recList)
 
 proc generateConfTails(
-  node: ConfFileSection,
-  result: var seq[ConfFileSectionTail],
-  pathsCache: var seq[ConfFileSection]
-) =
+    node: ConfFileSection,
+    result: var seq[ConfFileSectionTail],
+    pathsCache: var seq[ConfFileSection]) =
   pathsCache.add node
   if node.children.len == 0:
     result.add ConfFileSectionTail(
@@ -201,8 +206,20 @@ template cfSetter(a, b: untyped): untyped =
   else:
     a = b
 
-proc generateSetters(confType, CF: NimNode, cfst: seq[ConfFileSectionTail]):
-    (NimNode, NimNode, int) =
+func addCondition(condition: var NimNode, check: NimNode) =
+  if condition != nil:
+    condition = newNimNode(nnkInfix).add("and".ident).add(condition).add(check)
+  else:
+    condition = check
+
+func addField(fieldPath, condition: var NimNode, name: string) =
+  fieldPath = newDotExpr(fieldPath, name.ident)
+  condition.addCondition newDotExpr(fieldPath, "isSome".ident)
+  fieldPath = newDotExpr(fieldPath, "get".ident)
+
+func generateSetters(
+    confType, CF: NimNode,
+    cfst: seq[ConfFileSectionTail]): (NimNode, NimNode, int) =
   var
     procs = newStmtList()
     assignments = newStmtList()
@@ -216,30 +233,40 @@ proc generateSetters(confType, CF: NimNode, cfst: seq[ConfFileSectionTail]):
       inc numSetters
       continue
 
-    var fieldPath = c
-    var condition: NimNode
+    var fieldPaths = @[(fieldPath: c, condition: NimNode(nil))]
     let configVar = ident "config"
     var configField = configVar
     for node in cf.path:
       if node.isFlatten:
         configField = dotExpr(configField, ident node.fieldName)
+      elif not node.isCaseBranch:
+        for (fieldPath, condition) in fieldPaths.mitems:
+          addField(fieldPath, condition, node.getRenamedName)
       else:
-        fieldPath = newDotExpr(fieldPath, node.getRenamedName.ident)
-        let fieldChecker = newDotExpr(fieldPath, "isSome".ident)
-        if condition == nil:
-          condition = fieldChecker
-        else:
-          condition = newNimNode(nnkInfix).add("and".ident).add(condition).add(fieldChecker)
-        fieldPath = newDotExpr(fieldPath, "get".ident)
+        let discriminator = dotExpr(configField, ident node.discriminatorName)
+        var newFieldPaths: typeof(fieldPaths)
+        for entry in fieldPaths:
+          for (sectionName, enumSym) in node.branchValues:
+            var (fieldPath, condition) = entry
+            condition.addCondition infix(discriminator, "==", enumSym)
+            if sectionName != "":
+              addField(fieldPath, condition, sectionName)
+            newFieldPaths.add (fieldPath, condition)
+        fieldPaths = newFieldPaths
     configField = dotExpr(configField, ident cf.node.fieldName)
+
+    var setters = newStmtList()
+    for (fieldPath, condition) in fieldPaths:
+      setters.add quote do:
+        if `condition`:
+          cfSetter(`configField`, `fieldPath`)
+          return true
 
     let setterName = genSym(nskProc, cf.fullFieldName() & "CFSetter")
     procs.add quote do:
       proc `setterName`(`configVar`: var `confType`, cf: ref `CF`): bool {.nimcall, gcsafe.} =
         for `c` in cf.data:
-          if `condition`:
-            cfSetter(`configField`, `fieldPath`)
-            return true
+          `setters`
 
     assignments.add quote do:
       result.setters[`numSetters`] = `setterName`
