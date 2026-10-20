@@ -94,6 +94,14 @@ opt2 = "toml rangeCmd2"
 opt2 = "toml rangeCmd3"
 """
 
+  setCaseToml = """
+[setCmd2]
+opt2 = "toml setCmd2"
+
+[setCmd3]
+opt2 = "toml setCmd3"
+"""
+
   defaultCaseToml = """
 opt1 = "toml cmd1"
 
@@ -233,3 +241,26 @@ suite "test range case subcommand values toml":
     check:
       conf.cmd == RangeCmd.rangeCmd3
       conf.opt2 == "toml rangeCmd3"
+
+suite "test set case subcommand values toml":
+  test "options work for first subcommand in set":
+    let conf = TestSetConf.load(
+      secondarySources = loadContent(TestSetConf, setCaseToml),
+      cmdLine = @[
+        "setCmd2"
+      ]
+    )
+    check:
+      conf.cmd == SetCmd.setCmd2
+      conf.opt2 == "toml setCmd2"
+
+  test "options work for last subcommand in set":
+    let conf = TestSetConf.load(
+      secondarySources = loadContent(TestSetConf, setCaseToml),
+      cmdLine = @[
+        "setCmd3"
+      ]
+    )
+    check:
+      conf.cmd == SetCmd.setCmd3
+      conf.opt2 == "toml setCmd3"
