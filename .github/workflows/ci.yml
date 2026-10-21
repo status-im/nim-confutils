@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - nimble_test
   pull_request:
   workflow_dispatch:
 
@@ -10,6 +11,7 @@ jobs:
   build:
     uses: status-im/nimbus-common-workflow/.github/workflows/common.yml@main
     with:
+      nimble-version: 08be587ad79f1692d5adcb03ce0a13dfda5d8818
       test-command: |
         nimble --useSystemNim install -y --depsOnly toml_serialization json_serialization unittest2
         nimble list --installed --version
